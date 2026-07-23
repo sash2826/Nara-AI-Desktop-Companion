@@ -1,0 +1,21 @@
+# Auto detect text files
+* text=auto
+
+# Husky hooks must always use LF
+.husky/* text eol=lf
+*.sh text eol=lf
+
+# Windows scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Source files
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.toml text
+*.yaml text
+*.yml text
