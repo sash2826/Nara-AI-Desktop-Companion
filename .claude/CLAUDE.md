@@ -312,114 +312,62 @@ Lower layers must never depend on higher layers.
 
 # 14. Repository Structure
 
-The repository should follow this structure.
-
-```
-Enterprise-AI-Companion/
+The project follows a lightweight monorepo structure.
 
 .claude/
-docs/
+CLAUDE.md
+commands/
 
-frontend/
-backend/
-shared/
+apps/
+desktop/ # Tauri + React application
+backend/ # Python backend
+
+packages/
+shared/ # Shared utilities
+types/ # Shared DTOs
+config/ # Shared configuration
+
 database/
-scripts/
+migrations/
+schemas/
+seeds/
+
+docs/
+architecture/
+implementation/
+decisions/
+research/
+
 tests/
+unit/
+integration/
+e2e/
+
+scripts/
 assets/
-```
 
-Each directory has a specific responsibility.
+
+Applications may depend on packages.
+
+Packages must never depend on applications.
+
+Each directory has a single responsibility.
+
+The repository structure must remain consistent unless an Architecture Decision Record (ADR) explicitly changes it.
+---
+# Repository Discovery
+
+Before implementing any feature:
+
+- Search the repository for similar implementations.
+- Reuse existing abstractions whenever appropriate.
+- Preserve naming conventions.
+- Extend existing modules before creating new ones.
+- Avoid duplicate implementations.
+
+Understanding the existing repository is mandatory before writing new code.
 
 ---
-
-## frontend/
-
-Contains:
-
-- React application
-- UI components
-- Pages
-- Layouts
-- Hooks
-- Frontend state management
-
-The frontend must never contain business logic.
-
----
-
-## backend/
-
-Contains:
-
-- Business logic
-- Services
-- AI orchestration
-- File processing
-- Metadata extraction
-- Search
-- OCR
-- Indexing
-
----
-
-## shared/
-
-Contains code shared between frontend and backend.
-
-Examples:
-
-- Shared models
-- Constants
-- Type definitions
-- DTOs
-- Validation schemas
-
----
-
-## database/
-
-Contains:
-
-- Database schemas
-- Migrations
-- Seed scripts
-- Repository implementations
-
----
-
-## tests/
-
-Contains:
-
-- Unit tests
-- Integration tests
-- End-to-end tests
-
-Production code should never exist inside this directory.
-
----
-
-## scripts/
-
-Contains developer automation.
-
-Examples:
-
-- Setup scripts
-- Build scripts
-- Development tools
-
----
-
-## docs/
-
-Contains all engineering documentation.
-
-Documentation should evolve alongside the codebase.
-
----
-
 # 15. Capability-Based Organization
 
 The system is organized around capabilities rather than technologies.
@@ -481,6 +429,10 @@ Infrastructure:
 
 - May communicate with external systems.
 - Must remain isolated from business rules.
+
+The communication mechanism between the desktop application and the backend is defined by accepted Architecture Decision Records (ADRs).
+
+Claude must not invent or modify communication mechanisms without an accepted ADR.
 
 ---
 
@@ -768,6 +720,18 @@ Utils
 
 Constants should use uppercase snake case.
 
+These engineering standards apply to every language used within this repository.
+
+Language-specific conventions may take precedence when they are widely accepted.
+
+Examples:
+
+- Python follows PEP 8.
+- TypeScript follows modern TypeScript and React conventions.
+- Rust follows the Rust API Guidelines.
+
+When repository standards and language conventions conflict, prefer the language convention unless it weakens maintainability.
+
 Example
 
 ```python
@@ -841,6 +805,19 @@ Complex functions should explain:
 Avoid comments that simply repeat the code.
 
 Good comments explain *why*, not *what*.
+
+Documentation comments are encouraged.
+
+Examples include:
+
+- architectural rationale
+- temporary workarounds
+- TODO items with context
+- performance notes
+
+Commented-out source code is prohibited.
+
+Never leave inactive implementations in the repository.
 
 ---
 
@@ -1243,7 +1220,9 @@ Optimize only when improvements are measurable and do not reduce maintainability
 
 # 50. Response Format
 
-When completing an implementation task, structure the response as follows.
+For substantial implementations involving multiple files, architectural changes, or new capabilities, structure the response as follows.
+
+For minor fixes, documentation updates, configuration changes, or test adjustments, provide only the relevant sections while remaining concise.
 
 ## Summary
 
@@ -1478,10 +1457,16 @@ Errors should be explicit, logged, and recoverable where appropriate.
 When conflicting information exists, follow this priority order.
 
 1. User instructions in the current conversation.
-2. This `CLAUDE.md` document.
-3. Project documentation (`docs/`).
-4. Existing repository architecture.
-5. Personal implementation preferences.
+
+2. This CLAUDE.md document.
+
+3. Accepted Architecture Decision Records (ADRs).
+
+4. Project architecture documentation.
+
+5. Existing repository architecture.
+
+6. Personal implementation preferences.
 
 Never ignore a higher-priority instruction.
 
@@ -1591,16 +1576,19 @@ If any of the above conditions are not met, the task is not complete.
 
 # 61. Continuous Improvement
 
-While implementing features, continuously look for opportunities to improve:
+Improve code only within the scope of the current implementation.
 
-- Readability
-- Maintainability
-- Modularity
-- Documentation
-- Test coverage
-- Developer experience
+Appropriate improvements include:
 
-However, improvements should remain within the scope of the current task unless explicitly instructed otherwise.
+- improving readability
+- reducing duplication
+- strengthening tests
+- improving documentation
+- simplifying touched modules
+
+Avoid refactoring unrelated modules unless explicitly requested.
+
+Repository-wide improvements should be handled as dedicated refactoring tasks.
 
 ---
 
