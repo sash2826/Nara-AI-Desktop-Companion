@@ -10,22 +10,29 @@ import { AutomationPage } from "@/pages/AutomationPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import type { NavItemId } from "@/types/navigation";
 import type { ComponentType } from "react";
+import { cn } from "@/lib/utils";
 
-const PAGE_MAP: Record<NavItemId, ComponentType> = {
-  home: HomePage,
-  chat: ChatPage,
-  workspace: WorkspacePage,
-  search: SearchPage,
-  "knowledge-graph": KnowledgeGraphPage,
-  automation: AutomationPage,
-  settings: SettingsPage,
+interface PageModule {
+  component: ComponentType;
+  /** When true the page manages its own padding — host renders no p-6 */
+  fullBleed?: boolean;
+}
+
+const PAGE_MAP: Record<NavItemId, PageModule> = {
+  home: { component: HomePage },
+  chat: { component: ChatPage, fullBleed: true },
+  workspace: { component: WorkspacePage },
+  search: { component: SearchPage },
+  "knowledge-graph": { component: KnowledgeGraphPage },
+  automation: { component: AutomationPage },
+  settings: { component: SettingsPage },
 };
 
 const PAGE_TRANSITION: Transition = { duration: 0.15, ease: "easeOut" };
 
 export function MainContent() {
   const { activeItem } = useNavigationStore();
-  const ActivePage = PAGE_MAP[activeItem];
+  const { component: ActivePage, fullBleed } = PAGE_MAP[activeItem];
 
   return (
     <div className="relative flex-1 overflow-hidden bg-background">
@@ -36,7 +43,7 @@ export function MainContent() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={PAGE_TRANSITION}
-          className="absolute inset-0 scroll-y p-6"
+          className={cn("absolute inset-0", fullBleed ? "overflow-hidden" : "scroll-y p-6")}
         >
           <ActivePage />
         </motion.div>
