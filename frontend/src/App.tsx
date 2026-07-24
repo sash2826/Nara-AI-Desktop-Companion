@@ -1,13 +1,13 @@
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { LayoutProvider } from "@/providers/LayoutProvider";
+import { AppShell } from "@/layouts/AppShell";
 
 function App() {
   return (
     <ThemeProvider>
-      <div className="flex-col-fill bg-background text-foreground">
-        <main className="flex-col-fill items-center justify-center">
-          <p className="text-muted-foreground text-sm">Enterprise AI Companion</p>
-        </main>
-      </div>
+      <LayoutProvider>
+        <AppShell />
+      </LayoutProvider>
     </ThemeProvider>
   );
 }
