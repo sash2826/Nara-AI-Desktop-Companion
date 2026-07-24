@@ -4,9 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri + React + Typescript</title>
+    <meta name="description" content="Enterprise AI Companion" />
+    <title>Enterprise AI Companion</title>
+    <!--
+      Theme initialization script — runs synchronously before paint to prevent
+      flash of unstyled content (FOUC) when a non-default theme is persisted.
+    -->
+    <script>
+      (function () {
+        var key = "eac-theme";
+        var stored = null;
+        try { stored = localStorage.getItem(key); } catch (_) {}
+        var theme = (stored === "light" || stored === "dark" || stored === "system") ? stored : "system";
+        var dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var classMap = { light: "theme-light", dark: "theme-dark", system: "theme-system" };
+        document.documentElement.classList.add(classMap[theme]);
+        if (dark) document.documentElement.classList.add("dark");
+      })();
+    </script>
   </head>
-
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

@@ -1,0 +1,157 @@
+/*
+ * Design Tokens
+ *
+ * All design decisions are encoded here as CSS custom properties.
+ * These are raw, scale-level values — not semantic colors.
+ * Components must reference semantic tokens from themes.css, never these directly.
+ */
+
+:root {
+  /* ─── Color Palette ─────────────────────────────────────────────────────── */
+
+  /* Neutral */
+  --color-neutral-0: 0 0% 100%;
+  --color-neutral-50: 220 20% 97%;
+  --color-neutral-100: 220 15% 94%;
+  --color-neutral-150: 220 13% 90%;
+  --color-neutral-200: 220 12% 86%;
+  --color-neutral-300: 220 10% 75%;
+  --color-neutral-400: 220 8% 60%;
+  --color-neutral-500: 220 7% 46%;
+  --color-neutral-600: 220 9% 35%;
+  --color-neutral-700: 220 10% 26%;
+  --color-neutral-800: 220 13% 18%;
+  --color-neutral-850: 220 14% 13%;
+  --color-neutral-900: 222 16% 10%;
+  --color-neutral-950: 224 20% 6%;
+  --color-neutral-1000: 225 25% 3%;
+
+  /* Primary — Blue-indigo brand hue */
+  --color-primary-50: 227 100% 97%;
+  --color-primary-100: 226 100% 93%;
+  --color-primary-200: 226 96% 86%;
+  --color-primary-300: 226 92% 76%;
+  --color-primary-400: 227 84% 66%;
+  --color-primary-500: 228 76% 57%;
+  --color-primary-600: 228 68% 49%;
+  --color-primary-700: 228 62% 41%;
+  --color-primary-800: 228 56% 33%;
+  --color-primary-900: 229 50% 26%;
+  --color-primary-950: 230 44% 17%;
+
+  /* Success — Green */
+  --color-success-50: 142 76% 96%;
+  --color-success-100: 141 72% 90%;
+  --color-success-500: 142 71% 45%;
+  --color-success-600: 142 72% 38%;
+  --color-success-700: 143 64% 30%;
+
+  /* Warning — Amber */
+  --color-warning-50: 48 100% 96%;
+  --color-warning-100: 48 96% 89%;
+  --color-warning-500: 38 92% 50%;
+  --color-warning-600: 32 95% 44%;
+  --color-warning-700: 26 90% 37%;
+
+  /* Destructive — Red */
+  --color-destructive-50: 0 86% 97%;
+  --color-destructive-100: 0 93% 94%;
+  --color-destructive-500: 0 84% 60%;
+  --color-destructive-600: 0 72% 51%;
+  --color-destructive-700: 0 74% 42%;
+
+  /* Info — Cyan */
+  --color-info-50: 199 89% 97%;
+  --color-info-100: 198 86% 91%;
+  --color-info-500: 199 89% 48%;
+  --color-info-600: 200 98% 39%;
+  --color-info-700: 201 96% 32%;
+
+  /* ─── Typography Scale ──────────────────────────────────────────────────── */
+  --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+
+  --text-2xs: 0.625rem; /* 10px */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.125rem; /* 18px */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px */
+  --text-3xl: 1.875rem; /* 30px */
+  --text-4xl: 2.25rem; /* 36px */
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ─── Spacing Scale ─────────────────────────────────────────────────────── */
+  --space-px: 1px;
+  --space-0: 0;
+  --space-0-5: 0.125rem; /* 2px */
+  --space-1: 0.25rem; /* 4px */
+  --space-1-5: 0.375rem; /* 6px */
+  --space-2: 0.5rem; /* 8px */
+  --space-2-5: 0.625rem; /* 10px */
+  --space-3: 0.75rem; /* 12px */
+  --space-3-5: 0.875rem; /* 14px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-7: 1.75rem; /* 28px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-14: 3.5rem; /* 56px */
+  --space-16: 4rem; /* 64px */
+  --space-20: 5rem; /* 80px */
+  --space-24: 6rem; /* 96px */
+
+  /* ─── Border Radius Scale ───────────────────────────────────────────────── */
+  --radius-none: 0;
+  --radius-xs: 0.125rem; /* 2px */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.375rem; /* 6px */
+  --radius-lg: 0.5rem; /* 8px */
+  --radius-xl: 0.75rem; /* 12px */
+  --radius-2xl: 1rem; /* 16px */
+  --radius-3xl: 1.5rem; /* 24px */
+  --radius-full: 9999px;
+
+  /* ─── Animation Duration ────────────────────────────────────────────────── */
+  --duration-instant: 0ms;
+  --duration-fast: 100ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* ─── Easing ────────────────────────────────────────────────────────────── */
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ─── Z-Index Scale ─────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-overlay: 20;
+  --z-sticky: 30;
+  --z-fixed: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+  --z-toast: 80;
+  --z-top: 90;
+}

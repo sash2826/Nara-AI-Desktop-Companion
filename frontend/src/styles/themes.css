@@ -1,0 +1,220 @@
+/*
+ * Semantic Theme Tokens
+ *
+ * Maps raw palette tokens to semantic roles.
+ * All component colors must reference these — never the raw palette directly.
+ * Supports light, dark, and system (auto) themes via class and media-query strategies.
+ */
+
+/* ─── Light Theme ─────────────────────────────────────────────────────────── */
+:root,
+.theme-light {
+  /* Core surfaces */
+  --background: var(--color-neutral-0);
+  --foreground: var(--color-neutral-900);
+
+  /* Card */
+  --card: var(--color-neutral-0);
+  --card-foreground: var(--color-neutral-900);
+
+  /* Popover / dropdown */
+  --popover: var(--color-neutral-0);
+  --popover-foreground: var(--color-neutral-900);
+
+  /* Layered surfaces */
+  --surface: var(--color-neutral-50);
+  --surface-elevated: var(--color-neutral-0);
+  --surface-overlay: 220 20% 98%;
+
+  /* Primary action */
+  --primary: var(--color-primary-600);
+  --primary-foreground: var(--color-neutral-0);
+
+  /* Secondary action */
+  --secondary: var(--color-neutral-100);
+  --secondary-foreground: var(--color-neutral-800);
+
+  /* Muted / subdued */
+  --muted: var(--color-neutral-100);
+  --muted-foreground: var(--color-neutral-500);
+
+  /* Accent */
+  --accent: var(--color-primary-50);
+  --accent-foreground: var(--color-primary-700);
+
+  /* Destructive */
+  --destructive: var(--color-destructive-600);
+  --destructive-foreground: var(--color-neutral-0);
+
+  /* Semantic status */
+  --success: var(--color-success-600);
+  --success-foreground: var(--color-neutral-0);
+  --warning: var(--color-warning-600);
+  --warning-foreground: var(--color-neutral-0);
+  --info: var(--color-info-600);
+  --info-foreground: var(--color-neutral-0);
+
+  /* Borders & inputs */
+  --border: var(--color-neutral-200);
+  --input: var(--color-neutral-200);
+  --ring: var(--color-primary-500);
+
+  /* Sidebar */
+  --sidebar: var(--color-neutral-50);
+  --sidebar-foreground: var(--color-neutral-700);
+  --sidebar-border: var(--color-neutral-150);
+  --sidebar-accent: var(--color-neutral-100);
+  --sidebar-accent-foreground: var(--color-neutral-800);
+
+  /* Border radius (semantic default) */
+  --radius: var(--radius-lg);
+
+  /* Elevation shadows — light */
+  --shadow-color: 220deg 3% 15%;
+  --shadow-elevation-1: 0 1px 2px hsl(var(--shadow-color) / 0.08);
+  --shadow-elevation-2:
+    0 1px 2px hsl(var(--shadow-color) / 0.06), 0 2px 6px hsl(var(--shadow-color) / 0.1);
+  --shadow-elevation-3:
+    0 2px 4px hsl(var(--shadow-color) / 0.06), 0 4px 12px hsl(var(--shadow-color) / 0.12);
+  --shadow-elevation-4:
+    0 4px 8px hsl(var(--shadow-color) / 0.08), 0 8px 24px hsl(var(--shadow-color) / 0.14);
+
+  /* Focus ring */
+  --focus-ring-color: hsl(var(--color-primary-500) / 0.5);
+  --focus-ring-width: 3px;
+
+  /* Scrollbar */
+  --scrollbar-thumb: hsl(var(--color-neutral-300));
+  --scrollbar-track: transparent;
+}
+
+/* ─── Dark Theme ──────────────────────────────────────────────────────────── */
+.dark,
+.theme-dark {
+  /* Core surfaces */
+  --background: var(--color-neutral-950);
+  --foreground: var(--color-neutral-50);
+
+  /* Card */
+  --card: var(--color-neutral-900);
+  --card-foreground: var(--color-neutral-50);
+
+  /* Popover / dropdown */
+  --popover: var(--color-neutral-900);
+  --popover-foreground: var(--color-neutral-50);
+
+  /* Layered surfaces */
+  --surface: var(--color-neutral-900);
+  --surface-elevated: var(--color-neutral-850);
+  --surface-overlay: 222 16% 12%;
+
+  /* Primary action */
+  --primary: var(--color-primary-500);
+  --primary-foreground: var(--color-neutral-0);
+
+  /* Secondary action */
+  --secondary: var(--color-neutral-800);
+  --secondary-foreground: var(--color-neutral-100);
+
+  /* Muted / subdued */
+  --muted: var(--color-neutral-800);
+  --muted-foreground: var(--color-neutral-400);
+
+  /* Accent */
+  --accent: var(--color-primary-950);
+  --accent-foreground: var(--color-primary-300);
+
+  /* Destructive */
+  --destructive: var(--color-destructive-500);
+  --destructive-foreground: var(--color-neutral-0);
+
+  /* Semantic status */
+  --success: var(--color-success-500);
+  --success-foreground: var(--color-neutral-0);
+  --warning: var(--color-warning-500);
+  --warning-foreground: var(--color-neutral-0);
+  --info: var(--color-info-500);
+  --info-foreground: var(--color-neutral-0);
+
+  /* Borders & inputs */
+  --border: var(--color-neutral-800);
+  --input: var(--color-neutral-800);
+  --ring: var(--color-primary-400);
+
+  /* Sidebar */
+  --sidebar: var(--color-neutral-900);
+  --sidebar-foreground: var(--color-neutral-300);
+  --sidebar-border: var(--color-neutral-800);
+  --sidebar-accent: var(--color-neutral-850);
+  --sidebar-accent-foreground: var(--color-neutral-100);
+
+  /* Border radius (semantic default) */
+  --radius: var(--radius-lg);
+
+  /* Elevation shadows — dark */
+  --shadow-color: 220deg 30% 3%;
+  --shadow-elevation-1: 0 1px 2px hsl(var(--shadow-color) / 0.4);
+  --shadow-elevation-2:
+    0 1px 2px hsl(var(--shadow-color) / 0.3), 0 2px 6px hsl(var(--shadow-color) / 0.5);
+  --shadow-elevation-3:
+    0 2px 4px hsl(var(--shadow-color) / 0.35), 0 4px 12px hsl(var(--shadow-color) / 0.55);
+  --shadow-elevation-4:
+    0 4px 8px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.6);
+
+  /* Focus ring */
+  --focus-ring-color: hsl(var(--color-primary-400) / 0.5);
+
+  /* Scrollbar */
+  --scrollbar-thumb: hsl(var(--color-neutral-700));
+  --scrollbar-track: transparent;
+}
+
+/* ─── System theme (auto) ─────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .theme-system {
+    /* Core surfaces */
+    --background: var(--color-neutral-950);
+    --foreground: var(--color-neutral-50);
+    --card: var(--color-neutral-900);
+    --card-foreground: var(--color-neutral-50);
+    --popover: var(--color-neutral-900);
+    --popover-foreground: var(--color-neutral-50);
+    --surface: var(--color-neutral-900);
+    --surface-elevated: var(--color-neutral-850);
+    --surface-overlay: 222 16% 12%;
+    --primary: var(--color-primary-500);
+    --primary-foreground: var(--color-neutral-0);
+    --secondary: var(--color-neutral-800);
+    --secondary-foreground: var(--color-neutral-100);
+    --muted: var(--color-neutral-800);
+    --muted-foreground: var(--color-neutral-400);
+    --accent: var(--color-primary-950);
+    --accent-foreground: var(--color-primary-300);
+    --destructive: var(--color-destructive-500);
+    --destructive-foreground: var(--color-neutral-0);
+    --success: var(--color-success-500);
+    --success-foreground: var(--color-neutral-0);
+    --warning: var(--color-warning-500);
+    --warning-foreground: var(--color-neutral-0);
+    --info: var(--color-info-500);
+    --info-foreground: var(--color-neutral-0);
+    --border: var(--color-neutral-800);
+    --input: var(--color-neutral-800);
+    --ring: var(--color-primary-400);
+    --sidebar: var(--color-neutral-900);
+    --sidebar-foreground: var(--color-neutral-300);
+    --sidebar-border: var(--color-neutral-800);
+    --sidebar-accent: var(--color-neutral-850);
+    --sidebar-accent-foreground: var(--color-neutral-100);
+    --shadow-color: 220deg 30% 3%;
+    --shadow-elevation-1: 0 1px 2px hsl(var(--shadow-color) / 0.4);
+    --shadow-elevation-2:
+      0 1px 2px hsl(var(--shadow-color) / 0.3), 0 2px 6px hsl(var(--shadow-color) / 0.5);
+    --shadow-elevation-3:
+      0 2px 4px hsl(var(--shadow-color) / 0.35), 0 4px 12px hsl(var(--shadow-color) / 0.55);
+    --shadow-elevation-4:
+      0 4px 8px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.6);
+    --focus-ring-color: hsl(var(--color-primary-400) / 0.5);
+    --scrollbar-thumb: hsl(var(--color-neutral-700));
+  }
+}
