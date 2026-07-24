@@ -1,4 +1,4 @@
-import type { AIProvider } from "@/services/ai/AIProvider";
+import type { LLMProvider } from "@/services/ai/LLMProvider";
 
 /**
  * ConversationService owns all conversation business logic.
@@ -13,8 +13,9 @@ import type { AIProvider } from "@/services/ai/AIProvider";
  * interface, which the React layer (useConversation) implements using Zustand
  * store mutations. This inversion keeps the service decoupled from the UI.
  *
- * The service receives its AIProvider through constructor injection.
- * Swapping providers requires only passing a different implementation.
+ * The service receives its LLMProvider through constructor injection.
+ * Swapping providers (Mock ↔ APIM) requires only passing a different
+ * implementation — this class never changes.
  */
 
 export interface ConversationCallbacks {
@@ -45,10 +46,10 @@ export interface ConversationCallbacks {
 }
 
 export class ConversationService {
-  private readonly provider: AIProvider;
+  private readonly provider: LLMProvider;
   private abortController: AbortController | null = null;
 
-  constructor(provider: AIProvider) {
+  constructor(provider: LLMProvider) {
     this.provider = provider;
   }
 

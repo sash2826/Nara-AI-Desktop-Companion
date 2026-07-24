@@ -1,2 +1,3 @@
-export type { AIProvider, AIRequestOptions, AIStreamChunk } from "./AIProvider";
+export type { LLMProvider, LLMRequestOptions, LLMStreamChunk } from "./LLMProvider";
 export { MockProvider } from "./MockProvider";
+export { APIMProvider } from "./APIMProvider";

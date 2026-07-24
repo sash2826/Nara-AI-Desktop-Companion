@@ -1,15 +1,16 @@
-import type { AIProvider, AIRequestOptions, AIStreamChunk } from "./AIProvider";
+import type { LLMProvider, LLMRequestOptions, LLMStreamChunk } from "./LLMProvider";
 
 /**
- * Simulates AI provider behaviour using predefined keyword-matched responses.
+ * Development and testing implementation of LLMProvider.
  *
- * Responsibilities:
- * - Keyword matching against the user prompt.
- * - Returning markdown-formatted responses with code blocks and tables.
- * - Simulating a typing/thinking delay before the first chunk.
- * - Simulating token-by-token streaming.
+ * Returns deterministic, keyword-matched responses with no network calls.
+ * Simulates realistic provider behaviour including:
+ *   - Thinking delay before the first token
+ *   - Character-by-character streaming
+ *   - Cooperative cancellation via AbortSignal and internal flag
  *
- * No UI, framework, or Zustand dependency. Pure TypeScript.
+ * MockProvider is never used in production. APIMProvider is the production
+ * implementation and routes all requests through Azure API Management.
  */
 
 interface MockResponseEntry {
@@ -73,10 +74,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export class MockProvider implements AIProvider {
+export class MockProvider implements LLMProvider {
   private cancelled = false;
 
-  async generateResponse(prompt: string, options?: AIRequestOptions): Promise<string> {
+  async generateResponse(prompt: string, options?: LLMRequestOptions): Promise<string> {
     this.cancelled = false;
     await sleep(THINKING_DELAY_MS);
 
@@ -87,7 +88,10 @@ export class MockProvider implements AIProvider {
     return resolveResponse(prompt);
   }
 
-  async *streamResponse(prompt: string, options?: AIRequestOptions): AsyncIterable<AIStreamChunk> {
+  async *streamResponse(
+    prompt: string,
+    options?: LLMRequestOptions
+  ): AsyncIterable<LLMStreamChunk> {
     this.cancelled = false;
 
     // Simulate model thinking delay before the first token.

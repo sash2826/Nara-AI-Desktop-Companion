@@ -12,7 +12,7 @@ import type { ConversationCallbacks } from "@/services/conversation/Conversation
  * - Expose UI actions (sendMessage, clearMessages, setInputValue).
  *
  * This hook contains no business logic. Timing, streaming, cancellation,
- * and provider selection all live in ConversationService and AIProvider.
+ * and provider selection all live in ConversationService and LLMProvider.
  */
 export function useConversation() {
   const service = useContext(ConversationServiceContext);
