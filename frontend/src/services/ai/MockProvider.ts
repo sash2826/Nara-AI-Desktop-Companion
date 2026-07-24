@@ -1,9 +1,26 @@
-interface MockResponse {
+import type { AIProvider, AIRequestOptions, AIStreamChunk } from "./AIProvider";
+
+/**
+ * Simulates AI provider behaviour using predefined keyword-matched responses.
+ *
+ * Responsibilities:
+ * - Keyword matching against the user prompt.
+ * - Returning markdown-formatted responses with code blocks and tables.
+ * - Simulating a typing/thinking delay before the first chunk.
+ * - Simulating token-by-token streaming.
+ *
+ * No UI, framework, or Zustand dependency. Pure TypeScript.
+ */
+
+interface MockResponseEntry {
   keywords: string[];
   response: string;
 }
 
-const MOCK_RESPONSES: MockResponse[] = [
+const STREAM_INTERVAL_MS = 18;
+const THINKING_DELAY_MS = 600;
+
+const MOCK_RESPONSE_TABLE: MockResponseEntry[] = [
   {
     keywords: ["hello", "hi", "hey", "greetings"],
     response:
@@ -44,8 +61,57 @@ const MOCK_RESPONSES: MockResponse[] = [
 const FALLBACK_RESPONSE =
   "That's an interesting question. Once your workspace is indexed and AI services are connected, I'll be able to give you a detailed, context-aware answer grounded in your documents.\n\nFor now, I'm operating in demo mode. Try asking me to **summarise**, **search**, or **explain** something.";
 
-export function getMockResponse(input: string): string {
-  const lower = input.toLowerCase();
-  const match = MOCK_RESPONSES.find((r) => r.keywords.some((kw) => lower.includes(kw)));
+function resolveResponse(prompt: string): string {
+  const lower = prompt.toLowerCase();
+  const match = MOCK_RESPONSE_TABLE.find((entry) =>
+    entry.keywords.some((kw) => lower.includes(kw))
+  );
   return match ? match.response : FALLBACK_RESPONSE;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export class MockProvider implements AIProvider {
+  private cancelled = false;
+
+  async generateResponse(prompt: string, options?: AIRequestOptions): Promise<string> {
+    this.cancelled = false;
+    await sleep(THINKING_DELAY_MS);
+
+    if (this.cancelled || options?.signal?.aborted) {
+      return "";
+    }
+
+    return resolveResponse(prompt);
+  }
+
+  async *streamResponse(prompt: string, options?: AIRequestOptions): AsyncIterable<AIStreamChunk> {
+    this.cancelled = false;
+
+    // Simulate model thinking delay before the first token.
+    await sleep(THINKING_DELAY_MS);
+
+    if (this.cancelled || options?.signal?.aborted) {
+      return;
+    }
+
+    const fullResponse = resolveResponse(prompt);
+
+    for (const char of fullResponse) {
+      if (this.cancelled || options?.signal?.aborted) {
+        return;
+      }
+
+      yield { content: char, done: false };
+      await sleep(STREAM_INTERVAL_MS);
+    }
+
+    yield { content: "", done: true };
+  }
+
+  cancel(): void {
+    this.cancelled = true;
+  }
 }

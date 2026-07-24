@@ -1,60 +1,77 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useContext } from "react";
+import { ConversationServiceContext } from "@/providers/ConversationServiceContext";
 import { useConversationStore } from "@/store/conversationStore";
-import { getMockResponse } from "@/components/assistant/MOCK_RESPONSES";
-
-const TYPING_DELAY_MS = 600;
-const STREAM_INTERVAL_MS = 18;
+import type { ConversationCallbacks } from "@/services/conversation/ConversationService";
 
 /**
- * Encapsulates mock conversation logic: typing indicator → streaming response.
- * When real AI services are connected, only this hook needs to change.
+ * Thin bridge between ConversationService and the React UI.
+ *
+ * Responsibilities:
+ * - Retrieve the ConversationService from React context.
+ * - Map service callbacks to Zustand store mutations.
+ * - Expose UI actions (sendMessage, clearMessages, setInputValue).
+ *
+ * This hook contains no business logic. Timing, streaming, cancellation,
+ * and provider selection all live in ConversationService and AIProvider.
  */
 export function useConversation() {
+  const service = useContext(ConversationServiceContext);
   const store = useConversationStore();
-  // Token allows in-flight stream to be cancelled when a new message arrives.
-  const cancelRef = useRef<boolean>(false);
+
+  if (service === null) {
+    throw new Error("useConversation must be used within a ConversationServiceProvider.");
+  }
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || store.isStreaming || store.isTyping) return;
 
-      // Cancel any in-progress stream.
-      cancelRef.current = true;
-
       store.clearInput();
       store.addMessage("user", trimmed, "complete");
 
-      // Show typing indicator.
-      store.setTyping(true);
-      cancelRef.current = false;
+      const callbacks: ConversationCallbacks = {
+        onTypingStart() {
+          store.setTyping(true);
+        },
 
-      await delay(TYPING_DELAY_MS);
+        onTypingEnd() {
+          store.setTyping(false);
+        },
 
-      if (cancelRef.current) return;
+        onAssistantMessageCreate() {
+          return store.addMessage("assistant", "", "streaming");
+        },
 
-      store.setTyping(false);
+        onStreamStart(messageId) {
+          store.setStreaming(true, messageId);
+        },
 
-      const fullResponse = getMockResponse(trimmed);
-      const assistantId = store.addMessage("assistant", "", "streaming");
-      store.setStreaming(true, assistantId);
+        onStreamChunk(messageId, accumulatedContent) {
+          store.updateMessageContent(messageId, accumulatedContent);
+        },
 
-      // Simulate token-by-token streaming.
-      let accumulated = "";
-      for (const char of fullResponse) {
-        if (cancelRef.current) break;
-        accumulated += char;
-        store.updateMessageContent(assistantId, accumulated);
-        await delay(STREAM_INTERVAL_MS);
-      }
+        onStreamComplete(messageId) {
+          store.updateMessageStatus(messageId, "complete");
+          store.setStreaming(false);
+        },
 
-      if (!cancelRef.current) {
-        store.updateMessageStatus(assistantId, "complete");
-        store.setStreaming(false);
-      }
+        onStreamCancelled(messageId) {
+          store.updateMessageStatus(messageId, "complete");
+          store.setStreaming(false);
+          store.setTyping(false);
+        },
+      };
+
+      await service.send(trimmed, callbacks);
     },
-    [store]
+    [service, store]
   );
+
+  const clearMessages = useCallback(() => {
+    service.cancel();
+    store.clearMessages();
+  }, [service, store]);
 
   return {
     messages: store.messages,
@@ -62,11 +79,7 @@ export function useConversation() {
     isStreaming: store.isStreaming,
     inputValue: store.inputValue,
     setInputValue: store.setInputValue,
-    clearMessages: store.clearMessages,
+    clearMessages,
     sendMessage,
   };
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
