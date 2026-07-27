@@ -3,12 +3,17 @@ import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "path";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tsconfigPaths()],
+
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/tests/setup.ts"],
+  },
 
   resolve: {
     alias: {
