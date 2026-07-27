@@ -2,12 +2,15 @@ import { useCallback, useState } from "react";
 import { OrbContainer, ORB_SIZE } from "./OrbContainer";
 import { OrbIcon } from "./OrbIcon";
 import { cn } from "@/lib/utils";
+import { OrbState } from "@/services/orb/OrbState";
 
 export interface LivingOrbProps {
   /** Current x position of the orb in viewport pixels. */
   x: number;
   /** Current y position of the orb in viewport pixels. */
   y: number;
+  /** Current state from OrbStateMachine. Drives CSS classes. Defaults to Idle. */
+  orbState?: OrbState;
   /** Called when the user clicks or activates the orb via keyboard. */
   onClick?: () => void;
   /** Called when hover or keyboard-focus state changes. */
@@ -22,15 +25,17 @@ export interface LivingOrbProps {
  *
  * Responsibilities:
  *   - Render the orb at the given (x, y) position
+ *   - Apply a CSS class and data attribute reflecting the current OrbState
  *   - Expose click and hover callbacks for parent wiring
- *   - Meet accessibility requirements (role, label, focus, touch target)
+ *   - Meet accessibility requirements (label, focus, touch target)
  *
- * This component owns NO state beyond hover. Position, drag logic, persistence,
- * and DesktopPresenceService registration belong to the parent or dedicated hooks.
+ * This component owns NO service dependencies. Position, drag logic,
+ * persistence, and state machine subscription belong to the parent (OrbLayer).
  */
 export function LivingOrb({
   x,
   y,
+  orbState = OrbState.Idle,
   onClick,
   onHoverChange,
   onMouseDown,
@@ -73,6 +78,7 @@ export function LivingOrb({
       <button
         type="button"
         aria-label="Enterprise AI Companion"
+        data-orb-state={orbState}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onFocus={handleFocus}
@@ -85,7 +91,8 @@ export function LivingOrb({
           "rounded-full",
           "cursor-grab",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-          isActive && "ring-2 ring-primary/30"
+          isActive && "ring-2 ring-primary/30",
+          `orb-state-${orbState}`
         )}
       >
         <OrbIcon isHovered={isActive} />

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { DesktopPresenceProvider } from "@/providers/DesktopPresenceProvider";
 import { OrbLayer } from "@/layouts/OrbLayer";
 import { ORB_OVERLAY_ID } from "@/services/desktop/OrbController";
+import { OrbState } from "@/services/orb/OrbState";
 
 // Stub window dimensions so orbStore.defaultPosition() returns a deterministic value.
 vi.stubGlobal("innerWidth", 1280);
@@ -41,14 +42,50 @@ describe("OrbLayer", () => {
     expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toBeInTheDocument();
   });
 
+  // ── Initial state ─────────────────────────────────────────────────────────
+
+  it("renders with orb-state-idle class initially", () => {
+    renderOrbLayer();
+    expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toHaveClass(
+      "orb-state-idle"
+    );
+  });
+
   // ── OrbController registration ────────────────────────────────────────────
 
   it("registers OrbController with DesktopPresenceService on mount", async () => {
     renderOrbLayer();
-    // Registration is async (useEffect); flush pending effects.
     await act(async () => {});
-    // Successful registration makes the orb visible, so the button is present.
     expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toBeInTheDocument();
+  });
+
+  // ── State propagation via subscription ────────────────────────────────────
+
+  it("updates orb-state class to hover when mouse enters", async () => {
+    renderOrbLayer();
+    await act(async () => {});
+    const button = screen.getByRole("button", { name: "Enterprise AI Companion" });
+
+    await act(async () => {
+      fireEvent.mouseEnter(button);
+    });
+
+    expect(button).toHaveClass(`orb-state-${OrbState.Hover}`);
+  });
+
+  it("returns to orb-state-idle class when mouse leaves", async () => {
+    renderOrbLayer();
+    await act(async () => {});
+    const button = screen.getByRole("button", { name: "Enterprise AI Companion" });
+
+    await act(async () => {
+      fireEvent.mouseEnter(button);
+    });
+    await act(async () => {
+      fireEvent.mouseLeave(button);
+    });
+
+    expect(button).toHaveClass(`orb-state-${OrbState.Idle}`);
   });
 
   // ── Hover forwarding ──────────────────────────────────────────────────────
@@ -79,7 +116,6 @@ describe("OrbLayer", () => {
     const { unmount } = renderOrbLayer();
     await act(async () => {});
     unmount();
-    // After unmount the OrbController is unregistered. A fresh tree must not throw.
     expect(() => renderOrbLayer()).not.toThrow();
   });
 
@@ -87,7 +123,6 @@ describe("OrbLayer", () => {
 
   it("applies the --z-top CSS variable to the overlay container", () => {
     const { container } = renderOrbLayer();
-    // The first div child of the render root is the fixed overlay layer.
     const overlay = container.firstElementChild as HTMLElement;
     expect(overlay.style.zIndex).toBe("var(--z-top)");
   });

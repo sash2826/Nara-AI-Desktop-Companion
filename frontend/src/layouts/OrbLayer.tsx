@@ -4,6 +4,7 @@ import { useOrbPosition } from "@/hooks/useOrbPosition";
 import { useOrbDrag } from "@/hooks/useOrbDrag";
 import { useDesktopPresence } from "@/hooks/useDesktopPresence";
 import { OrbController } from "@/services/desktop/OrbController";
+import { OrbState } from "@/services/orb/OrbState";
 
 /**
  * A fixed full-screen layer that hosts the Living Orb above all other content.
@@ -12,6 +13,7 @@ import { OrbController } from "@/services/desktop/OrbController";
  *  - position persistence (useOrbPosition)
  *  - mouse dragging (useOrbDrag)
  *  - OrbController registration with DesktopPresenceService
+ *  - OrbStateMachine subscription → orbState prop forwarded to LivingOrb
  *  - hover/focus → OrbController state forwarding
  */
 export function OrbLayer() {
@@ -20,6 +22,7 @@ export function OrbLayer() {
   const service = useDesktopPresence();
 
   const [controller] = useState<OrbController>(() => new OrbController());
+  const [orbState, setOrbState] = useState<OrbState>(OrbState.Idle);
 
   useEffect(() => {
     void controller.register(service);
@@ -27,6 +30,13 @@ export function OrbLayer() {
       void controller.dispose(service);
     };
   }, [controller, service]);
+
+  useEffect(() => {
+    const unsubscribe = controller.subscribe((snapshot) => {
+      setOrbState(snapshot.orbState);
+    });
+    return unsubscribe;
+  }, [controller]);
 
   const handleHoverChange = useCallback(
     (hovered: boolean) => {
@@ -45,6 +55,7 @@ export function OrbLayer() {
         <LivingOrb
           x={position.x}
           y={position.y}
+          orbState={orbState}
           onMouseDown={handleMouseDown}
           onHoverChange={handleHoverChange}
         />

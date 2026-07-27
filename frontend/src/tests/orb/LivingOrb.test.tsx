@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { LivingOrb } from "@/components/orb/LivingOrb";
+import { OrbState } from "@/services/orb/OrbState";
 
 function renderOrb(props: Partial<React.ComponentProps<typeof LivingOrb>> = {}) {
   return render(<LivingOrb x={100} y={100} {...props} />);
@@ -17,6 +18,35 @@ describe("LivingOrb", () => {
   it("has the expected accessible label", () => {
     renderOrb();
     expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toBeInTheDocument();
+  });
+
+  // ── OrbState CSS classes ───────────────────────────────────────────────────
+
+  it("applies orb-state-idle class by default", () => {
+    renderOrb();
+    expect(screen.getByRole("button")).toHaveClass("orb-state-idle");
+  });
+
+  it("applies the correct class for each OrbState", () => {
+    const states = Object.values(OrbState);
+    for (const state of states) {
+      const { unmount } = renderOrb({ orbState: state });
+      expect(screen.getByRole("button")).toHaveClass(`orb-state-${state}`);
+      unmount();
+    }
+  });
+
+  it("sets data-orb-state attribute to the current state", () => {
+    renderOrb({ orbState: OrbState.Thinking });
+    expect(screen.getByRole("button")).toHaveAttribute("data-orb-state", OrbState.Thinking);
+  });
+
+  it("updates data-orb-state when orbState prop changes", () => {
+    const { rerender } = renderOrb({ orbState: OrbState.Idle });
+    expect(screen.getByRole("button")).toHaveAttribute("data-orb-state", OrbState.Idle);
+
+    rerender(<LivingOrb x={100} y={100} orbState={OrbState.Hover} />);
+    expect(screen.getByRole("button")).toHaveAttribute("data-orb-state", OrbState.Hover);
   });
 
   // ── Hover interaction ─────────────────────────────────────────────────────
