@@ -1,4 +1,4 @@
-# Phase 00: Assistant Experience
+# Phase 00: Desktop Companion Experience
 
 **Phase:** 00
 
@@ -33,10 +33,10 @@ Upon completion of this phase, the application should provide:
 * Living Orb
 * Glass Prompt
 * Desktop Presence Layer
-* Responsive workspace
+* Responsive Workspace
 * Conversation area
 * Message input
-* Mock assistant responses
+* Mock companion responses
 * Theme support
 * Navigation foundation
 * Clean architecture service layer
@@ -206,7 +206,6 @@ The Context Engine enriches requests with workspace context before they reach th
 The Retrieval Broker resolves knowledge queries across available connectors and returns ranked results that the Conversation Service may incorporate into its response.
 
 The Workspace sits alongside this flow, providing an expanded view when the interaction outgrows the Glass Prompt.
-
 
 ---
 
@@ -901,15 +900,13 @@ LLM_CONFIG.provider = "apim"   ← production
 
 ---
 
+# Epic 0.6 – Product Identity & Desktop Companion Presence
 
+Define and implement the Desktop Companion's visual identity, interaction model, and desktop presence.
 
-# Epic 0.6 – Product Identity & Assistant Presence
+The Living Orb and Glass Prompt form the application's primary interaction surface.
 
-Define and implement the assistant's visual identity, name, personality guidelines, and presence within the application.
-
-The Living Orb and Glass Prompt form the application's primary interaction model.
-
-Rather than requiring users to launch and navigate a traditional application window, the assistant remains immediately accessible through a persistent desktop presence while the Workspace provides an expanded environment for longer interactions.
+Rather than requiring users to launch and navigate a traditional application window, the Desktop Companion remains immediately accessible through a persistent desktop presence while the Workspace provides an expanded environment for longer interactions.
 
 The objective of this phase is not to build intelligence, but to build the experience.
 
@@ -919,7 +916,7 @@ The objective of this phase is not to build intelligence, but to build the exper
 
 **Status:** Complete
 
-
+---
 
 ## 0.6.1 Product Requirements Document (PRD)
 
@@ -1004,7 +1001,7 @@ The following features are intentionally excluded from this version of the produ
 - Calendar awareness
 - Screen understanding
 
-These capabilities may be introduced in future releases once the assistant foundation has matured.
+These capabilities may be introduced in future releases once the companion foundation has matured.
 
 ---
 
@@ -1024,11 +1021,11 @@ These users frequently interact with AI throughout the day and benefit from mini
 
 # User Experience Principles
 
-The assistant should follow several core design principles.
+The Desktop Companion should follow these core design principles. See also: Experience Principles in the Phase 00 overview for the full principle set.
 
 ## Always Available
 
-The assistant should remain accessible regardless of which application the user is currently using.
+The Desktop Companion should remain accessible regardless of which application the user is currently using.
 
 ---
 
@@ -1036,7 +1033,7 @@ The assistant should remain accessible regardless of which application the user 
 
 Simple requests should require as few interactions as possible.
 
-Opening the assistant should feel nearly instantaneous.
+Opening the Glass Prompt should feel nearly instantaneous.
 
 ---
 
@@ -1044,7 +1041,7 @@ Opening the assistant should feel nearly instantaneous.
 
 Quick interactions should remain lightweight.
 
-More complex workflows should naturally transition into the full workspace without interrupting the conversation.
+More complex workflows should naturally transition into the Workspace without interrupting the conversation.
 
 ---
 
@@ -1058,7 +1055,7 @@ The product should not imitate macOS conventions.
 
 ## Calm Presence
 
-The assistant should feel alive without becoming distracting.
+The Desktop Companion should feel alive without becoming distracting.
 
 Animations should communicate state rather than seek attention.
 
@@ -1075,7 +1072,7 @@ Clicks the Living Orb
 
 ↓
 
-Glass Prompt Opens
+Glass Prompt opens
 
 ↓
 
@@ -1083,7 +1080,7 @@ User asks a question
 
 ↓
 
-Assistant responds inline
+Companion responds inline
 
 ↓
 
@@ -1104,7 +1101,7 @@ Conversation becomes lengthy
 
 ↓
 
-Assistant recommends opening Workspace
+Companion recommends opening Workspace
 
 ↓
 
@@ -1140,7 +1137,7 @@ User interacts entirely using the keyboard
 
 ## Living Orb
 
-The assistant shall:
+The Living Orb shall:
 
 - Remain visible on the desktop.
 - Support dragging and repositioning.
@@ -1176,9 +1173,9 @@ The application shall:
 
 ---
 
-## Assistant States
+## Living Orb States
 
-The assistant shall visually represent:
+The Living Orb shall visually represent:
 
 - Initializing
 - Idle
@@ -1197,7 +1194,7 @@ Each state should have a distinct animation while maintaining a consistent visua
 
 ## Accessibility
 
-The assistant shall:
+The Desktop Companion shall:
 
 - Support keyboard navigation.
 - Support screen readers where applicable.
@@ -1224,12 +1221,12 @@ Performance objectives include:
 
 The epic is considered successful when:
 
-- Users can interact with AI without opening the main workspace.
+- Users can interact with AI without opening the Workspace.
 - Desktop interactions feel responsive.
 - Workspace transitions are seamless.
-- The assistant has a distinct and recognizable identity.
+- The Desktop Companion has a distinct and recognizable visual identity.
 - The overall experience feels native to Windows.
-- Existing chat functionality continues to operate correctly.
+- Existing conversation functionality continues to operate correctly.
 
 ---
 
@@ -1279,9 +1276,9 @@ Completion of this epic should produce:
 
 ### Overview
 
-This Technical Design Document defines the software architecture required to implement the Product Identity & Assistant Presence epic.
+This Technical Design Document defines the software architecture required to implement the Product Identity & Desktop Companion Presence epic.
 
-The objective is to establish a modular, maintainable, and extensible architecture that enables the assistant to exist as a persistent desktop companion while remaining decoupled from AI providers, business logic, and future desktop intelligence features.
+The objective is to establish a modular, maintainable, and extensible architecture that enables the Desktop Companion to exist as a persistent presence on the user's desktop while remaining decoupled from AI providers, business logic, and future desktop intelligence features.
 
 The architecture introduced in this document serves as the foundation for future capabilities such as desktop awareness, notifications, contextual actions, and proactive assistance without requiring significant redesign.
 
@@ -1295,7 +1292,7 @@ The implementation follows the following engineering principles.
 
 Each component should have a single responsibility.
 
-The visual assistant should never directly communicate with AI providers.
+The Living Orb should never directly communicate with AI providers.
 
 Business logic should remain independent of UI components.
 
@@ -1450,9 +1447,9 @@ Responsible for:
 - Message lifecycle
 - Conversation state
 - Streaming orchestration
-- Context management
+- Incorporating context snapshots from the Context Engine into each request
 
-Conversation Service remains UI-independent.
+Conversation Service remains UI-independent. It consumes context provided by the Context Engine; it does not gather workspace signals directly.
 
 ---
 
@@ -1585,7 +1582,7 @@ Responsibilities:
 
 ## OrbStateMachine
 
-Defines every possible Desktop Companion state.
+Defines every possible state of the Living Orb.
 
 The state machine prevents invalid transitions and ensures consistent animations.
 
@@ -1709,7 +1706,7 @@ LLM unavailable
 
 ↓
 
-Display assistant error state
+Living Orb transitions to Error state
 
 ↓
 
@@ -1805,9 +1802,9 @@ These capabilities will build upon this architecture in future phases.
 
 This document defines the visual identity, motion principles, interaction language, and aesthetic guidelines for Enterprise AI Companion.
 
-The objective is to establish a distinctive, professional, and cohesive visual language that reflects the assistant's role as a persistent desktop companion while remaining consistent with Windows design principles.
+The objective is to establish a distinctive, professional, and cohesive visual language that reflects the Desktop Companion's role as a persistent presence in the user's environment while remaining consistent with Windows design principles.
 
-The assistant should feel calm, intelligent, and trustworthy rather than flashy or distracting.
+The Desktop Companion should feel calm, intelligent, and trustworthy rather than flashy or distracting.
 
 ---
 
@@ -1833,7 +1830,7 @@ The interface should never use visual effects purely for decoration.
 
 ## Calm Presence
 
-The assistant should always feel available without demanding attention.
+The Desktop Companion should always feel available without demanding attention.
 
 It should exist quietly until needed.
 
@@ -1898,7 +1895,7 @@ It should immediately communicate:
 
 The orb should never appear static.
 
-Subtle movement should indicate that the assistant is active.
+Subtle movement should indicate that the Desktop Companion is active.
 
 The orb should avoid appearing cartoonish or overly futuristic.
 
@@ -2148,7 +2145,7 @@ Completion of this document establishes:
 
 ### Overview
 
-This Implementation Plan defines the engineering roadmap for completing the Product Identity & Assistant Presence epic.
+This Implementation Plan defines the engineering roadmap for completing the Product Identity & Desktop Companion Presence epic.
 
 The objective is to deliver the Living Orb, Glass Prompt, Desktop Presence Layer, and supporting infrastructure through incremental, independently testable tasks while minimizing integration risk.
 
@@ -2178,7 +2175,7 @@ No task should require unfinished functionality from a later task.
 
 ### Objective
 
-Introduce the desktop presence architecture without modifying existing assistant functionality.
+Introduce the desktop presence architecture without modifying existing application functionality.
 
 ### Scope
 
@@ -2231,7 +2228,7 @@ Task 0.6.4.1
 
 ### Objective
 
-Implement the assistant state machine.
+Implement the Living Orb state machine.
 
 ### Scope
 
@@ -2367,7 +2364,7 @@ Task 0.6.4.5
 
 ### Objective
 
-Validate the complete Product Identity experience.
+Validate the complete Desktop Companion experience.
 
 ### Scope
 
@@ -2491,14 +2488,15 @@ The Implementation Plan is considered complete when:
 - Performance objectives have been achieved.
 - Accessibility requirements have been satisfied.
 - Documentation reflects the implemented system.
-- The Living Orb becomes the primary interaction model for Enterprise AI Companion.
+- The Living Orb is established as the primary interaction entry point for the Desktop Companion.
+
 ---
 
 ## Epic 0.6.5 – Acceptance Criteria
 
 ### Overview
 
-This document defines the measurable conditions required for Epic 0.6 – Product Identity & Assistant Presence to be considered complete.
+This document defines the measurable conditions required for Epic 0.6 – Product Identity & Desktop Companion Presence to be considered complete.
 
 All acceptance criteria must be satisfied before the epic can be marked as complete and implementation can proceed to the next phase.
 
@@ -2514,7 +2512,7 @@ The Living Orb shall:
 - Support mouse interaction.
 - Support dragging and repositioning.
 - Persist its position between application launches.
-- Display all defined assistant states.
+- Display all defined interaction states.
 - Remain responsive during AI interactions.
 
 ---
@@ -2556,7 +2554,7 @@ The desktop presence layer shall:
 
 ## Conversation Integration
 
-The assistant shall:
+The Desktop Companion shall:
 
 - Reuse the existing Conversation Service.
 - Preserve conversation history.
@@ -2595,7 +2593,7 @@ The implementation shall meet the following performance goals:
 
 # Accessibility Acceptance Criteria
 
-The assistant shall:
+The Desktop Companion shall:
 
 - Support keyboard-only interaction.
 - Respect reduced-motion preferences.
@@ -2640,7 +2638,7 @@ Epic 0.6 is considered complete when:
 - Manual validation confirms the expected user experience.
 - Performance targets have been achieved.
 - Accessibility requirements have been met.
-- The Living Orb successfully becomes the primary interaction model for Enterprise AI Companion.
+- The Living Orb is established as the primary interaction entry point for the Desktop Companion.
 
 ---
 
@@ -2648,7 +2646,7 @@ Epic 0.6 is considered complete when:
 
 ### Overview
 
-This section outlines capabilities intentionally excluded from the initial implementation of the Product Identity & Assistant Presence epic.
+This section outlines capabilities intentionally excluded from the initial implementation of the Product Identity & Desktop Companion Presence epic.
 
 These enhancements are outside the scope of Version 1 but have been considered during architectural design to minimize future refactoring.
 
@@ -2663,7 +2661,7 @@ The Desktop Presence architecture is designed to support future desktop-aware ca
 Potential enhancements include:
 
 - Intelligent desktop event monitoring
-- Context-aware assistant suggestions
+- Context-aware companion suggestions
 - Active application awareness
 - Window context detection
 - Smart workflow recommendations
@@ -2674,7 +2672,7 @@ These features should be implemented only after the desktop presence foundation 
 
 # File Intelligence
 
-Future versions may allow the assistant to understand and react to files.
+Future versions may allow the Desktop Companion to understand and react to files.
 
 Examples include:
 
@@ -2721,7 +2719,7 @@ Voice interaction is intentionally excluded from Version 1.
 
 # Notification Framework
 
-The assistant may eventually support proactive notifications.
+The Desktop Companion may eventually support proactive notifications.
 
 Examples include:
 
@@ -2769,7 +2767,7 @@ Plugin support will be introduced in a later project phase.
 
 Future enterprise enhancements may include:
 
-- Organization-wide assistant configuration
+- Organization-wide companion configuration
 - Enterprise policy enforcement
 - Team knowledge sharing
 - Advanced auditing
@@ -2785,7 +2783,7 @@ The provider architecture enables future AI capabilities such as:
 
 - Multi-agent workflows
 - Long-term memory
-- Personalized assistant behavior
+- Personalized companion behavior
 - Advanced reasoning pipelines
 - Tool calling
 - Retrieval-augmented workflows
@@ -2801,7 +2799,7 @@ The visual identity may continue evolving through:
 
 - Additional animation states
 - Seasonal themes
-- Custom assistant appearances
+- Custom companion appearances
 - User personalization
 - Enhanced motion language
 
@@ -2836,12 +2834,14 @@ Future enhancements should extend this foundation incrementally while preserving
 - [ ] Living Orb implemented
 - [ ] Glass Prompt implemented
 - [ ] Workspace transition completed
-- [ ] Assistant state system implemented
+- [ ] Living Orb state system implemented
 
 ### Architecture
 - [ ] DesktopPresenceService integrated
 - [ ] OverlayManager implemented
 - [ ] OrbStateMachine implemented
+- [ ] ContextEngine interface defined
+- [ ] RetrievalBroker interface defined
 - [ ] Window management validated
 - [ ] Existing ConversationService remains unchanged
 
