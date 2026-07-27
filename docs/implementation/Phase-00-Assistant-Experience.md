@@ -12,13 +12,15 @@
 
 Phase 00 establishes the visual identity and primary interaction model of the Enterprise AI Companion.
 
-Unlike traditional desktop applications where users first navigate menus or dashboards, the Enterprise AI Companion is designed around an intelligent assistant.
+The Enterprise AI Companion is not a chat application that lives in a window. It is a **desktop-native AI companion** — a persistent, context-aware presence that understands the user's work and is immediately accessible from anywhere within Windows.
 
-The Living Orb and Glass Prompt form the application's primary interaction model. The Workspace provides an expanded environment for longer conversations and advanced capabilities. Every major capability introduced in Version 1 should be accessible directly or indirectly through this assistant.
+The Living Orb and Glass Prompt form the application's primary interaction surface. The Workspace provides an expanded environment for longer conversations and advanced capabilities. Beneath these surfaces lies a Context Engine that understands what the user is working on, a Retrieval Broker that can locate knowledge across local files and cloud storage, and a Project Knowledge Layer that accumulates understanding over time.
+
+Every major capability introduced in Version 1 should be accessible directly or indirectly through this companion interface.
 
 The objective of this phase is **not** to build intelligence, but to build the experience.
 
-At the end of this phase, users should be able to launch the application and immediately interact with a polished assistant interface using mock responses.
+At the end of this phase, users should be able to launch the application and immediately interact with a polished companion interface using mock responses.
 
 ---
 
@@ -41,6 +43,90 @@ Upon completion of this phase, the application should provide:
 * AI provider abstraction
 
 No backend services or real AI providers are required during this phase.
+
+---
+
+# Product Pillars
+
+The Enterprise AI Companion is built around five core pillars. Each pillar represents a distinct capability domain that the platform must support.
+
+## Desktop Companion
+
+A persistent, always-accessible presence on the Windows desktop.
+
+The companion appears through the Living Orb and Glass Prompt. It is available from any application, at any moment, without requiring the user to switch context. This is the primary interaction model for Version 1.
+
+---
+
+## Context Intelligence
+
+The ability to understand what the user is working on without being told explicitly.
+
+The Context Engine observes the active workspace — open documents, recent activity, project folders — and uses this signal to improve retrieval relevance and response quality. Context intelligence transforms the companion from a generic chat interface into a knowledgeable collaborator.
+
+---
+
+## Cross-Platform Retrieval
+
+The ability to search and retrieve knowledge from multiple sources through a single interface.
+
+The Retrieval Broker abstracts access to local files and cloud storage connectors. In Version 1, two connectors are supported: the Local File Connector and the OneDrive Connector. Additional connectors may be added in future phases without changing the retrieval interface.
+
+---
+
+## Project Knowledge
+
+The ability to accumulate and organize knowledge associated with specific projects over time.
+
+The Project Knowledge Layer allows the companion to maintain awareness of project goals, decisions, and history. This accumulated context enables increasingly relevant assistance as the user continues working within a project.
+
+---
+
+## Workspace
+
+An expanded environment for extended interactions, structured knowledge exploration, and deeper engagement with retrieved content.
+
+The Workspace surfaces when a conversation or task exceeds the lightweight interaction model of the Glass Prompt. It provides conversation history, document references, and access to project knowledge without losing the active conversational thread.
+
+---
+
+# Experience Principles
+
+These principles govern how the Enterprise AI Companion behaves from the user's perspective.
+
+## Desktop First, Workspace Second
+
+The primary interaction should never require opening the full workspace. Quick questions, document lookups, and brief exchanges should complete entirely within the Glass Prompt. The Workspace is an escalation path, not the default.
+
+---
+
+## Context Before Conversation
+
+The companion should understand what the user is working on before the user explains it. Retrieved results and generated responses should reflect active context whenever possible. Users should never need to re-state what they are doing.
+
+---
+
+## Unified Knowledge
+
+The user should experience a single search surface regardless of where their files live. Local files and OneDrive documents should surface in the same response. The distinction between storage locations should be invisible to the user.
+
+---
+
+## Progressive Disclosure
+
+Lightweight interactions remain lightweight. Complexity is introduced only when the user needs it. The companion should never present more interface than the current task requires.
+
+---
+
+## Calm Intelligence
+
+The companion should feel present and capable without demanding attention. State changes, notifications, and transitions should be visually calm. The orb communicates system state through subtle visual cues rather than interruptions.
+
+---
+
+## Confidence Transparency
+
+When the companion retrieves or generates content, it should be clear what it knows and how confident it is. Uncertain responses should be presented as such. Fabricated context is worse than acknowledged uncertainty.
 
 ---
 
@@ -95,13 +181,16 @@ Routing
 
 # Architecture
 
-                Living Orb
+         Desktop Companion
+         (Living Orb · Glass Prompt)
                      │
                      ▼
-              Glass Prompt
+              Context Engine
+          (workspace awareness)
                      │
                      ▼
-                Workspace
+           Retrieval Broker
+    (Local File · OneDrive connectors)
                      │
                      ▼
           Conversation Service
@@ -109,6 +198,111 @@ Routing
                      ▼
               LLM Provider
 
+
+The Desktop Companion is the interaction surface.
+
+The Context Engine enriches requests with workspace context before they reach the Conversation Service.
+
+The Retrieval Broker resolves knowledge queries across available connectors and returns ranked results that the Conversation Service may incorporate into its response.
+
+The Workspace sits alongside this flow, providing an expanded view when the interaction outgrows the Glass Prompt.
+
+
+---
+
+# Context Engine
+
+The Context Engine is the layer responsible for understanding what the user is currently working on.
+
+It sits between the Desktop Companion and the Conversation Service. Before a user's request reaches the conversation pipeline, the Context Engine enriches it with signals derived from the active workspace.
+
+## Signals (Version 1)
+
+- Active project folder
+- Recently opened documents
+- Current file context passed explicitly by the user
+
+## Responsibilities
+
+- Maintain a lightweight representation of the current workspace context
+- Attach relevant context signals to outbound conversation requests
+- Expose a clean interface that the Conversation Service depends on without knowing where context comes from
+
+## Implementation Note
+
+The Context Engine does not perform retrieval. It gathers ambient workspace signals and passes them forward. Retrieval is the Retrieval Broker's responsibility.
+
+In Phase 00, the Context Engine is scaffolded but not connected to live signals. It returns empty context. Actual signal collection begins in a later phase.
+
+---
+
+# Retrieval Broker
+
+The Retrieval Broker is the single interface through which the application retrieves knowledge from external sources.
+
+It decouples the Conversation Service from the implementation details of individual storage systems. Adding a new connector in a future phase does not require changes to the Conversation Service.
+
+## Architecture
+
+```text
+Conversation Service
+        │
+Retrieval Broker
+        │
+   ┌────┴────┐
+   │         │
+Local File   OneDrive
+Connector    Connector
+```
+
+## Version 1 Connectors
+
+**Local File Connector**
+
+Searches indexed content from the user's local file system. Results come from the local vector index (Qdrant) built during the indexing pipeline.
+
+**OneDrive Connector**
+
+Retrieves documents from the user's OneDrive. Searches across personal files accessible via the user's authenticated session.
+
+## Responsibilities
+
+- Accept a structured retrieval query from the Conversation Service
+- Fan the query across active connectors
+- Rank and merge results into a unified response
+- Return a ranked list of document fragments with source metadata
+
+## Implementation Note
+
+In Phase 00, the Retrieval Broker is not connected to live connectors. Both connectors return empty results. The interface is defined so that Phase 01 can activate connectors without changing the Conversation Service.
+
+---
+
+# Project Knowledge Layer
+
+The Project Knowledge Layer is a conceptual architectural concern rather than a standalone service.
+
+It represents the accumulated understanding the companion develops about a specific project over time: goals, decisions, key documents, recurring entities, and historical conversation context.
+
+## What It Is
+
+- A structured store of project-level knowledge separate from the raw document index
+- The source of long-term context that supplements the active workspace signals provided by the Context Engine
+- The mechanism through which the companion becomes more useful the longer a user works within a project
+
+## What It Is Not
+
+- A file system
+- A chat history store
+- A replacement for the vector index
+
+## Relationship to Other Layers
+
+The Project Knowledge Layer is populated by the indexing pipeline and conversation processing. It is queried by the Context Engine when enriching requests with project-level context. It is read-only from the companion's perspective during a conversation.
+
+## Implementation Note
+
+The Project Knowledge Layer is not implemented in Phase 00. This section documents the concept so that architectural decisions made during Phase 00 do not foreclose its introduction in later phases.
 
 ---
 
@@ -139,30 +333,136 @@ Launch Application
 
 ↓
 
-Assistant appears
+Desktop Companion appears (Living Orb)
 
 ↓
 
-User enters prompt
+User enters prompt via Glass Prompt
 
 ↓
 
-Mock response displayed
+Context Engine enriches the request
 
 ↓
 
-Conversation updates
+Retrieval Broker surfaces relevant documents
 
 ↓
 
-User explores navigation
+Response displayed inline
+
+↓
+
+User explores navigation or opens Workspace
 ```
+
+---
+
+## User Flow — Document Recognized
+
+```text
+User opens a document
+
+↓
+
+Context Engine detects active file
+
+↓
+
+Companion surfaces a suggestion card in the Glass Prompt
+
+↓
+
+User accepts or dismisses
+
+↓
+
+Accepted: companion summarizes the document in context
+```
+
+---
+
+## User Flow — Unified Search
+
+```text
+User enters a search query in the Glass Prompt
+
+↓
+
+Retrieval Broker queries Local File Connector and OneDrive Connector
+
+↓
+
+Results ranked and merged
+
+↓
+
+Unified response displayed with source attribution
+
+↓
+
+User selects a result to open or continue in Workspace
+```
+
+---
+
+## User Flow — Conversation Grows to Workspace
+
+```text
+User opens Glass Prompt
+
+↓
+
+Conversation becomes lengthy
+
+↓
+
+Companion recommends opening Workspace
+
+↓
+
+User accepts
+
+↓
+
+Workspace opens with full conversation history intact
+
+↓
+
+Conversation continues without interruption
+```
+
+---
+
+# Confidence Model
+
+The Confidence Model defines how the companion communicates uncertainty to the user.
+
+## Principle
+
+The companion must never present fabricated or unverified content as fact. When the companion is uncertain about retrieved information, the degree of confidence should be reflected in how the response is framed.
+
+## Confidence Levels
+
+**High confidence** — Retrieved from an indexed source with a strong semantic match. The response may reference the source directly.
+
+**Moderate confidence** — Inferred from partial context or a weaker match. The response acknowledges that the information may be incomplete.
+
+**Low confidence** — Generated without retrieved grounding. The response is clearly framed as the model's best attempt without document support.
+
+## Presentation Principle
+
+The companion should make confidence levels visible in a way that is informative but not disruptive. A source attribution, a hedging phrase, or a confidence indicator are all acceptable approaches. The specific presentation mechanism is defined during implementation.
+
+## Implementation Note
+
+The Confidence Model is a product principle in Phase 00. It does not require implementation during this phase. The Conversation Service and Retrieval Broker should be designed in a way that makes confidence metadata available when those components are implemented in later phases.
 
 ---
 
 # User Interface Requirements
 
-The assistant should always remain the primary focus.
+The Desktop Companion should always remain the primary focus.
 
 Users should never feel lost after launching the application.
 
@@ -195,9 +495,9 @@ This phase is complete when:
 
 # Success Definition
 
-A user launching the Enterprise AI Companion for the first time should immediately understand that the application is centered around an intelligent assistant.
+A user launching the Enterprise AI Companion for the first time should immediately understand that the application is a desktop-native AI companion — not a chat window they navigate to, but a persistent and accessible presence that understands their work.
 
-Even without AI functionality, the experience should communicate the product's vision through a polished, responsive, and intuitive interface.
+Even without AI functionality, the experience should communicate the product's vision through a polished, responsive, and intuitive interface. The architecture introduced in this phase should support the Context Engine, Retrieval Broker, and Project Knowledge Layer without requiring significant redesign when those capabilities are introduced.
 
 ---
 
@@ -625,25 +925,27 @@ The objective of this phase is not to build intelligence, but to build the exper
 
 ### Overview
 
-This Product Requirements Document defines the vision, goals, user experience, and functional requirements for the Product Identity & Assistant Presence epic.
+This Product Requirements Document defines the vision, goals, user experience, and functional requirements for the Product Identity & Desktop Companion Presence epic.
 
-Unlike traditional AI chat applications that require users to open a dedicated window before interacting with the assistant, Enterprise AI Companion introduces a persistent desktop presence through a living assistant that is immediately accessible from anywhere within Windows.
+Unlike traditional AI chat applications that require users to open a dedicated window before interacting, Enterprise AI Companion introduces a persistent desktop-native companion that is immediately accessible from anywhere within Windows. The companion understands what the user is working on, can retrieve knowledge from local and cloud sources, and accumulates project context over time.
 
-This epic establishes the assistant as the primary interface of the application while positioning the full workspace as a secondary interface for extended interactions.
+This epic establishes the Desktop Companion as the primary interface of the application while positioning the full Workspace as a secondary interface for extended interactions.
 
-The objective is to create an experience where interacting with AI feels instantaneous, natural, and integrated into the desktop environment rather than confined to a standalone application window.
+The objective is to create an experience where interacting with AI feels instantaneous, natural, and integrated into the desktop environment — not confined to a standalone application window, and not requiring the user to explain their context on every interaction.
 
 ---
 
 ## Vision
 
-Enterprise AI Companion should feel less like a chat application and more like a native desktop assistant.
+Enterprise AI Companion should feel less like a chat application and more like a native desktop companion that understands the user's work.
 
-The assistant should always be available without interrupting the user's workflow.
+The companion should always be available without interrupting the user's workflow.
 
-Rather than requiring users to launch an application and navigate to a conversation window, the assistant remains present as a lightweight floating companion capable of handling quick interactions while providing seamless access to the complete workspace whenever deeper interaction is required.
+Rather than requiring users to launch an application and navigate to a conversation window, the companion remains present as a lightweight floating presence capable of handling quick interactions while providing seamless access to the complete workspace whenever deeper interaction is required.
 
-The desktop assistant should become the product's defining experience and primary interaction model.
+The companion knows what the user is working on. It can retrieve documents from local storage and cloud drives. It accumulates knowledge about active projects. Over time, it becomes more useful without requiring the user to teach it anything explicitly.
+
+The Desktop Companion should become the product's defining experience and primary interaction model.
 
 ---
 
@@ -653,7 +955,7 @@ Current AI desktop applications generally follow the same interaction pattern:
 
 Application
 → Chat Window
-→ AI Assistant
+→ AI Response
 
 This introduces unnecessary friction for simple interactions.
 
@@ -662,25 +964,28 @@ Users must:
 - Locate the application.
 - Open the application.
 - Navigate to the chat interface.
+- Re-establish context for every new request.
 - Begin interacting.
 
-For frequent AI usage, these repeated actions interrupt workflow and reduce accessibility.
+For frequent AI usage, these repeated actions interrupt workflow and reduce accessibility. The need to re-state context on every interaction compounds the friction further.
 
-Enterprise AI Companion aims to eliminate this friction by making AI continuously available through a persistent desktop presence.
+Enterprise AI Companion aims to eliminate this friction by making AI continuously available through a persistent desktop companion that already understands the user's work.
 
 ---
 
 ## Goals
 
-The Product Identity & Assistant Presence epic aims to achieve the following goals:
+The Product Identity & Desktop Companion Presence epic aims to achieve the following goals:
 
-- Establish the assistant as the primary interaction point.
+- Establish the Desktop Companion as the primary interaction point.
 - Provide instant access to AI from anywhere on the desktop.
 - Reduce interaction friction for common AI tasks.
-- Create a unique visual identity distinct from existing AI assistants.
+- Create a unique visual identity distinct from existing AI tools.
 - Maintain a Windows-native user experience.
-- Support smooth transitions between lightweight interactions and the full workspace.
-- Create a scalable architecture capable of supporting future desktop intelligence features.
+- Support smooth transitions between lightweight interactions and the full Workspace.
+- Introduce the Context Engine architecture so workspace signals can enrich requests.
+- Introduce the Retrieval Broker architecture so knowledge retrieval is connector-agnostic.
+- Create a scalable architecture capable of supporting the Project Knowledge Layer in later phases.
 
 ---
 
@@ -962,9 +1267,11 @@ Completion of this epic should produce:
 - Glass Prompt
 - Desktop Presence Layer
 - Workspace Transition Flow
-- Assistant State System
+- Desktop Companion State System
+- Context Engine interface (scaffolded)
+- Retrieval Broker interface (scaffolded, two connectors defined)
 - Windows-native interaction model
-- Supporting architecture for future desktop intelligence
+- Supporting architecture for Project Knowledge Layer in later phases
 
 ---
 
@@ -1041,19 +1348,25 @@ without requiring major architectural changes.
 
 # High-Level Architecture
 
-The Product Identity layer is positioned above the existing conversation architecture.
+The Desktop Companion layer is positioned above the existing conversation architecture. The Context Engine and Retrieval Broker form a new intelligence layer between the presentation surface and the Conversation Service.
 
 ```
 
-Living Orb
-
-↓
-
-Glass Prompt
+Desktop Companion
+(Living Orb · Glass Prompt)
 
 ↓
 
 Desktop Presence Layer
+
+↓
+
+Context Engine
+
+↓
+
+Retrieval Broker
+(Local File Connector · OneDrive Connector)
 
 ↓
 
@@ -1073,9 +1386,11 @@ LLM
 
 ```
 
-The Living Orb is responsible only for user interaction.
+The Living Orb is responsible only for user interaction. It has no knowledge of AI providers, conversations, or retrieval.
 
-It has no knowledge of AI providers, conversations, or external services.
+The Context Engine enriches requests with workspace signals before they reach the Conversation Service.
+
+The Retrieval Broker resolves knowledge queries across connectors. The Conversation Service depends on the Retrieval Broker interface, not on any individual connector.
 
 ---
 
@@ -1154,6 +1469,40 @@ The provider communicates exclusively through Azure API Management.
 
 ---
 
+## Context Engine
+
+Responsible for:
+
+- Observing active workspace signals (open documents, active project folder)
+- Constructing a lightweight context snapshot for each request
+- Passing context to the Conversation Service without exposing workspace implementation details
+
+The Context Engine does not perform retrieval. It gathers ambient signals and packages them.
+
+In Phase 00, the Context Engine returns empty context. The interface is defined so that later phases can attach real workspace signals without changing the Conversation Service.
+
+---
+
+## Retrieval Broker
+
+Responsible for:
+
+- Accepting structured retrieval queries from the Conversation Service
+- Routing queries to active connectors
+- Ranking and merging results across connectors
+- Returning a unified, attributed result set
+
+The Retrieval Broker owns the connector lifecycle. The Conversation Service depends on the broker interface only.
+
+**Version 1 Connectors:**
+
+- Local File Connector — queries the local vector index (Qdrant)
+- OneDrive Connector — queries the user's authenticated OneDrive
+
+In Phase 00, both connectors are scaffolded but inactive. They return empty results.
+
+---
+
 # Proposed Services
 
 The following services are introduced by this epic.
@@ -1209,9 +1558,34 @@ Business logic remains outside this controller.
 
 ---
 
+## ContextEngine
+
+Constructs workspace context snapshots.
+
+Responsibilities:
+
+- Observe active workspace signals
+- Produce a ContextSnapshot consumed by the Conversation Service
+- Expose a clean interface independent of how signals are collected
+
+---
+
+## RetrievalBroker
+
+Resolves retrieval queries across connectors.
+
+Responsibilities:
+
+- Manage connector registry
+- Fan queries across active connectors
+- Merge and rank results
+- Return attributed document fragments
+
+---
+
 ## OrbStateMachine
 
-Defines every possible assistant state.
+Defines every possible Desktop Companion state.
 
 The state machine prevents invalid transitions and ensures consistent animations.
 
@@ -1400,6 +1774,8 @@ Completion of this technical design introduces:
 - OrbController
 - OrbStateMachine
 - AnimationController
+- ContextEngine interface
+- RetrievalBroker interface with LocalFileConnector and OneDriveConnector stubs
 - Updated application architecture
 - Window transition framework
 - Event-driven desktop interaction model
