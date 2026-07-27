@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
+import type { CSSProperties } from "react";
 import { OrbContainer, ORB_SIZE } from "./OrbContainer";
 import { OrbIcon } from "./OrbIcon";
 import { cn } from "@/lib/utils";
 import { OrbState } from "@/services/orb/OrbState";
+import { ORB_FOCUS_RING } from "@/theme/orbTheme";
 
 export interface LivingOrbProps {
   /** Current x position of the orb in viewport pixels. */
@@ -31,6 +33,7 @@ export interface LivingOrbProps {
  *
  * This component owns NO service dependencies. Position, drag logic,
  * persistence, and state machine subscription belong to the parent (OrbLayer).
+ * All visual tokens (colours, shadows, sizing) come from orbTheme.
  */
 export function LivingOrb({
   x,
@@ -73,6 +76,10 @@ export function LivingOrb({
     [onClick]
   );
 
+  const focusStyle: CSSProperties = {
+    "--orb-focus-ring": ORB_FOCUS_RING,
+  } as CSSProperties;
+
   return (
     <OrbContainer x={x} y={y} className={className}>
       <button
@@ -86,12 +93,12 @@ export function LivingOrb({
         onMouseDown={onMouseDown}
         onClick={onClick}
         onKeyDown={handleKeyDown}
-        style={{ width: ORB_SIZE, height: ORB_SIZE }}
+        style={{ ...focusStyle, width: ORB_SIZE, height: ORB_SIZE }}
         className={cn(
-          "rounded-full",
+          "relative rounded-full",
           "cursor-grab",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-          isActive && "ring-2 ring-primary/30",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+          "focus-visible:outline-[var(--orb-focus-ring)]",
           `orb-state-${orbState}`
         )}
       >

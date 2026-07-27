@@ -1,8 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { ORB_SIZE } from "@/theme/orbTheme";
 
-/** Physical size of the orb hit-target in pixels. Meets the 44 × 44 minimum touch target. */
-export const ORB_SIZE = 56;
+export { ORB_SIZE };
 
 interface OrbContainerProps {
   x: number;
@@ -12,10 +12,10 @@ interface OrbContainerProps {
 }
 
 /**
- * Positions the orb absolutely within a fixed full-screen layer.
+ * Positions the orb absolutely within a fixed full-screen layer using
+ * GPU-composited transform. Sizing comes from orbTheme.
  *
- * Responsibility: layout and sizing only.
- * Drag logic, interaction, and hover state live in LivingOrb.
+ * Responsibility: layout and positioning only.
  */
 export function OrbContainer({ x, y, children, className }: OrbContainerProps) {
   const style: CSSProperties = {
