@@ -2911,8 +2911,8 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 - ✅ pnpm workspace configured
 - ✅ Tauri v2 desktop application building successfully
 - ✅ React 19 + Vite frontend bootstrapped
-- ☐ Tauri application identity updated (`productName`, `identifier`, window `title` — currently placeholder `"tauri-app"`)
-- ☐ Minimum window dimensions set in `tauri.conf.json`
+- ✅ Tauri application identity updated (`productName`: "Enterprise AI Companion", `identifier`: "com.volvogroup.enterprise-ai-companion", window `title` corrected)
+- ✅ Minimum window dimensions set in `tauri.conf.json` (minWidth: 960, minHeight: 640; default 1280×800)
 - ☐ Python backend directory scaffolded with README (Phase 01 requires it to exist)
 - ☐ Directory layout decision recorded: confirm `frontend/` as permanent home or migrate to `apps/desktop/` per architecture spec
 
