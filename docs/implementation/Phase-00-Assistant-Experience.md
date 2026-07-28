@@ -188,22 +188,20 @@ Routing
               Context Engine
           (workspace awareness)
                      │
-                     ▼
-           Retrieval Broker
-    (Local File · OneDrive connectors)
+              ContextSnapshot
                      │
                      ▼
-          Conversation Service
-                     │
+          Conversation Service ──── RetrievalQuery ────► Retrieval Broker
+                     │                                (Local File · OneDrive)
                      ▼
               LLM Provider
 
 
 The Desktop Companion is the interaction surface.
 
-The Context Engine enriches requests with workspace context before they reach the Conversation Service.
+The Context Engine enriches each request with a ContextSnapshot before it reaches the Conversation Service. The Conversation Service receives the snapshot as an input; it does not call the Context Engine directly.
 
-The Retrieval Broker resolves knowledge queries across available connectors and returns ranked results that the Conversation Service may incorporate into its response.
+The Conversation Service calls the Retrieval Broker when a request requires document retrieval. The Retrieval Broker fans the query across active connectors and returns a ranked result set. The Conversation Service incorporates those results into its response.
 
 The Workspace sits alongside this flow, providing an expanded view when the interaction outgrows the Glass Prompt.
 
@@ -226,6 +224,24 @@ It sits between the Desktop Companion and the Conversation Service. Before a use
 - Maintain a lightweight representation of the current workspace context
 - Attach relevant context signals to outbound conversation requests
 - Expose a clean interface that the Conversation Service depends on without knowing where context comes from
+
+## Interface
+
+The Context Engine exposes a single method and returns a `ContextSnapshot`:
+
+```typescript
+interface ContextEngine {
+  getSnapshot(): Promise<ContextSnapshot>;
+}
+
+interface ContextSnapshot {
+  activeProjectFolder: string | null;
+  recentDocuments: string[];
+  explicitContext: string | null;
+}
+```
+
+`ContextSnapshot` is the primary contract between the Context Engine and the Conversation Service. Fields not yet populated return `null` or an empty array. The Conversation Service attaches the snapshot to each outbound request.
 
 ## Implementation Note
 
@@ -271,6 +287,35 @@ Retrieves documents from the user's OneDrive. Searches across personal files acc
 - Rank and merge results into a unified response
 - Return a ranked list of document fragments with source metadata
 
+## Interface
+
+The Retrieval Broker exposes a single method. The Conversation Service calls it with a `RetrievalQuery` and receives a `RetrievalResult`:
+
+```typescript
+interface RetrievalBroker {
+  retrieve(query: RetrievalQuery): Promise<RetrievalResult>;
+}
+
+interface RetrievalQuery {
+  text: string;
+  projectFolder: string | null;
+  maxResults: number;
+}
+
+interface RetrievalResult {
+  fragments: DocumentFragment[];
+}
+
+interface DocumentFragment {
+  content: string;
+  sourcePath: string;
+  sourceType: "local" | "onedrive";
+  score: number;
+}
+```
+
+`RetrievalQuery` is the primary contract between the Conversation Service and the Retrieval Broker. Connectors added in future phases receive the same query type. `DocumentFragment.score` is normalized to `[0, 1]` by each connector before the broker merges results.
+
 ## Implementation Note
 
 In Phase 00, the Retrieval Broker is not connected to live connectors. Both connectors return empty results. The interface is defined so that Phase 01 can activate connectors without changing the Conversation Service.
@@ -299,9 +344,30 @@ It represents the accumulated understanding the companion develops about a speci
 
 The Project Knowledge Layer is populated by the indexing pipeline and conversation processing. It is queried by the Context Engine when enriching requests with project-level context. It is read-only from the companion's perspective during a conversation.
 
+## Core Types
+
+The following minimal types are defined now so that services built in Phase 01 can reference them without redesign when Project Knowledge is implemented.
+
+```typescript
+interface Project {
+  id: string;           // UUID
+  name: string;
+  folderPath: string;
+  createdAt: string;    // ISO 8601
+}
+
+interface ProjectKnowledgeRepository {
+  findByFolderPath(folderPath: string): Promise<Project | null>;
+}
+```
+
+`Project` is the entity that other services use when they reference "the active project." The `id` field is the stable identifier; `folderPath` is how the Context Engine resolves a project from a file system signal.
+
+`ProjectKnowledgeRepository` is not implemented in Phase 00. It is defined here so that the Context Engine and Conversation Service can declare a dependency on it without knowing its implementation. In Phase 00, a `NullProjectKnowledgeRepository` returns `null` for all queries.
+
 ## Implementation Note
 
-The Project Knowledge Layer is not implemented in Phase 00. This section documents the concept so that architectural decisions made during Phase 00 do not foreclose its introduction in later phases.
+The Project Knowledge Layer is not implemented in Phase 00. This section documents the concept and establishes the minimal interface contracts so that architectural decisions made during Phase 00 do not foreclose its introduction in later phases.
 
 ---
 
@@ -1265,10 +1331,10 @@ Completion of this epic should produce:
 - Desktop Presence Layer
 - Workspace Transition Flow
 - Desktop Companion State System
-- Context Engine interface (scaffolded)
-- Retrieval Broker interface (scaffolded, two connectors defined)
+- `ContextEngine` interface with `ContextSnapshot` type (scaffolded)
+- `RetrievalBroker` interface with `RetrievalQuery` and `RetrievalResult` types (scaffolded, two connectors defined)
+- `Project` entity and `ProjectKnowledgeRepository` interface stub
 - Windows-native interaction model
-- Supporting architecture for Project Knowledge Layer in later phases
 
 ---
 
@@ -1345,7 +1411,7 @@ without requiring major architectural changes.
 
 # High-Level Architecture
 
-The Desktop Companion layer is positioned above the existing conversation architecture. The Context Engine and Retrieval Broker form a new intelligence layer between the presentation surface and the Conversation Service.
+The Desktop Companion layer is positioned above the existing conversation architecture. The Context Engine enriches requests before they reach the Conversation Service. The Retrieval Broker is called by the Conversation Service when document retrieval is required.
 
 ```
 
@@ -1359,16 +1425,12 @@ Desktop Presence Layer
 ↓
 
 Context Engine
+(produces ContextSnapshot)
 
-↓
+↓ ContextSnapshot
 
-Retrieval Broker
-(Local File Connector · OneDrive Connector)
-
-↓
-
-Conversation Service
-
+Conversation Service ──── RetrievalQuery ────► Retrieval Broker
+                                              (Local File · OneDrive)
 ↓
 
 LLM Provider
@@ -1385,9 +1447,9 @@ LLM
 
 The Living Orb is responsible only for user interaction. It has no knowledge of AI providers, conversations, or retrieval.
 
-The Context Engine enriches requests with workspace signals before they reach the Conversation Service.
+The Context Engine produces a ContextSnapshot and passes it to the Conversation Service. The Conversation Service receives context as an input; it does not call the Context Engine.
 
-The Retrieval Broker resolves knowledge queries across connectors. The Conversation Service depends on the Retrieval Broker interface, not on any individual connector.
+The Conversation Service calls the Retrieval Broker when a request requires document retrieval. The Retrieval Broker resolves the query across connectors and returns a ranked result set. The Conversation Service depends on the Retrieval Broker interface, not on any individual connector.
 
 ---
 
@@ -1447,9 +1509,11 @@ Responsible for:
 - Message lifecycle
 - Conversation state
 - Streaming orchestration
-- Incorporating context snapshots from the Context Engine into each request
+- Accepting a `ContextSnapshot` as an input to each request
+- Calling the Retrieval Broker with a `RetrievalQuery` when document retrieval is required
+- Incorporating retrieved `DocumentFragment` results into the outbound request
 
-Conversation Service remains UI-independent. It consumes context provided by the Context Engine; it does not gather workspace signals directly.
+Conversation Service remains UI-independent. It receives a `ContextSnapshot` from its caller; it does not call the Context Engine directly. It calls the Retrieval Broker by interface; it has no knowledge of individual connectors.
 
 ---
 
@@ -1771,8 +1835,10 @@ Completion of this technical design introduces:
 - OrbController
 - OrbStateMachine
 - AnimationController
-- ContextEngine interface
-- RetrievalBroker interface with LocalFileConnector and OneDriveConnector stubs
+- `ContextEngine` interface with `ContextSnapshot` type
+- `RetrievalBroker` interface with `RetrievalQuery`, `RetrievalResult`, and `DocumentFragment` types
+- `LocalFileConnector` and `OneDriveConnector` stubs
+- `Project` entity and `ProjectKnowledgeRepository` interface stub
 - Updated application architecture
 - Window transition framework
 - Event-driven desktop interaction model
@@ -2840,8 +2906,9 @@ Future enhancements should extend this foundation incrementally while preserving
 - [ ] DesktopPresenceService integrated
 - [ ] OverlayManager implemented
 - [ ] OrbStateMachine implemented
-- [ ] ContextEngine interface defined
-- [ ] RetrievalBroker interface defined
+- [ ] `ContextEngine` interface and `ContextSnapshot` type defined
+- [ ] `RetrievalBroker` interface, `RetrievalQuery`, `RetrievalResult`, and `DocumentFragment` types defined
+- [ ] `Project` entity and `ProjectKnowledgeRepository` interface stub defined
 - [ ] Window management validated
 - [ ] Existing ConversationService remains unchanged
 
