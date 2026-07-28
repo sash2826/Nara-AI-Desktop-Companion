@@ -2894,49 +2894,230 @@ Future enhancements should extend this foundation incrementally while preserving
 
 ---
 
-## Epic Completion Checklist
+## Phase 00 Completion Checklist
 
-### Product
-- [ ] Living Orb implemented
-- [ ] Glass Prompt implemented
-- [ ] Workspace transition completed
-- [ ] Living Orb state system implemented
+This checklist is the authoritative record of everything required for Phase 00 to be complete. It incorporates the results of the full implementation audit conducted against the current codebase and the post-redesign architecture.
 
-### Architecture
-- [ ] DesktopPresenceService integrated
-- [ ] OverlayManager implemented
-- [ ] OrbStateMachine implemented
-- [ ] `ContextEngine` interface and `ContextSnapshot` type defined
-- [ ] `RetrievalBroker` interface, `RetrievalQuery`, `RetrievalResult`, and `DocumentFragment` types defined
-- [ ] `Project` entity and `ProjectKnowledgeRepository` interface stub defined
-- [ ] Window management validated
-- [ ] Existing ConversationService remains unchanged
+Items marked ✅ are verified complete in the current codebase. Items marked ☐ are open.
 
-### User Experience
-- [ ] Windows-native interaction verified
-- [ ] Motion language implemented
-- [ ] Visual design matches specifications
-- [ ] Keyboard shortcuts function correctly
-- [ ] Multi-monitor support validated
+Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 
-### Performance
-- [ ] Startup performance validated
-- [ ] Animations maintain target frame rate
-- [ ] Idle resource usage within budget
+---
 
-### Quality Assurance
-- [ ] Unit tests completed
-- [ ] Integration tests completed
-- [ ] Manual testing completed
-- [ ] Accessibility reviewed
-- [ ] No critical bugs remain
+### Foundation
+
+- ✅ Repository initialized with Git and version control configured
+- ✅ Development tooling configured (Prettier, ESLint, TypeScript, Husky, lint-staged)
+- ✅ pnpm workspace configured
+- ✅ Tauri v2 desktop application building successfully
+- ✅ React 19 + Vite frontend bootstrapped
+- ☐ Tauri application identity updated (`productName`, `identifier`, window `title` — currently placeholder `"tauri-app"`)
+- ☐ Minimum window dimensions set in `tauri.conf.json`
+- ☐ Python backend directory scaffolded with README (Phase 01 requires it to exist)
+- ☐ Directory layout decision recorded: confirm `frontend/` as permanent home or migrate to `apps/desktop/` per architecture spec
+
+---
+
+### Frontend Foundation
+
+- ✅ AppShell layout with animated collapsible sidebar
+- ✅ TopBar and StatusBar
+- ✅ Theme management: light / dark / system, localStorage persistence, media-query listener
+- ✅ Zustand stores: `conversationStore`, `layoutStore`, `navigationStore`, `orbStore`
+- ✅ Navigation via `navigationStore` + `MainContent` page router
+- ✅ 7 navigation items with placeholder pages
+- ☐ `shadcn/ui` base components generated into `src/components/ui/` (Button, Input, Dialog — required by Glass Prompt)
+- ☐ Global keyboard shortcut Ctrl+K wired to open Glass Prompt
+- ☐ Notification service scaffolded (stub only)
+
+---
+
+### Conversation Architecture
+
+- ✅ `LLMProvider` interface (`generateResponse`, `streamResponse`, `cancel`)
+- ✅ `MockProvider` with keyword responses, 600 ms delay, 18 ms/character streaming
+- ✅ `APIMProvider` skeleton (Fetch + SSE structure, `APIMError`, AbortController)
+- ✅ `ConversationService` with streaming lifecycle and `ConversationCallbacks` inversion
+- ✅ `ConversationServiceContext` + `ConversationServiceProvider`
+- ✅ `ProviderFactory` with exhaustive provider switch and `assertNever`
+- ✅ `useConversation` hook (thin bridge to Zustand store)
+- ✅ `conversationStore` with all message operations
+- ☐ `ConversationService.send()` updated to accept optional `context?: ContextSnapshot` (signature seam for Phase 01; `context` is ignored in Phase 00)
+
+---
+
+### Character Widget
+
+- ✅ `AssistantWidget` assembling header, message list, and footer
+- ✅ `MessageBubble` with react-markdown, remark-gfm, streaming cursor, copy button
+- ✅ `MessageList` with auto-scroll-to-bottom and `TypingIndicator`
+- ✅ `PromptInput` auto-resize, Enter to send, Shift+Enter for newline, 4 000-character limit
+- ✅ `TypingIndicator` animated three-dot component
+- ✅ `QuickActions` prompt chips
+- ✅ `SendButton` with streaming cancel state
+
+---
+
+### Architectural Interface Stubs
+
+These interfaces are defined in the architecture document but do not yet exist in the codebase. They must be created before Phase 01 begins.
+
+- ☐ `services/context/ContextEngine.ts` — `ContextEngine` interface + `ContextSnapshot` type
+- ☐ `services/context/NullContextEngine.ts` — returns empty `ContextSnapshot` for all fields
+- ☐ `services/retrieval/RetrievalBroker.ts` — `RetrievalBroker` interface + `RetrievalQuery`, `RetrievalResult`, `DocumentFragment` types
+- ☐ `services/retrieval/NullRetrievalBroker.ts` — returns empty `RetrievalResult`
+- ☐ `services/retrieval/connectors/LocalFileConnector.ts` — stub returning empty results
+- ☐ `services/retrieval/connectors/OneDriveConnector.ts` — stub returning empty results
+- ☐ `services/knowledge/ProjectKnowledgeRepository.ts` — `ProjectKnowledgeRepository` interface + `Project` type
+- ☐ `services/knowledge/NullProjectKnowledgeRepository.ts` — returns `null` for `findByFolderPath`
+- ☐ Unit tests for all null implementations
+
+---
+
+### Living Orb
+
+- ✅ `LivingOrb` component with CSS state classes, accessibility, and interaction callbacks
+- ✅ `OrbContainer` GPU-composited fixed-layer positioning
+- ✅ `OrbIcon` glass sphere (linear-gradient base, radial depth overlay, specular highlight)
+- ✅ `orbTheme` design tokens
+- ✅ `orbStore` with position persistence (localStorage) and viewport clamping
+- ✅ `useOrbPosition` and `useOrbDrag` hooks
+- ✅ `OrbLayer` wiring: position + drag + OrbController registration + state subscription
+- ☐ Multi-monitor orb positioning (monitor boundary detection)
+
+---
+
+### Orb State Machine
+
+The state machine mechanics are correct. The state names in the code use voice-assistant terminology that contradicts the desktop companion product vision and must be aligned with the specification.
+
+- ✅ `OrbStateMachine` deterministic FSM — throws on invalid transition
+- ✅ Subscribe / unsubscribe pattern; `reset()` returns to Idle without notifying
+- ⚠️ **State names must be corrected:**
+  - ☐ Rename `Thinking` → `Processing`
+  - ☐ Rename `Speaking` → `Streaming`
+  - ☐ Remove `Listening` (voice interaction is a Non-Goal in Phase 00)
+  - ☐ Add `Initializing`
+  - ☐ Add `Active` (Glass Prompt open, awaiting user input)
+  - ☐ Add `Success`
+  - ☐ Update `TRANSITIONS` map in `OrbStateMachine.ts` to cover all 10 states
+- ⚠️ **OrbEvents must be corrected:**
+  - ☐ Rename `SpeakingStarted` / `SpeakingFinished` → `StreamingStarted` / `StreamingFinished`
+  - ☐ Remove or replace `ListeningStarted` / `ListeningFinished`
+- ☐ Update `LivingOrb.tsx` CSS class names to match corrected state names
+- ☐ Update all tests that reference renamed or removed states
+
+---
+
+### Desktop Presence
+
+- ✅ `DesktopPresenceService` — initialize, shutdown, registerOverlay, unregisterOverlay, getOverlay, listOverlays
+- ✅ `Overlay` interface — id, initialize, show, hide, destroy, isVisible
+- ✅ `OverlayRegistry` — Map-backed with duplicate-id guard
+- ✅ `DesktopPresenceContext` + `DesktopPresenceProvider`
+- ✅ `OrbController` — implements Overlay, owns OrbStateMachine, hover state transitions, subscribe pattern
+- ✅ Unit tests: `DesktopPresenceService`, `OrbController`, `OverlayRegistry`
+
+---
+
+### Glass Prompt
+
+Nothing in this section exists in the current codebase.
+
+- ☐ `GlassPrompt` overlay component with frosted glass visual (backdrop-filter or Tauri window-vibrancy)
+- ☐ Opens on Living Orb click
+- ☐ Opens on Ctrl+K global keyboard shortcut
+- ☐ Auto-focuses prompt input field on open
+- ☐ Prompt input wired to `ConversationService` (with `ContextSnapshot` passed through)
+- ☐ Streamed response displayed in Glass Prompt
+- ☐ Markdown rendering in Glass Prompt
+- ☐ Close on Escape or outside-click
+- ☐ Conversation state preserved when Glass Prompt closes
+- ☐ Open / close animation (Framer Motion)
+- ☐ Living Orb transitions: `Idle` → `Active` when Glass Prompt opens
+- ☐ Orb state tracks conversation: `Active` → `Processing` → `Streaming` → `Success` / `Error` → `Idle`
+- ☐ Unit tests for `GlassPrompt` component
+- ☐ Integration tests: `GlassPrompt` ↔ `ConversationService` ↔ `OrbController` state flow
+
+---
+
+### Workspace Transition
+
+Nothing in this section exists in the current codebase.
+
+- ☐ `WorkspacePage` implemented (replaces `PlaceholderPage`)
+- ☐ Trigger: Glass Prompt offers "Open in Workspace" when conversation becomes lengthy
+- ☐ Conversation history transferred from Glass Prompt to Workspace without loss
+- ☐ Active streaming continues through the transition without cancellation
+- ☐ Glass Prompt closes gracefully during transition
+- ☐ Focus management: Workspace receives focus after transition
+- ☐ Return path from Workspace to compact orb-only mode
+- ☐ Integration tests for state handoff and streaming continuity
+
+---
+
+### Animation System
+
+- ✅ `OrbAnimationController` — subscribes `OrbStateMachine` to `OrbAnimationDriver` interface
+- ✅ `OrbAnimationDriver` interface
+- ✅ `OrbEvents` typed event set (pending rename per state machine corrections above)
+- ☐ CSS animations defined for all 10 orb states (`orb-state-idle`, `orb-state-hover`, `orb-state-processing`, `orb-state-streaming`, `orb-state-success`, `orb-state-active`, `orb-state-initializing`, `orb-state-notification`, `orb-state-sleeping`, `orb-state-error`)
+- ☐ Concrete `OrbAnimationDriver` implementation (Framer Motion variants or CSS keyframes)
+- ☐ Idle pulse animation (subtle, continuous)
+- ☐ Processing animation (activity indicator)
+- ☐ Streaming animation (content flow indicator)
+- ☐ Success animation (brief positive feedback, returns to Idle)
+- ☐ Error animation (distinct negative feedback)
+- ☐ Glass Prompt open / close transition animations
+- ☐ Workspace transition animation
+
+---
+
+### Windows Native Experience
+
+- ☐ Frosted glass / acrylic material on Glass Prompt (CSS `backdrop-filter` or Tauri `window-vibrancy`)
+- ☐ Minimum window dimensions enforced in `tauri.conf.json`
+- ☐ Multi-monitor orb positioning (monitor boundary detection at runtime)
+- ☐ Ctrl+K global shortcut functional when companion is not the foreground window
+- ☐ Keyboard navigation validated end-to-end through Orb → Glass Prompt → Workspace flow
+- ☐ `prefers-reduced-motion` respected in all orb and Glass Prompt animations
+- ☐ High contrast mode tested
+
+---
+
+### Testing
+
+- ✅ `OrbStateMachine` unit tests (all valid and invalid transitions, subscribers, reset)
+- ✅ `orbStore` unit tests (position defaults, `setPosition`, viewport clamping)
+- ✅ `LivingOrb` component tests (render, accessibility label, CSS state class, data attribute, interactions)
+- ✅ `OrbLayer` integration tests (registration, hover propagation, unmount cleanup)
+- ✅ `useOrbDrag` hook tests (delta calculation, pointer event handling)
+- ✅ `DesktopPresenceService` unit tests (initialize idempotency, shutdown, overlay lifecycle)
+- ✅ `OrbController` unit tests (registration, show/hide, hover FSM, subscribe/dispose)
+- ✅ `OverlayRegistry` unit tests (register, get, unregister, clear, duplicate error)
+- ☐ All existing tests updated after `OrbState` rename
+- ☐ `NullContextEngine` unit tests
+- ☐ `NullRetrievalBroker` unit tests
+- ☐ `NullProjectKnowledgeRepository` unit tests
+- ☐ `GlassPrompt` component unit tests
+- ☐ `GlassPrompt` ↔ `ConversationService` integration tests
+- ☐ Workspace transition integration tests
+- ☐ Manual desktop integration test checklist executed: overlay stability, Ctrl+K focus acquisition, multi-monitor positioning, streaming continuity during window transition
+
+---
 
 ### Documentation
-- [ ] PRD completed
-- [ ] TDD completed
-- [ ] Visual Design Language completed
-- [ ] Implementation completed
-- [ ] Documentation updated
+
+- ✅ PRD completed
+- ✅ TDD completed
+- ✅ Visual Design Language completed
+- ✅ Implementation Plan completed
+- ✅ Acceptance Criteria completed
+- ✅ Architecture diagrams updated (Retrieval Broker call direction resolved)
+- ✅ `ContextSnapshot`, `RetrievalQuery`, `Project` types defined in documentation
+- ☐ ADR-007 (IPC Communication) created
+- ☐ Directory layout decision recorded in documentation
+- ☐ Completion Checklist items updated as implementation proceeds
 
 ---
 
