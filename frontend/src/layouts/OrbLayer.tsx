@@ -5,6 +5,7 @@ import { useOrbDrag } from "@/hooks/useOrbDrag";
 import { useDesktopPresence } from "@/hooks/useDesktopPresence";
 import { OrbController } from "@/services/desktop/OrbController";
 import { OrbState } from "@/services/orb/OrbState";
+import { useGlassPromptStore } from "@/store/glassPromptStore";
 
 /**
  * A fixed full-screen layer that hosts the Living Orb above all other content.
@@ -20,6 +21,7 @@ export function OrbLayer() {
   const { position, setPosition } = useOrbPosition();
   const { handleMouseDown } = useOrbDrag({ position, onPositionChange: setPosition });
   const service = useDesktopPresence();
+  const { isOpen, open, close } = useGlassPromptStore();
 
   const [controller] = useState<OrbController>(() => new OrbController());
   const [orbState, setOrbState] = useState<OrbState>(OrbState.Idle);
@@ -37,6 +39,23 @@ export function OrbLayer() {
     });
     return unsubscribe;
   }, [controller]);
+
+  // Sync orb Active state with Glass Prompt open/closed state
+  useEffect(() => {
+    if (isOpen) {
+      controller.onActivate();
+    } else {
+      controller.onDeactivate();
+    }
+  }, [isOpen, controller]);
+
+  const handleClick = useCallback(() => {
+    if (isOpen) {
+      close();
+    } else {
+      open();
+    }
+  }, [isOpen, open, close]);
 
   const handleHoverChange = useCallback(
     (hovered: boolean) => {
@@ -58,6 +77,7 @@ export function OrbLayer() {
           orbState={orbState}
           onMouseDown={handleMouseDown}
           onHoverChange={handleHoverChange}
+          onClick={handleClick}
         />
       </div>
     </div>

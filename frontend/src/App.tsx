@@ -4,6 +4,7 @@ import { ConversationServiceProvider } from "@/providers/ConversationServiceProv
 import { DesktopPresenceProvider } from "@/providers/DesktopPresenceProvider";
 import { AppShell } from "@/layouts/AppShell";
 import { OrbLayer } from "@/layouts/OrbLayer";
+import { GlassPromptContainer } from "@/layouts/GlassPromptContainer";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <DesktopPresenceProvider>
             <AppShell />
             <OrbLayer />
+            <GlassPromptContainer />
           </DesktopPresenceProvider>
         </ConversationServiceProvider>
       </LayoutProvider>

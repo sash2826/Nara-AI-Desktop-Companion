@@ -107,6 +107,20 @@ export class OrbController implements Overlay {
     this.notify();
   }
 
+  /** Notify the controller that the Glass Prompt has opened. */
+  onActivate(): void {
+    if (!this.stateMachine.canTransition(OrbState.Active)) return;
+    this.stateMachine.setState(OrbState.Active);
+    this.notify();
+  }
+
+  /** Notify the controller that the Glass Prompt has closed. */
+  onDeactivate(): void {
+    if (!this.stateMachine.canTransition(OrbState.Idle)) return;
+    this.stateMachine.setState(OrbState.Idle);
+    this.notify();
+  }
+
   // ── Observable state ─────────────────────────────────────────────────────
 
   /** Returns a snapshot of the current state. */

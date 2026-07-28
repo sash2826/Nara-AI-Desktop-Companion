@@ -3013,19 +3013,19 @@ These interfaces are defined in the architecture document but do not yet exist i
 
 Nothing in this section exists in the current codebase.
 
-- ☐ `GlassPrompt` overlay component with frosted glass visual (backdrop-filter or Tauri window-vibrancy)
-- ☐ Opens on Living Orb click
+- ✅ `GlassPrompt` overlay component with frosted glass visual (`backdrop-blur-xl`, `bg-white/80`)
+- ✅ Opens on Living Orb click
 - ☐ Opens on Ctrl+K global keyboard shortcut
-- ☐ Auto-focuses prompt input field on open
+- ✅ Auto-focuses prompt input field on open
 - ☐ Prompt input wired to `ConversationService` (with `ContextSnapshot` passed through)
 - ☐ Streamed response displayed in Glass Prompt
 - ☐ Markdown rendering in Glass Prompt
-- ☐ Close on Escape or outside-click
+- ✅ Close on Escape or outside-click
 - ☐ Conversation state preserved when Glass Prompt closes
-- ☐ Open / close animation (Framer Motion)
-- ☐ Living Orb transitions: `Idle` → `Active` when Glass Prompt opens
+- ✅ Open / close animation (Framer Motion spring enter, ease-out exit)
+- ✅ Living Orb transitions: `Idle` / `Hover` → `Active` when Glass Prompt opens
 - ☐ Orb state tracks conversation: `Active` → `Processing` → `Streaming` → `Success` / `Error` → `Idle`
-- ☐ Unit tests for `GlassPrompt` component
+- ✅ Unit tests for `GlassPrompt` component (11 tests — visibility, Escape, backdrop, close button, a11y)
 - ☐ Integration tests: `GlassPrompt` ↔ `ConversationService` ↔ `OrbController` state flow
 
 ---
@@ -3088,7 +3088,7 @@ Nothing in this section exists in the current codebase.
 - ✅ `NullContextEngine` unit tests
 - ✅ `NullRetrievalBroker` unit tests
 - ✅ `NullProjectKnowledgeRepository` unit tests
-- ☐ `GlassPrompt` component unit tests
+- ✅ `GlassPrompt` component unit tests
 - ☐ `GlassPrompt` ↔ `ConversationService` integration tests
 - ☐ Workspace transition integration tests
 - ☐ Manual desktop integration test checklist executed: overlay stability, Ctrl+K focus acquisition, multi-monitor positioning, streaming continuity during window transition
