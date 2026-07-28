@@ -37,8 +37,8 @@ describe("LivingOrb", () => {
   });
 
   it("sets data-orb-state attribute to the current state", () => {
-    renderOrb({ orbState: OrbState.Thinking });
-    expect(screen.getByRole("button")).toHaveAttribute("data-orb-state", OrbState.Thinking);
+    renderOrb({ orbState: OrbState.Processing });
+    expect(screen.getByRole("button")).toHaveAttribute("data-orb-state", OrbState.Processing);
   });
 
   it("updates data-orb-state when orbState prop changes", () => {

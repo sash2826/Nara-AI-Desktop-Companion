@@ -1,4 +1,5 @@
 import type { LLMProvider } from "@/services/ai/LLMProvider";
+export type { ContextSnapshot } from "@/services/context/ContextEngine";
 
 /**
  * ConversationService owns all conversation business logic.
@@ -56,8 +57,16 @@ export class ConversationService {
   /**
    * Sends a user prompt and streams the provider response.
    * Cancels any in-flight request before starting a new one.
+   *
+   * `context` is accepted as a Phase 01 seam — the Conversation Service will
+   * use it to scope the Retrieval Broker query once the retrieval pipeline is
+   * wired. In Phase 00 the parameter is ignored.
    */
-  async send(prompt: string, callbacks: ConversationCallbacks): Promise<void> {
+  async send(
+    prompt: string,
+    callbacks: ConversationCallbacks,
+    _context?: ContextSnapshot
+  ): Promise<void> {
     // Cancel any previous request before starting a new one.
     this.cancel();
 

@@ -11,12 +11,12 @@
 export type OrbEventType =
   | "HoverEnter"
   | "HoverLeave"
-  | "ThinkingStarted"
-  | "ThinkingFinished"
-  | "ListeningStarted"
-  | "ListeningFinished"
-  | "SpeakingStarted"
-  | "SpeakingFinished"
+  | "InputStarted"
+  | "InputFinished"
+  | "ProcessingStarted"
+  | "ProcessingFinished"
+  | "StreamingStarted"
+  | "StreamingFinished"
   | "NotificationReceived"
   | "ErrorOccurred"
   | "Sleep"
@@ -30,28 +30,28 @@ export interface HoverLeaveEvent {
   readonly type: "HoverLeave";
 }
 
-export interface ThinkingStartedEvent {
-  readonly type: "ThinkingStarted";
+export interface InputStartedEvent {
+  readonly type: "InputStarted";
 }
 
-export interface ThinkingFinishedEvent {
-  readonly type: "ThinkingFinished";
+export interface InputFinishedEvent {
+  readonly type: "InputFinished";
 }
 
-export interface ListeningStartedEvent {
-  readonly type: "ListeningStarted";
+export interface ProcessingStartedEvent {
+  readonly type: "ProcessingStarted";
 }
 
-export interface ListeningFinishedEvent {
-  readonly type: "ListeningFinished";
+export interface ProcessingFinishedEvent {
+  readonly type: "ProcessingFinished";
 }
 
-export interface SpeakingStartedEvent {
-  readonly type: "SpeakingStarted";
+export interface StreamingStartedEvent {
+  readonly type: "StreamingStarted";
 }
 
-export interface SpeakingFinishedEvent {
-  readonly type: "SpeakingFinished";
+export interface StreamingFinishedEvent {
+  readonly type: "StreamingFinished";
 }
 
 export interface NotificationReceivedEvent {
@@ -76,12 +76,12 @@ export interface WakeEvent {
 export type OrbEvent =
   | HoverEnterEvent
   | HoverLeaveEvent
-  | ThinkingStartedEvent
-  | ThinkingFinishedEvent
-  | ListeningStartedEvent
-  | ListeningFinishedEvent
-  | SpeakingStartedEvent
-  | SpeakingFinishedEvent
+  | InputStartedEvent
+  | InputFinishedEvent
+  | ProcessingStartedEvent
+  | ProcessingFinishedEvent
+  | StreamingStartedEvent
+  | StreamingFinishedEvent
   | NotificationReceivedEvent
   | ErrorOccurredEvent
   | SleepEvent

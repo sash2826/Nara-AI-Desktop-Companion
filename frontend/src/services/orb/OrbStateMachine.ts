@@ -5,19 +5,22 @@ export type OrbStateListener = (state: OrbState) => void;
 
 /** All valid state transitions. Every entry not listed here is rejected. */
 const TRANSITIONS = new Map<OrbState, Set<OrbState>>([
+  [OrbState.Initializing, new Set<OrbState>([OrbState.Idle])],
   [
     OrbState.Idle,
     new Set<OrbState>([
       OrbState.Hover,
-      OrbState.Thinking,
+      OrbState.Active,
+      OrbState.Processing,
       OrbState.Sleeping,
       OrbState.Notification,
     ]),
   ],
-  [OrbState.Hover, new Set<OrbState>([OrbState.Idle, OrbState.Thinking])],
-  [OrbState.Thinking, new Set<OrbState>([OrbState.Speaking, OrbState.Error, OrbState.Idle])],
-  [OrbState.Speaking, new Set<OrbState>([OrbState.Idle])],
-  [OrbState.Listening, new Set<OrbState>([OrbState.Thinking, OrbState.Idle])],
+  [OrbState.Hover, new Set<OrbState>([OrbState.Idle, OrbState.Active])],
+  [OrbState.Active, new Set<OrbState>([OrbState.Idle, OrbState.Processing])],
+  [OrbState.Processing, new Set<OrbState>([OrbState.Streaming, OrbState.Error, OrbState.Idle])],
+  [OrbState.Streaming, new Set<OrbState>([OrbState.Success, OrbState.Error, OrbState.Idle])],
+  [OrbState.Success, new Set<OrbState>([OrbState.Idle])],
   [OrbState.Notification, new Set<OrbState>([OrbState.Idle])],
   [OrbState.Error, new Set<OrbState>([OrbState.Idle])],
   [OrbState.Sleeping, new Set<OrbState>([OrbState.Idle])],

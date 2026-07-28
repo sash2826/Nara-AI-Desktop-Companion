@@ -5,12 +5,14 @@
  * New states must not be added without a corresponding update to OrbStateMachine.
  */
 export enum OrbState {
+  Initializing = "initializing",
   Idle = "idle",
   Hover = "hover",
-  Thinking = "thinking",
-  Listening = "listening",
-  Speaking = "speaking",
+  Active = "active",
+  Processing = "processing",
+  Streaming = "streaming",
+  Success = "success",
   Notification = "notification",
-  Error = "error",
   Sleeping = "sleeping",
+  Error = "error",
 }
