@@ -3017,14 +3017,14 @@ Nothing in this section exists in the current codebase.
 - ✅ Opens on Living Orb click
 - ☐ Opens on Ctrl+K global keyboard shortcut
 - ✅ Auto-focuses prompt input field on open
-- ☐ Prompt input wired to `ConversationService` (with `ContextSnapshot` passed through)
-- ☐ Streamed response displayed in Glass Prompt
-- ☐ Markdown rendering in Glass Prompt
+- ✅ Prompt input wired to `ConversationService` via `useConversation` hook
+- ✅ Streamed response displayed in Glass Prompt (`MessageList` + `MessageBubble` reused)
+- ✅ Markdown rendering in Glass Prompt (via existing `MessageBubble` + react-markdown)
 - ✅ Close on Escape or outside-click
-- ☐ Conversation state preserved when Glass Prompt closes
+- ✅ Conversation state preserved when Glass Prompt closes (lives in `conversationStore`)
 - ✅ Open / close animation (Framer Motion spring enter, ease-out exit)
 - ✅ Living Orb transitions: `Idle` / `Hover` → `Active` when Glass Prompt opens
-- ☐ Orb state tracks conversation: `Active` → `Processing` → `Streaming` → `Success` / `Error` → `Idle`
+- ✅ Orb state tracks conversation: `Active` → `Processing` → `Streaming` → `Success` → `Active`
 - ✅ Unit tests for `GlassPrompt` component (11 tests — visibility, Escape, backdrop, close button, a11y)
 - ☐ Integration tests: `GlassPrompt` ↔ `ConversationService` ↔ `OrbController` state flow
 

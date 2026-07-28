@@ -6,6 +6,7 @@ import { useDesktopPresence } from "@/hooks/useDesktopPresence";
 import { OrbController } from "@/services/desktop/OrbController";
 import { OrbState } from "@/services/orb/OrbState";
 import { useGlassPromptStore } from "@/store/glassPromptStore";
+import { OrbControllerContext } from "@/providers/OrbControllerContext";
 
 /**
  * A fixed full-screen layer that hosts the Living Orb above all other content.
@@ -69,17 +70,19 @@ export function OrbLayer() {
   );
 
   return (
-    <div className="pointer-events-none fixed inset-0" style={{ zIndex: "var(--z-top)" }}>
-      <div className="pointer-events-auto">
-        <LivingOrb
-          x={position.x}
-          y={position.y}
-          orbState={orbState}
-          onMouseDown={handleMouseDown}
-          onHoverChange={handleHoverChange}
-          onClick={handleClick}
-        />
+    <OrbControllerContext.Provider value={controller}>
+      <div className="pointer-events-none fixed inset-0" style={{ zIndex: "var(--z-top)" }}>
+        <div className="pointer-events-auto">
+          <LivingOrb
+            x={position.x}
+            y={position.y}
+            orbState={orbState}
+            onMouseDown={handleMouseDown}
+            onHoverChange={handleHoverChange}
+            onClick={handleClick}
+          />
+        </div>
       </div>
-    </div>
+    </OrbControllerContext.Provider>
   );
 }

@@ -121,6 +121,44 @@ export class OrbController implements Overlay {
     this.notify();
   }
 
+  /** Notify the controller that a conversation request has been submitted. */
+  onProcessingStart(): void {
+    if (!this.stateMachine.canTransition(OrbState.Processing)) return;
+    this.stateMachine.setState(OrbState.Processing);
+    this.notify();
+  }
+
+  /** Notify the controller that streaming has begun. */
+  onStreamingStart(): void {
+    if (!this.stateMachine.canTransition(OrbState.Streaming)) return;
+    this.stateMachine.setState(OrbState.Streaming);
+    this.notify();
+  }
+
+  /** Notify the controller that the response completed successfully. */
+  onStreamingComplete(): void {
+    if (!this.stateMachine.canTransition(OrbState.Success)) return;
+    this.stateMachine.setState(OrbState.Success);
+    this.notify();
+  }
+
+  /**
+   * Return the orb to Active state after a conversation turn completes.
+   * Used when the Glass Prompt remains open and the user can send another message.
+   */
+  onReturnToActive(): void {
+    if (!this.stateMachine.canTransition(OrbState.Active)) return;
+    this.stateMachine.setState(OrbState.Active);
+    this.notify();
+  }
+
+  /** Notify the controller that an error occurred during a request. */
+  onError(): void {
+    if (!this.stateMachine.canTransition(OrbState.Error)) return;
+    this.stateMachine.setState(OrbState.Error);
+    this.notify();
+  }
+
   // ── Observable state ─────────────────────────────────────────────────────
 
   /** Returns a snapshot of the current state. */
