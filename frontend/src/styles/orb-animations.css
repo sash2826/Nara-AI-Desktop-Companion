@@ -1,0 +1,290 @@
+/*
+ * Orb State Animations
+ *
+ * Each .orb-state-* class maps to one OrbState enum value. The string value
+ * of each enum member (e.g. OrbState.Idle = "idle") is used as the suffix,
+ * so these class names are the canonical source of truth for orb appearance.
+ *
+ * Animation strategy:
+ *   - CSS keyframes for continuous loops (idle pulse, processing spin,
+ *     streaming wave, sleeping breath)
+ *   - CSS transitions for one-shot state changes (hover lift, active glow,
+ *     success flash, error shake)
+ *   - prefers-reduced-motion: all animations reduced to opacity-only fades
+ *
+ * The orb button element already carries `orb-state-{value}` via LivingOrb.
+ * The OrbIcon element inside it is targeted with the descendant selector.
+ */
+
+/* ─── Keyframe Definitions ──────────────────────────────────────────────────── */
+
+/* Idle: slow, subtle pulse — signals presence without demanding attention */
+@keyframes orb-idle-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 hsl(var(--primary) / 0),
+      var(--shadow-elevation-4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px hsl(var(--primary) / 0.12),
+      var(--shadow-elevation-4);
+  }
+}
+
+/* Processing: rotating conic gradient overlay — signals active computation */
+@keyframes orb-processing-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Processing: pulsing scale — subtle size variation */
+@keyframes orb-processing-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+/* Streaming: radial wave expanding outward — signals content flowing in */
+@keyframes orb-streaming-wave {
+  0% {
+    box-shadow:
+      0 0 0 0 hsl(var(--primary) / 0.5),
+      var(--shadow-elevation-4);
+    transform: scale(1);
+  }
+  70% {
+    box-shadow:
+      0 0 0 10px hsl(var(--primary) / 0),
+      var(--shadow-elevation-4);
+    transform: scale(1.04);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 hsl(var(--primary) / 0),
+      var(--shadow-elevation-4);
+    transform: scale(1);
+  }
+}
+
+/* Success: quick scale-up then back — tactile confirmation */
+@keyframes orb-success-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.14);
+  }
+  70% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Error: horizontal shake — clear negative feedback */
+@keyframes orb-error-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-5px);
+  }
+  30% {
+    transform: translateX(5px);
+  }
+  45% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(4px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+  90% {
+    transform: translateX(2px);
+  }
+}
+
+/* Sleeping: slow breath — orb is dormant, barely alive */
+@keyframes orb-sleeping-breath {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.96);
+  }
+}
+
+/* Notification: brief bounce — draws attention without alarming */
+@keyframes orb-notification-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-3px);
+  }
+}
+
+/* ─── Base Transition ────────────────────────────────────────────────────────── */
+
+/*
+ * All state classes share a smooth transition for the properties that
+ * non-animated states change (opacity, box-shadow, filter).
+ * Animated states override box-shadow and transform via keyframes.
+ */
+.orb-state-idle,
+.orb-state-hover,
+.orb-state-active,
+.orb-state-initializing,
+.orb-state-processing,
+.orb-state-streaming,
+.orb-state-success,
+.orb-state-notification,
+.orb-state-sleeping,
+.orb-state-error {
+  transition:
+    opacity 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease,
+    transform 0.2s ease;
+}
+
+/* ─── Initializing ───────────────────────────────────────────────────────────── */
+
+/*
+ * Orb fades in as the app loads. No keyframe — the opacity transition
+ * from 0 to 1 on mount is sufficient.
+ */
+.orb-state-initializing {
+  opacity: 0.6;
+}
+
+/* ─── Idle ───────────────────────────────────────────────────────────────────── */
+
+.orb-state-idle {
+  opacity: 1;
+  animation: orb-idle-pulse 3.2s ease-in-out infinite;
+}
+
+/* ─── Hover ──────────────────────────────────────────────────────────────────── */
+
+.orb-state-hover {
+  opacity: 1;
+  transform: scale(1.07) translateY(-1px);
+  box-shadow:
+    0 0 0 3px hsl(var(--primary) / 0.22),
+    0 4px 20px hsl(var(--primary) / 0.28),
+    var(--shadow-elevation-4);
+  filter: brightness(1.08);
+}
+
+/* ─── Active (Glass Prompt open) ─────────────────────────────────────────────── */
+
+.orb-state-active {
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow:
+    0 0 0 4px hsl(var(--primary) / 0.35),
+    0 6px 28px hsl(var(--primary) / 0.4),
+    var(--shadow-elevation-4);
+  filter: brightness(1.12);
+}
+
+/* ─── Processing ─────────────────────────────────────────────────────────────── */
+
+.orb-state-processing {
+  opacity: 1;
+  animation: orb-processing-scale 1s ease-in-out infinite;
+  box-shadow:
+    0 0 0 3px hsl(var(--primary) / 0.28),
+    0 4px 20px hsl(var(--primary) / 0.32),
+    var(--shadow-elevation-4);
+  filter: brightness(1.06) saturate(1.2);
+}
+
+/* ─── Streaming ──────────────────────────────────────────────────────────────── */
+
+.orb-state-streaming {
+  opacity: 1;
+  animation: orb-streaming-wave 1.4s ease-out infinite;
+  filter: brightness(1.1) saturate(1.3);
+}
+
+/* ─── Success ────────────────────────────────────────────────────────────────── */
+
+.orb-state-success {
+  opacity: 1;
+  animation: orb-success-pop 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+  filter: brightness(1.18) saturate(1.4);
+}
+
+/* ─── Notification ───────────────────────────────────────────────────────────── */
+
+.orb-state-notification {
+  opacity: 1;
+  animation: orb-notification-bounce 0.6s ease-out;
+  box-shadow:
+    0 0 0 5px hsl(var(--color-warning-500) / 0.3),
+    var(--shadow-elevation-4);
+}
+
+/* ─── Sleeping ───────────────────────────────────────────────────────────────── */
+
+.orb-state-sleeping {
+  animation: orb-sleeping-breath 4s ease-in-out infinite;
+  filter: grayscale(0.4) brightness(0.7);
+}
+
+/* ─── Error ──────────────────────────────────────────────────────────────────── */
+
+.orb-state-error {
+  opacity: 1;
+  animation: orb-error-shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+  filter: brightness(0.9) saturate(1.5) hue-rotate(-15deg);
+}
+
+/* ─── Reduced Motion ─────────────────────────────────────────────────────────── */
+
+/*
+ * Honour prefers-reduced-motion. All continuous loops are disabled;
+ * one-shot animations (success, error, notification) are replaced with
+ * an opacity transition so the state change is still communicated.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .orb-state-idle,
+  .orb-state-processing,
+  .orb-state-streaming,
+  .orb-state-sleeping,
+  .orb-state-notification {
+    animation: none;
+  }
+
+  .orb-state-success,
+  .orb-state-error {
+    animation: none;
+    transition: opacity 0.3s ease;
+  }
+}

@@ -3050,14 +3050,18 @@ Nothing in this section exists in the current codebase.
 - ✅ `OrbAnimationController` — subscribes `OrbStateMachine` to `OrbAnimationDriver` interface
 - ✅ `OrbAnimationDriver` interface
 - ✅ `OrbEvents` typed event set — renamed to match corrected state names
-- ☐ CSS animations defined for all 10 orb states (`orb-state-idle`, `orb-state-hover`, `orb-state-processing`, `orb-state-streaming`, `orb-state-success`, `orb-state-active`, `orb-state-initializing`, `orb-state-notification`, `orb-state-sleeping`, `orb-state-error`)
-- ☐ Concrete `OrbAnimationDriver` implementation (Framer Motion variants or CSS keyframes)
-- ☐ Idle pulse animation (subtle, continuous)
-- ☐ Processing animation (activity indicator)
-- ☐ Streaming animation (content flow indicator)
-- ☐ Success animation (brief positive feedback, returns to Idle)
-- ☐ Error animation (distinct negative feedback)
-- ☐ Glass Prompt open / close transition animations
+- ✅ CSS animations defined for all 10 orb states in `src/styles/orb-animations.css`
+- ✅ Idle pulse animation (3.2s ease-in-out box-shadow loop)
+- ✅ Hover lift (scale + coloured halo, CSS transition)
+- ✅ Active glow (scale 1.1 + stronger halo, CSS transition)
+- ✅ Processing animation (scale pulse 1s infinite)
+- ✅ Streaming animation (expanding wave ring 1.4s infinite)
+- ✅ Success animation (pop keyframe, 0.45s forwards)
+- ✅ Error animation (horizontal shake keyframe, 0.5s forwards)
+- ✅ Sleeping animation (4s breath loop — scale + opacity)
+- ✅ Notification animation (bounce keyframe, 0.6s)
+- ✅ `prefers-reduced-motion` respected — all loops disabled, one-shots become opacity fades
+- ✅ Glass Prompt open / close transition animations (Framer Motion spring enter, ease exit)
 - ☐ Workspace transition animation
 
 ---
@@ -3069,7 +3073,7 @@ Nothing in this section exists in the current codebase.
 - ☐ Multi-monitor orb positioning (monitor boundary detection at runtime)
 - ☐ Ctrl+K global shortcut functional when companion is not the foreground window
 - ☐ Keyboard navigation validated end-to-end through Orb → Glass Prompt → Workspace flow
-- ☐ `prefers-reduced-motion` respected in all orb and Glass Prompt animations
+- ✅ `prefers-reduced-motion` respected in all orb and Glass Prompt animations
 - ☐ High contrast mode tested
 
 ---

@@ -18,7 +18,7 @@ vi.mock("framer-motion", async (importOriginal) => {
   };
 });
 
-function renderPrompt(isOpen: boolean, onClose = vi.fn()) {
+function renderPrompt(isOpen: boolean, onClose: () => void = vi.fn()) {
   return render(
     <GlassPrompt isOpen={isOpen} onClose={onClose}>
       <input data-testid="inner-input" />
@@ -27,7 +27,7 @@ function renderPrompt(isOpen: boolean, onClose = vi.fn()) {
 }
 
 describe("GlassPrompt", () => {
-  let onClose: ReturnType<typeof vi.fn>;
+  let onClose: () => void;
 
   beforeEach(() => {
     onClose = vi.fn();
