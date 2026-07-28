@@ -1,4 +1,6 @@
 import type { LLMProvider } from "@/services/ai/LLMProvider";
+import type { ContextSnapshot } from "@/services/context/ContextEngine";
+
 export type { ContextSnapshot } from "@/services/context/ContextEngine";
 
 /**

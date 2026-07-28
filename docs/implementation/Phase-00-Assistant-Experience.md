@@ -2926,7 +2926,7 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 - ✅ Zustand stores: `conversationStore`, `layoutStore`, `navigationStore`, `orbStore`
 - ✅ Navigation via `navigationStore` + `MainContent` page router
 - ✅ 7 navigation items with placeholder pages
-- ☐ `shadcn/ui` base components generated into `src/components/ui/` (Button, Input, Dialog — required by Glass Prompt)
+- ✅ `shadcn/ui` base components written into `src/components/ui/` (Button, Input, Dialog)
 - ☐ Global keyboard shortcut Ctrl+K wired to open Glass Prompt
 - ☐ Notification service scaffolded (stub only)
 
