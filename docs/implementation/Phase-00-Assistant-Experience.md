@@ -2942,7 +2942,7 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 - ✅ `ProviderFactory` with exhaustive provider switch and `assertNever`
 - ✅ `useConversation` hook (thin bridge to Zustand store)
 - ✅ `conversationStore` with all message operations
-- ☐ `ConversationService.send()` updated to accept optional `context?: ContextSnapshot` (signature seam for Phase 01; `context` is ignored in Phase 00)
+- ✅ `ConversationService.send()` updated to accept optional `context?: ContextSnapshot` (signature seam for Phase 01; `context` is ignored in Phase 00)
 
 ---
 
@@ -2962,15 +2962,15 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 
 These interfaces are defined in the architecture document but do not yet exist in the codebase. They must be created before Phase 01 begins.
 
-- ☐ `services/context/ContextEngine.ts` — `ContextEngine` interface + `ContextSnapshot` type
-- ☐ `services/context/NullContextEngine.ts` — returns empty `ContextSnapshot` for all fields
-- ☐ `services/retrieval/RetrievalBroker.ts` — `RetrievalBroker` interface + `RetrievalQuery`, `RetrievalResult`, `DocumentFragment` types
-- ☐ `services/retrieval/NullRetrievalBroker.ts` — returns empty `RetrievalResult`
-- ☐ `services/retrieval/connectors/LocalFileConnector.ts` — stub returning empty results
-- ☐ `services/retrieval/connectors/OneDriveConnector.ts` — stub returning empty results
-- ☐ `services/knowledge/ProjectKnowledgeRepository.ts` — `ProjectKnowledgeRepository` interface + `Project` type
-- ☐ `services/knowledge/NullProjectKnowledgeRepository.ts` — returns `null` for `findByFolderPath`
-- ☐ Unit tests for all null implementations
+- ✅ `services/context/ContextEngine.ts` — `ContextEngine` interface + `ContextSnapshot` type
+- ✅ `services/context/NullContextEngine.ts` — returns empty `ContextSnapshot` for all fields
+- ✅ `services/retrieval/RetrievalBroker.ts` — `RetrievalBroker` interface + `RetrievalQuery`, `RetrievalResult`, `DocumentFragment` types
+- ✅ `services/retrieval/NullRetrievalBroker.ts` — returns empty `RetrievalResult`
+- ✅ `services/retrieval/connectors/LocalFileConnector.ts` — stub returning empty results
+- ✅ `services/retrieval/connectors/OneDriveConnector.ts` — stub returning empty results
+- ✅ `services/knowledge/ProjectKnowledgeRepository.ts` — `ProjectKnowledgeRepository` interface + `Project` type
+- ✅ `services/knowledge/NullProjectKnowledgeRepository.ts` — returns `null` for `findByFolderPath`
+- ✅ Unit tests for all null implementations
 
 ---
 
@@ -2989,23 +2989,12 @@ These interfaces are defined in the architecture document but do not yet exist i
 
 ### Orb State Machine
 
-The state machine mechanics are correct. The state names in the code use voice-assistant terminology that contradicts the desktop companion product vision and must be aligned with the specification.
-
 - ✅ `OrbStateMachine` deterministic FSM — throws on invalid transition
 - ✅ Subscribe / unsubscribe pattern; `reset()` returns to Idle without notifying
-- ⚠️ **State names must be corrected:**
-  - ☐ Rename `Thinking` → `Processing`
-  - ☐ Rename `Speaking` → `Streaming`
-  - ☐ Remove `Listening` (voice interaction is a Non-Goal in Phase 00)
-  - ☐ Add `Initializing`
-  - ☐ Add `Active` (Glass Prompt open, awaiting user input)
-  - ☐ Add `Success`
-  - ☐ Update `TRANSITIONS` map in `OrbStateMachine.ts` to cover all 10 states
-- ⚠️ **OrbEvents must be corrected:**
-  - ☐ Rename `SpeakingStarted` / `SpeakingFinished` → `StreamingStarted` / `StreamingFinished`
-  - ☐ Remove or replace `ListeningStarted` / `ListeningFinished`
-- ☐ Update `LivingOrb.tsx` CSS class names to match corrected state names
-- ☐ Update all tests that reference renamed or removed states
+- ✅ State names aligned to 10-state specification: `Initializing`, `Idle`, `Hover`, `Active`, `Processing`, `Streaming`, `Success`, `Notification`, `Sleeping`, `Error`
+- ✅ `TRANSITIONS` map updated to cover all 10 states with correct edges
+- ✅ `OrbEvents` renamed: voice terminology removed; `StreamingStarted/Finished`, `ProcessingStarted/Finished`, `InputStarted/Finished` in place
+- ✅ `LivingOrb.tsx` CSS class names verified correct (`orb-state-*` uses enum string values)
 
 ---
 
@@ -3060,7 +3049,7 @@ Nothing in this section exists in the current codebase.
 
 - ✅ `OrbAnimationController` — subscribes `OrbStateMachine` to `OrbAnimationDriver` interface
 - ✅ `OrbAnimationDriver` interface
-- ✅ `OrbEvents` typed event set (pending rename per state machine corrections above)
+- ✅ `OrbEvents` typed event set — renamed to match corrected state names
 - ☐ CSS animations defined for all 10 orb states (`orb-state-idle`, `orb-state-hover`, `orb-state-processing`, `orb-state-streaming`, `orb-state-success`, `orb-state-active`, `orb-state-initializing`, `orb-state-notification`, `orb-state-sleeping`, `orb-state-error`)
 - ☐ Concrete `OrbAnimationDriver` implementation (Framer Motion variants or CSS keyframes)
 - ☐ Idle pulse animation (subtle, continuous)
@@ -3095,10 +3084,10 @@ Nothing in this section exists in the current codebase.
 - ✅ `DesktopPresenceService` unit tests (initialize idempotency, shutdown, overlay lifecycle)
 - ✅ `OrbController` unit tests (registration, show/hide, hover FSM, subscribe/dispose)
 - ✅ `OverlayRegistry` unit tests (register, get, unregister, clear, duplicate error)
-- ☐ All existing tests updated after `OrbState` rename
-- ☐ `NullContextEngine` unit tests
-- ☐ `NullRetrievalBroker` unit tests
-- ☐ `NullProjectKnowledgeRepository` unit tests
+- ✅ All existing tests updated after `OrbState` rename
+- ✅ `NullContextEngine` unit tests
+- ✅ `NullRetrievalBroker` unit tests
+- ✅ `NullProjectKnowledgeRepository` unit tests
 - ☐ `GlassPrompt` component unit tests
 - ☐ `GlassPrompt` ↔ `ConversationService` integration tests
 - ☐ Workspace transition integration tests
