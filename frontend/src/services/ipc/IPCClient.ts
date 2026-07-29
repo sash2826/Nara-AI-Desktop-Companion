@@ -55,6 +55,12 @@ export interface PersistedConversation {
   messages: PersistedMessage[];
 }
 
+export interface ConversationSummary {
+  id: string;
+  created_at: string;
+  message_count: number;
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -134,9 +140,20 @@ async function loadConversation(conversationId: string): Promise<PersistedConver
   return invoke<PersistedConversation>("load_conversation", { conversationId });
 }
 
+/**
+ * Calls the `list_conversations` Tauri command.
+ *
+ * Returns all conversations ordered by most recent first.
+ * Used on startup to resume the last active conversation.
+ */
+async function listConversations(): Promise<ConversationSummary[]> {
+  return invoke<ConversationSummary[]>("list_conversations");
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
   saveMessage,
   loadConversation,
+  listConversations,
 } as const;

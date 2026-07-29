@@ -69,6 +69,13 @@ pub struct ConversationResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ConversationSummaryResponse {
+    pub id: String,
+    pub created_at: String,
+    pub message_count: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IpcError {
     pub message: String,
 }
@@ -182,6 +189,31 @@ async fn save_message(
         .json::<MessageResponse>()
         .await
         .map_err(|e| format!("Failed to parse save_message response: {}", e))
+}
+
+/// Returns all conversations, most recent first, with their message counts.
+#[tauri::command]
+async fn list_conversations(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<ConversationSummaryResponse>, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/conversations", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("list_conversations request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "list_conversations returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<Vec<ConversationSummaryResponse>>()
+        .await
+        .map_err(|e| format!("Failed to parse list_conversations response: {}", e))
 }
 
 /// Loads all messages for a conversation from SQLite, oldest first.
@@ -341,7 +373,8 @@ pub fn run() {
             health_check,
             generate_embedding,
             save_message,
-            load_conversation
+            load_conversation,
+            list_conversations
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

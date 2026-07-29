@@ -148,6 +148,40 @@ describe("IPCClient.generateEmbedding", () => {
   });
 });
 
+describe("IPCClient.listConversations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("invokes list_conversations and returns summaries", async () => {
+    const fakeSummaries = [
+      { id: "conv-2", created_at: "2026-07-29T12:01:00Z", message_count: 5 },
+      { id: "conv-1", created_at: "2026-07-28T09:00:00Z", message_count: 3 },
+    ];
+    mockInvoke.mockResolvedValueOnce(fakeSummaries);
+
+    const result = await IPCClient.listConversations();
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_conversations");
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe("conv-2");
+    expect(result[0].message_count).toBe(5);
+  });
+
+  it("returns an empty array when no conversations exist", async () => {
+    mockInvoke.mockResolvedValueOnce([]);
+
+    const result = await IPCClient.listConversations();
+
+    expect(result).toEqual([]);
+  });
+
+  it("propagates errors from invoke", async () => {
+    mockInvoke.mockRejectedValueOnce("sidecar not ready");
+    await expect(IPCClient.listConversations()).rejects.toMatch("sidecar not ready");
+  });
+});
+
 describe("waitForSidecar", () => {
   beforeEach(() => {
     vi.clearAllMocks();

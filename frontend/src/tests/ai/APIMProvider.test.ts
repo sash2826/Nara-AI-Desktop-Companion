@@ -22,6 +22,7 @@ import type { APIMConfig } from "@/config/ai";
 
 const TEST_CONFIG: APIMConfig = {
   endpoint: "https://test.azure-api.net/llm",
+  model: "gpt-test-model",
   subscriptionKey: "test-key-123",
   timeoutMs: 5_000,
   maxRetries: 2,
@@ -229,7 +230,13 @@ describe("APIMProvider — error mapping", () => {
     fetchSpy.mockResolvedValueOnce(mockJSONResponse({ error: { message: "Unauthorized" } }, 401));
 
     const provider = makeProvider({ maxRetries: 0 });
-    await expect(provider.streamResponse("hi").next()).rejects.toMatchObject({
+    const consume = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of provider.streamResponse("hi")) {
+        /* drain */
+      }
+    };
+    await expect(consume()).rejects.toMatchObject({
       name: "APIMError",
       statusCode: 401,
     });

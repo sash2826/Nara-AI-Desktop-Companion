@@ -1,6 +1,6 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { ConversationServiceContext } from "./ConversationServiceContext";
-import { ConversationIdContext } from "./ConversationIdContext";
+import { ConversationIdContext, type ConversationIdContextValue } from "./ConversationIdContext";
 import { ContextEngineContext } from "./ContextEngineContext";
 import { ConversationService } from "@/services/conversation/ConversationService";
 import { WorkspaceContextEngine } from "@/services/context/WorkspaceContextEngine";
@@ -15,7 +15,6 @@ interface ConversationServiceProviderProps {
   children: ReactNode;
 }
 
-/** Generates a simple time-based conversation ID for the current session. */
 function makeConversationId(): string {
   return `conv-${Date.now()}`;
 }
@@ -25,20 +24,17 @@ function makeConversationId(): string {
  *
  * Service lifetime is tied to this component's mount/unmount cycle — no hidden
  * global state. Switching between development (mock) and production (apim)
- * requires only changing LLM_CONFIG.provider. No React component, hook, or
- * service implementation needs modification.
+ * requires only changing LLM_CONFIG.provider.
  *
- * useState with a lazy initializer creates the service exactly once per mount.
- * On mount, any stuck isTyping/isStreaming state from a previous session is
- * cleared so the guard in useConversation does not block the first message.
+ * Conversation ID resolution (Tauri only):
+ *   1. On mount, call listConversations() to find the most recent conversation.
+ *   2. Use its ID so the session continues where it left off.
+ *   3. Fall back to a freshly generated ID when no conversations exist yet.
+ *   4. renew() replaces the ID with a new one — called by clearMessages() so
+ *      the cleared history is not restored on the next app launch.
  *
- * WorkspaceContextEngine is co-located here so the same engine instance is
- * shared across all consumers (useConversation, future retrieval hooks, etc.).
- * Phase 03 will extend this with full workspace event subscription.
- *
- * A stable conversationId is generated once per session and exposed via
- * ConversationIdContext so useConversation can persist messages without
- * needing its own ID generation logic.
+ * In the browser (non-Tauri), a new ID is generated synchronously and renew()
+ * is a no-op since there is no persistence layer.
  */
 export function ConversationServiceProvider({ children }: ConversationServiceProviderProps) {
   const [service] = useState<ConversationService>(() => {
@@ -47,7 +43,20 @@ export function ConversationServiceProvider({ children }: ConversationServicePro
   });
 
   const [contextEngine] = useState(() => new WorkspaceContextEngine());
-  const [conversationId] = useState(() => makeConversationId());
+
+  // null = resolving from SQLite; string = resolved (or newly generated).
+  const [conversationId, setConversationId] = useState<string | null>(
+    IS_TAURI ? null : makeConversationId()
+  );
+
+  const renew = useCallback(() => {
+    setConversationId(makeConversationId());
+  }, []);
+
+  const conversationIdContextValue: ConversationIdContextValue = {
+    conversationId,
+    renew,
+  };
 
   // Clear any stuck conversation state left over from HMR or a previous session.
   useEffect(() => {
@@ -59,31 +68,37 @@ export function ConversationServiceProvider({ children }: ConversationServicePro
     }
   }, []);
 
-  // On mount in Tauri: hydrate the store from the most recent persisted conversation.
-  // Fire-and-forget — a failure here does not block the UI.
+  // On mount in Tauri: resolve the most recent conversation ID from SQLite,
+  // then hydrate the store with its messages. Fire-and-forget — failures do
+  // not block the UI; the user just starts a fresh conversation.
   useEffect(() => {
     if (!IS_TAURI) return;
 
-    IPCClient.loadConversation(conversationId)
-      .then((persisted) => {
-        if (persisted.messages.length === 0) return;
+    IPCClient.listConversations()
+      .then((summaries) => {
+        const resolvedId = summaries.length > 0 ? summaries[0].id : makeConversationId();
+        setConversationId(resolvedId);
 
-        const store = useConversationStore.getState();
-        // Only hydrate if the store has only the welcome message (i.e. fresh session).
-        if (store.messages.length > 1) return;
+        return IPCClient.loadConversation(resolvedId).then((persisted) => {
+          if (persisted.messages.length === 0) return;
 
-        for (const msg of persisted.messages) {
-          store.addMessage(msg.role, msg.content, "complete");
-        }
+          const store = useConversationStore.getState();
+          if (store.messages.length > 1) return;
+
+          for (const msg of persisted.messages) {
+            store.addMessage(msg.role, msg.content, "complete");
+          }
+        });
       })
       .catch((err: unknown) => {
-        console.warn("[ConversationService] failed to hydrate from persistence:", err);
+        console.warn("[ConversationService] failed to resolve conversation from persistence:", err);
+        // Fall back to a fresh conversation so the app remains usable.
+        setConversationId(makeConversationId());
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <ConversationIdContext.Provider value={conversationId}>
+    <ConversationIdContext.Provider value={conversationIdContextValue}>
       <ContextEngineContext.Provider value={contextEngine}>
         <ConversationServiceContext.Provider value={service}>
           {children}

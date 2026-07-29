@@ -26,7 +26,7 @@ const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in windo
 export function useConversation() {
   const service = useContext(ConversationServiceContext);
   const contextEngine = useContext(ContextEngineContext);
-  const conversationId = useContext(ConversationIdContext);
+  const { conversationId, renew } = useContext(ConversationIdContext);
   const store = useConversationStore();
 
   if (service === null) {
@@ -124,7 +124,10 @@ export function useConversation() {
   const clearMessages = useCallback(() => {
     service.cancel();
     store.clearMessages();
-  }, [service, store]);
+    // Generate a new conversation ID so the cleared history is not restored
+    // from SQLite on the next app launch.
+    if (IS_TAURI) renew();
+  }, [service, store, renew]);
 
   return {
     messages: store.messages,
