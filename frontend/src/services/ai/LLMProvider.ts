@@ -24,6 +24,14 @@
 export interface LLMRequestOptions {
   /** Caller-supplied signal for cooperative cancellation. */
   signal?: AbortSignal;
+
+  /**
+   * Prior conversation turns for multi-turn context.
+   * Providers that support conversation history (e.g. APIMProvider) will
+   * include these in the request. Providers that do not (e.g. MockProvider)
+   * may ignore this field.
+   */
+  history?: Array<{ role: "user" | "assistant" | "system"; content: string }>;
 }
 
 export interface LLMStreamChunk {

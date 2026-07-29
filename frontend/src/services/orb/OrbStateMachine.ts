@@ -20,7 +20,7 @@ const TRANSITIONS = new Map<OrbState, Set<OrbState>>([
   [OrbState.Active, new Set<OrbState>([OrbState.Idle, OrbState.Processing])],
   [OrbState.Processing, new Set<OrbState>([OrbState.Streaming, OrbState.Error, OrbState.Idle])],
   [OrbState.Streaming, new Set<OrbState>([OrbState.Success, OrbState.Error, OrbState.Idle])],
-  [OrbState.Success, new Set<OrbState>([OrbState.Idle])],
+  [OrbState.Success, new Set<OrbState>([OrbState.Idle, OrbState.Active])],
   [OrbState.Notification, new Set<OrbState>([OrbState.Idle])],
   [OrbState.Error, new Set<OrbState>([OrbState.Idle])],
   [OrbState.Sleeping, new Set<OrbState>([OrbState.Idle])],

@@ -1,7 +1,18 @@
 import type { LLMProvider } from "@/services/ai/LLMProvider";
+import type { APIMChatMessage } from "@/services/ai/APIMProvider";
 import type { ContextSnapshot } from "@/services/context/ContextEngine";
 
 export type { ContextSnapshot } from "@/services/context/ContextEngine";
+
+/**
+ * A prior conversation turn passed to the provider for multi-turn context.
+ * Mirrors APIMChatMessage so ConversationService stays decoupled from
+ * APIM-specific types at the call site — the cast happens here.
+ */
+export interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}
 
 /**
  * ConversationService owns all conversation business logic.
@@ -60,13 +71,18 @@ export class ConversationService {
    * Sends a user prompt and streams the provider response.
    * Cancels any in-flight request before starting a new one.
    *
-   * `context` is accepted as a Phase 01 seam — the Conversation Service will
-   * use it to scope the Retrieval Broker query once the retrieval pipeline is
-   * wired. In Phase 00 the parameter is ignored.
+   * `history` is the ordered list of prior turns in the current conversation.
+   * It is forwarded to the provider so APIM receives full multi-turn context.
+   * MockProvider ignores it (keyword matching is prompt-only).
+   *
+   * `context` is accepted as a Phase 01 seam — it will be injected into the
+   * system message once the Context Engine returns real signals. For now it
+   * is not yet used inside this method.
    */
   async send(
     prompt: string,
     callbacks: ConversationCallbacks,
+    history?: ConversationTurn[],
     _context?: ContextSnapshot
   ): Promise<void> {
     // Cancel any previous request before starting a new one.
@@ -82,7 +98,11 @@ export class ConversationService {
     let streamStarted = false;
 
     try {
-      const stream = this.provider.streamResponse(prompt, { signal });
+      const apimHistory = history?.map<APIMChatMessage>((t) => ({
+        role: t.role,
+        content: t.content,
+      }));
+      const stream = this.provider.streamResponse(prompt, { signal, history: apimHistory });
 
       for await (const chunk of stream) {
         if (signal.aborted) {
@@ -102,13 +122,21 @@ export class ConversationService {
         }
       }
 
+      // Ensure typing indicator is cleared even if no chunks arrived.
+      if (!streamStarted) {
+        callbacks.onTypingEnd();
+        callbacks.onStreamStart(assistantMessageId);
+      }
+
       if (signal.aborted) {
         callbacks.onStreamCancelled(assistantMessageId);
       } else {
         callbacks.onStreamComplete(assistantMessageId);
       }
-    } catch {
-      // If the provider throws on cancellation, treat as cancelled.
+    } catch (err) {
+      console.error("[AI] request failed:", err instanceof Error ? err.message : err);
+      // Ensure typing/streaming state is always cleared on error.
+      if (!streamStarted) callbacks.onTypingEnd();
       callbacks.onStreamCancelled(assistantMessageId);
     } finally {
       this.abortController = null;

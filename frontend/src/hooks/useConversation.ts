@@ -1,7 +1,10 @@
 import { useCallback, useContext } from "react";
 import { ConversationServiceContext } from "@/providers/ConversationServiceContext";
 import { useConversationStore } from "@/store/conversationStore";
-import type { ConversationCallbacks } from "@/services/conversation/ConversationService";
+import type {
+  ConversationCallbacks,
+  ConversationTurn,
+} from "@/services/conversation/ConversationService";
 
 /**
  * Thin bridge between ConversationService and the React UI.
@@ -28,6 +31,14 @@ export function useConversation() {
       if (!trimmed || store.isStreaming || store.isTyping) return;
 
       store.clearInput();
+
+      // Capture completed turns before adding the new user message so that
+      // history passed to the provider reflects only prior turns, not the
+      // current one.
+      const history: ConversationTurn[] = store.messages
+        .filter((m) => m.status === "complete" && (m.role === "user" || m.role === "assistant"))
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
       store.addMessage("user", trimmed, "complete");
 
       const callbacks: ConversationCallbacks = {
@@ -63,7 +74,7 @@ export function useConversation() {
         },
       };
 
-      await service.send(trimmed, callbacks);
+      await service.send(trimmed, callbacks, history);
     },
     [service, store]
   );

@@ -23,6 +23,11 @@ import { APIMProvider } from "@/services/ai/APIMProvider";
  * are encapsulated behind APIM.
  */
 export function createLLMProvider(config: LLMConfig): LLMProvider {
+  console.info(
+    `[LLM] provider: ${config.provider}`,
+    config.apim ? { endpoint: config.apim.endpoint } : "(no APIM config)"
+  );
+
   switch (config.provider) {
     case "mock":
       return new MockProvider();

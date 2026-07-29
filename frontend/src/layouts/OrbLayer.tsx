@@ -2,11 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { LivingOrb } from "@/components/orb/LivingOrb";
 import { useOrbPosition } from "@/hooks/useOrbPosition";
 import { useOrbDrag } from "@/hooks/useOrbDrag";
-import { useDesktopPresence } from "@/hooks/useDesktopPresence";
-import { OrbController } from "@/services/desktop/OrbController";
 import { OrbState } from "@/services/orb/OrbState";
 import { useGlassPromptStore } from "@/store/glassPromptStore";
-import { OrbControllerContext } from "@/providers/OrbControllerContext";
+import { useOrbController } from "@/hooks/useOrbController";
 
 /**
  * A fixed full-screen layer that hosts the Living Orb above all other content.
@@ -14,25 +12,18 @@ import { OrbControllerContext } from "@/providers/OrbControllerContext";
  * Wires together:
  *  - position persistence (useOrbPosition)
  *  - mouse dragging (useOrbDrag)
- *  - OrbController registration with DesktopPresenceService
  *  - OrbStateMachine subscription → orbState prop forwarded to LivingOrb
  *  - hover/focus → OrbController state forwarding
+ *
+ * OrbController is provided by OrbControllerProvider higher in the tree.
  */
 export function OrbLayer() {
   const { position, setPosition } = useOrbPosition();
   const { handleMouseDown } = useOrbDrag({ position, onPositionChange: setPosition });
-  const service = useDesktopPresence();
+  const controller = useOrbController();
   const { isOpen, open, close } = useGlassPromptStore();
 
-  const [controller] = useState<OrbController>(() => new OrbController());
   const [orbState, setOrbState] = useState<OrbState>(OrbState.Idle);
-
-  useEffect(() => {
-    void controller.register(service);
-    return () => {
-      void controller.dispose(service);
-    };
-  }, [controller, service]);
 
   useEffect(() => {
     const unsubscribe = controller.subscribe((snapshot) => {
@@ -70,19 +61,17 @@ export function OrbLayer() {
   );
 
   return (
-    <OrbControllerContext.Provider value={controller}>
-      <div className="pointer-events-none fixed inset-0" style={{ zIndex: "var(--z-top)" }}>
-        <div className="pointer-events-auto">
-          <LivingOrb
-            x={position.x}
-            y={position.y}
-            orbState={orbState}
-            onMouseDown={handleMouseDown}
-            onHoverChange={handleHoverChange}
-            onClick={handleClick}
-          />
-        </div>
+    <div className="pointer-events-none fixed inset-0" style={{ zIndex: "var(--z-top)" }}>
+      <div className="pointer-events-auto">
+        <LivingOrb
+          x={position.x}
+          y={position.y}
+          orbState={orbState}
+          onMouseDown={handleMouseDown}
+          onHoverChange={handleHoverChange}
+          onClick={handleClick}
+        />
       </div>
-    </OrbControllerContext.Provider>
+    </div>
   );
 }

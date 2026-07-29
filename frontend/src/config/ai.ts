@@ -1,21 +1,21 @@
 /**
  * LLM provider configuration for the Enterprise AI Companion.
  *
- * The desktop application communicates with exactly two provider
- * implementations:
+ * Provider selection is automatic:
  *
- *   "mock"  — MockProvider. Local keyword matching. No network calls.
- *             Used during development and automated testing.
+ *   "apim"  — Selected when VITE_APIM_ENDPOINT and VITE_APIM_SUBSCRIPTION_KEY
+ *             are both present in the environment. Routes all requests through
+ *             Azure API Management. Used in production and staging.
  *
- *   "apim"  — APIMProvider. Routes all requests through Azure API Management.
- *             Used in all production and staging deployments.
+ *   "mock"  — Selected when either APIM env var is absent. Returns local
+ *             keyword-matched responses with no network calls. Used during
+ *             development when APIM credentials are not available.
  *
- * Switching from development to production requires only changing
- * LLM_CONFIG.provider from "mock" to "apim".
+ * Override auto-detection by setting VITE_LLM_PROVIDER explicitly.
  *
  * The desktop application never communicates directly with any LLM vendor.
- * Model selection (GPT, Claude, Gemini, Mistral, Llama, etc.) is an APIM
- * policy concern — invisible to the desktop application.
+ * Model selection (GPT, Claude, Gemini, etc.) is an APIM policy concern
+ * that is invisible to the desktop application.
  */
 
 export type LLMProviderKey = "mock" | "apim";
@@ -23,21 +23,35 @@ export type LLMProviderKey = "mock" | "apim";
 /**
  * Configuration specific to the APIMProvider.
  *
- * Values must come from environment variables or a secure configuration
- * store. They must never be hardcoded in source code.
- *
- * ── TODO (Phase 01): Populate these from the application configuration
- * service once infrastructure is established.
+ * Values come from environment variables — never hardcoded.
  */
 export interface APIMConfig {
   /** APIM gateway endpoint for LLM requests. */
   endpoint: string;
 
   /**
-   * APIM subscription key used for API-key authentication.
+   * Model deployment ID passed in the request body.
+   * For GenAI Hub: e.g. "gpt-5.4-mini_gb_2026-03-17"
+   */
+  model: string;
+
+  /**
+   * APIM subscription key (api-key header).
    * Will be replaced by an Azure AD bearer token in Phase 02.
    */
   subscriptionKey: string;
+
+  /**
+   * Request timeout in milliseconds. Defaults to 30 000 ms.
+   * Applies to both streaming and non-streaming requests.
+   */
+  timeoutMs: number;
+
+  /**
+   * Maximum number of retry attempts for retryable errors (429, 503).
+   * Defaults to 3.
+   */
+  maxRetries: number;
 }
 
 export interface LLMConfig {
@@ -50,13 +64,33 @@ export interface LLMConfig {
   apim?: APIMConfig;
 }
 
-/**
- * Active configuration.
- *
- * Development default: MockProvider.
- * Production: set provider to "apim" and supply apim credentials via
- * environment variables before instantiation.
- */
+// ── Environment variable resolution ───────────────────────────────────────────
+
+const apimEndpoint = import.meta.env.VITE_APIM_ENDPOINT as string | undefined;
+const apimKey = import.meta.env.VITE_APIM_SUBSCRIPTION_KEY as string | undefined;
+const providerOverride = import.meta.env.VITE_LLM_PROVIDER as string | undefined;
+
+function resolveProvider(): LLMProviderKey {
+  if (providerOverride === "mock") return "mock";
+  if (providerOverride === "apim") return "apim";
+  // Auto-detect: use APIM when both credentials are present and non-empty.
+  return apimEndpoint && apimKey ? "apim" : "mock";
+}
+
+function resolveAPIMConfig(): APIMConfig | undefined {
+  if (!apimEndpoint || !apimKey) return undefined;
+  return {
+    endpoint: apimEndpoint,
+    model: "gpt-5.4-mini_gb_2026-03-17",
+    subscriptionKey: apimKey,
+    timeoutMs: 30_000,
+    maxRetries: 3,
+  };
+}
+
+// ── Active configuration ───────────────────────────────────────────────────────
+
 export const LLM_CONFIG: LLMConfig = {
-  provider: "mock",
+  provider: resolveProvider(),
+  apim: resolveAPIMConfig(),
 };

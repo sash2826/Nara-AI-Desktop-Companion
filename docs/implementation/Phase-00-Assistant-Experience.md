@@ -2913,8 +2913,8 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 - ✅ React 19 + Vite frontend bootstrapped
 - ✅ Tauri application identity updated (`productName`: "Enterprise AI Companion", `identifier`: "com.volvogroup.enterprise-ai-companion", window `title` corrected)
 - ✅ Minimum window dimensions set in `tauri.conf.json` (minWidth: 960, minHeight: 640; default 1280×800)
-- ☐ Python backend directory scaffolded with README (Phase 01 requires it to exist)
-- ☐ Directory layout decision recorded: confirm `frontend/` as permanent home or migrate to `apps/desktop/` per architecture spec
+- ✅ Python backend directory scaffolded with README, `pyproject.toml`, capability subdirectories, and passing smoke tests (`backend/` at repo root, parallel to `frontend/`)
+- ⚠️ Directory layout decision recorded: repo uses `frontend/` and `backend/` at root rather than `apps/desktop/` and `apps/backend/` as specified in `repository-layout.md`. Current layout is accepted for Phase 00. Migration to the spec layout should be evaluated before Phase 01 begins and recorded in an ADR.
 
 ---
 
@@ -2927,7 +2927,7 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 - ✅ Navigation via `navigationStore` + `MainContent` page router
 - ✅ 7 navigation items with placeholder pages
 - ✅ `shadcn/ui` base components written into `src/components/ui/` (Button, Input, Dialog)
-- ☐ Global keyboard shortcut Ctrl+K wired to open Glass Prompt
+- ✅ Global keyboard shortcut Ctrl+K wired to open Glass Prompt (toggles; listener in `GlassPromptContainer`; system-level shortcut when app is not foreground is Phase 01)
 - ☐ Notification service scaffolded (stub only)
 
 ---
@@ -2982,7 +2982,7 @@ These interfaces are defined in the architecture document but do not yet exist i
 - ✅ `orbTheme` design tokens
 - ✅ `orbStore` with position persistence (localStorage) and viewport clamping
 - ✅ `useOrbPosition` and `useOrbDrag` hooks
-- ✅ `OrbLayer` wiring: position + drag + OrbController registration + state subscription
+- ✅ `OrbLayer` wiring: position + drag + OrbController state subscription (registration owned by `OrbControllerProvider`)
 - ☐ Multi-monitor orb positioning (monitor boundary detection)
 
 ---
@@ -2992,7 +2992,7 @@ These interfaces are defined in the architecture document but do not yet exist i
 - ✅ `OrbStateMachine` deterministic FSM — throws on invalid transition
 - ✅ Subscribe / unsubscribe pattern; `reset()` returns to Idle without notifying
 - ✅ State names aligned to 10-state specification: `Initializing`, `Idle`, `Hover`, `Active`, `Processing`, `Streaming`, `Success`, `Notification`, `Sleeping`, `Error`
-- ✅ `TRANSITIONS` map updated to cover all 10 states with correct edges
+- ✅ `TRANSITIONS` map updated to cover all 10 states with correct edges (`Success → Active` edge added — required for Glass Prompt multi-turn flow)
 - ✅ `OrbEvents` renamed: voice terminology removed; `StreamingStarted/Finished`, `ProcessingStarted/Finished`, `InputStarted/Finished` in place
 - ✅ `LivingOrb.tsx` CSS class names verified correct (`orb-state-*` uses enum string values)
 
@@ -3005,6 +3005,7 @@ These interfaces are defined in the architecture document but do not yet exist i
 - ✅ `OverlayRegistry` — Map-backed with duplicate-id guard
 - ✅ `DesktopPresenceContext` + `DesktopPresenceProvider`
 - ✅ `OrbController` — implements Overlay, owns OrbStateMachine, hover state transitions, subscribe pattern
+- ✅ `OrbControllerProvider` — lifts `OrbController` creation + registration to App level so both `OrbLayer` and `GlassPromptContainer` share the same controller instance via context (fixes blank-screen crash)
 - ✅ Unit tests: `DesktopPresenceService`, `OrbController`, `OverlayRegistry`
 
 ---
@@ -3015,7 +3016,7 @@ Nothing in this section exists in the current codebase.
 
 - ✅ `GlassPrompt` overlay component with frosted glass visual (`backdrop-blur-xl`, `bg-white/80`)
 - ✅ Opens on Living Orb click
-- ☐ Opens on Ctrl+K global keyboard shortcut
+- ✅ Opens on Ctrl+K global keyboard shortcut (within Tauri window; system-level is Phase 01)
 - ✅ Auto-focuses prompt input field on open
 - ✅ Prompt input wired to `ConversationService` via `useConversation` hook
 - ✅ Streamed response displayed in Glass Prompt (`MessageList` + `MessageBubble` reused)
@@ -3026,7 +3027,7 @@ Nothing in this section exists in the current codebase.
 - ✅ Living Orb transitions: `Idle` / `Hover` → `Active` when Glass Prompt opens
 - ✅ Orb state tracks conversation: `Active` → `Processing` → `Streaming` → `Success` → `Active`
 - ✅ Unit tests for `GlassPrompt` component (11 tests — visibility, Escape, backdrop, close button, a11y)
-- ☐ Integration tests: `GlassPrompt` ↔ `ConversationService` ↔ `OrbController` state flow
+- ✅ Integration tests: `GlassPrompt` ↔ `ConversationService` ↔ `OrbController` state flow (12 tests covering full orb arc, message content, and input lifecycle)
 
 ---
 
@@ -3069,9 +3070,9 @@ Nothing in this section exists in the current codebase.
 ### Windows Native Experience
 
 - ☐ Frosted glass / acrylic material on Glass Prompt (CSS `backdrop-filter` or Tauri `window-vibrancy`)
-- ☐ Minimum window dimensions enforced in `tauri.conf.json`
+- ✅ Minimum window dimensions enforced in `tauri.conf.json` (minWidth: 960, minHeight: 640)
 - ☐ Multi-monitor orb positioning (monitor boundary detection at runtime)
-- ☐ Ctrl+K global shortcut functional when companion is not the foreground window
+- ☐ Ctrl+K global shortcut functional when companion is not the foreground window (Phase 01 — requires Tauri `globalShortcut` plugin)
 - ☐ Keyboard navigation validated end-to-end through Orb → Glass Prompt → Workspace flow
 - ✅ `prefers-reduced-motion` respected in all orb and Glass Prompt animations
 - ☐ High contrast mode tested
@@ -3093,7 +3094,7 @@ Nothing in this section exists in the current codebase.
 - ✅ `NullRetrievalBroker` unit tests
 - ✅ `NullProjectKnowledgeRepository` unit tests
 - ✅ `GlassPrompt` component unit tests
-- ☐ `GlassPrompt` ↔ `ConversationService` integration tests
+- ✅ `GlassPrompt` ↔ `ConversationService` ↔ `OrbController` integration tests
 - ☐ Workspace transition integration tests
 - ☐ Manual desktop integration test checklist executed: overlay stability, Ctrl+K focus acquisition, multi-monitor positioning, streaming continuity during window transition
 
