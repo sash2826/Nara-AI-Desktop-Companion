@@ -1,6 +1,8 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { ConversationServiceContext } from "./ConversationServiceContext";
+import { ContextEngineContext } from "./ContextEngineContext";
 import { ConversationService } from "@/services/conversation/ConversationService";
+import { WorkspaceContextEngine } from "@/services/context/WorkspaceContextEngine";
 import { createLLMProvider } from "@/services/providers/ProviderFactory";
 import { LLM_CONFIG } from "@/config/ai";
 import { useConversationStore } from "@/store/conversationStore";
@@ -20,12 +22,18 @@ interface ConversationServiceProviderProps {
  * useState with a lazy initializer creates the service exactly once per mount.
  * On mount, any stuck isTyping/isStreaming state from a previous session is
  * cleared so the guard in useConversation does not block the first message.
+ *
+ * WorkspaceContextEngine is co-located here so the same engine instance is
+ * shared across all consumers (useConversation, future retrieval hooks, etc.).
+ * Phase 03 will extend this with full workspace event subscription.
  */
 export function ConversationServiceProvider({ children }: ConversationServiceProviderProps) {
   const [service] = useState<ConversationService>(() => {
     const provider = createLLMProvider(LLM_CONFIG);
     return new ConversationService(provider);
   });
+
+  const [contextEngine] = useState(() => new WorkspaceContextEngine());
 
   // Clear any stuck conversation state left over from HMR or a previous session.
   // Zustand store is module-level singleton — it persists across React remounts.
@@ -39,8 +47,10 @@ export function ConversationServiceProvider({ children }: ConversationServicePro
   }, []);
 
   return (
-    <ConversationServiceContext.Provider value={service}>
-      {children}
-    </ConversationServiceContext.Provider>
+    <ContextEngineContext.Provider value={contextEngine}>
+      <ConversationServiceContext.Provider value={service}>
+        {children}
+      </ConversationServiceContext.Provider>
+    </ContextEngineContext.Provider>
   );
 }

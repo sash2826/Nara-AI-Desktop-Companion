@@ -32,6 +32,14 @@ export interface LLMRequestOptions {
    * may ignore this field.
    */
   history?: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+
+  /**
+   * Optional system message prepended before history and the user prompt.
+   * Used by the Context Engine to inject workspace signals (active folder,
+   * recent documents) into each request. Providers that do not support
+   * system messages may ignore this field.
+   */
+  systemMessage?: string;
 }
 
 export interface LLMStreamChunk {

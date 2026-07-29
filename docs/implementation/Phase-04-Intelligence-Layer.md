@@ -4,7 +4,7 @@
 
 **Status:** Planned
 
-**Estimated Duration:** 10-14 Days
+**Estimated Duration:** 3-5 Days
 
 ---
 

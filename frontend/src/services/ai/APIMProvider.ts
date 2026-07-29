@@ -100,7 +100,7 @@ export class APIMProvider implements LLMProvider {
       : controller.signal;
 
     try {
-      const messages = this.buildMessages(prompt, options?.history);
+      const messages = this.buildMessages(prompt, options?.history, options?.systemMessage);
       const response = await this.fetchWithRetry(
         { model: this.config.model, messages, stream: false },
         signal
@@ -142,7 +142,7 @@ export class APIMProvider implements LLMProvider {
       : controller.signal;
 
     try {
-      const messages = this.buildMessages(prompt, options?.history);
+      const messages = this.buildMessages(prompt, options?.history, options?.systemMessage);
 
       // In dev the proxy buffers the full upstream body before responding, so
       // SSE streaming is unavailable. Request non-streaming JSON and simulate
@@ -286,11 +286,22 @@ export class APIMProvider implements LLMProvider {
    * Builds the ordered message array sent to APIM.
    *
    * Structure:
-   *   1. Optional prior turns (history), oldest first.
-   *   2. Current user prompt.
+   *   1. Optional system message (workspace context), prepended before history.
+   *   2. Optional prior turns (history), oldest first.
+   *   3. Current user prompt.
    */
-  private buildMessages(prompt: string, history?: APIMChatMessage[]): APIMChatMessage[] {
-    const messages: APIMChatMessage[] = history ? [...history] : [];
+  private buildMessages(
+    prompt: string,
+    history?: APIMChatMessage[],
+    systemMessage?: string
+  ): APIMChatMessage[] {
+    const messages: APIMChatMessage[] = [];
+    if (systemMessage) {
+      messages.push({ role: "system", content: systemMessage });
+    }
+    if (history) {
+      messages.push(...history);
+    }
     messages.push({ role: "user", content: prompt });
     return messages;
   }

@@ -75,15 +75,14 @@ export class ConversationService {
    * It is forwarded to the provider so APIM receives full multi-turn context.
    * MockProvider ignores it (keyword matching is prompt-only).
    *
-   * `context` is accepted as a Phase 01 seam — it will be injected into the
-   * system message once the Context Engine returns real signals. For now it
-   * is not yet used inside this method.
+   * `context` is injected as a system message so the model is aware of the
+   * user's active workspace folder and recently accessed documents.
    */
   async send(
     prompt: string,
     callbacks: ConversationCallbacks,
     history?: ConversationTurn[],
-    _context?: ContextSnapshot
+    context?: ContextSnapshot
   ): Promise<void> {
     // Cancel any previous request before starting a new one.
     this.cancel();
@@ -102,7 +101,13 @@ export class ConversationService {
         role: t.role,
         content: t.content,
       }));
-      const stream = this.provider.streamResponse(prompt, { signal, history: apimHistory });
+
+      const systemMessage = this.buildSystemMessage(context);
+      const stream = this.provider.streamResponse(prompt, {
+        signal,
+        history: apimHistory,
+        systemMessage,
+      });
 
       for await (const chunk of stream) {
         if (signal.aborted) {
@@ -141,6 +146,28 @@ export class ConversationService {
     } finally {
       this.abortController = null;
     }
+  }
+
+  /**
+   * Builds an optional system message from a context snapshot.
+   * Returns undefined when the snapshot carries no meaningful signals so
+   * the provider sends no system message rather than an empty one.
+   */
+  private buildSystemMessage(context?: ContextSnapshot): string | undefined {
+    if (!context) return undefined;
+
+    const parts: string[] = [];
+    if (context.activeProjectFolder) {
+      parts.push(`Active folder: ${context.activeProjectFolder}`);
+    }
+    if (context.recentDocuments.length > 0) {
+      parts.push(`Recent files: ${context.recentDocuments.join(", ")}`);
+    }
+    if (context.explicitContext) {
+      parts.push(context.explicitContext);
+    }
+
+    return parts.length > 0 ? parts.join(". ") + "." : undefined;
   }
 
   /**

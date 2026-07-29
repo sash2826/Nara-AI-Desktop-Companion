@@ -1,5 +1,6 @@
 import { useCallback, useContext } from "react";
 import { ConversationServiceContext } from "@/providers/ConversationServiceContext";
+import { ContextEngineContext } from "@/providers/ContextEngineContext";
 import { useConversationStore } from "@/store/conversationStore";
 import type {
   ConversationCallbacks,
@@ -19,6 +20,7 @@ import type {
  */
 export function useConversation() {
   const service = useContext(ConversationServiceContext);
+  const contextEngine = useContext(ContextEngineContext);
   const store = useConversationStore();
 
   if (service === null) {
@@ -40,6 +42,10 @@ export function useConversation() {
         .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
       store.addMessage("user", trimmed, "complete");
+
+      // Snapshot workspace context before sending — null engine means no context
+      // enrichment (e.g. in tests that only provide ConversationServiceContext).
+      const context = contextEngine ? await contextEngine.getSnapshot() : undefined;
 
       const callbacks: ConversationCallbacks = {
         onTypingStart() {
@@ -74,9 +80,9 @@ export function useConversation() {
         },
       };
 
-      await service.send(trimmed, callbacks, history);
+      await service.send(trimmed, callbacks, history, context);
     },
-    [service, store]
+    [service, contextEngine, store]
   );
 
   const clearMessages = useCallback(() => {
