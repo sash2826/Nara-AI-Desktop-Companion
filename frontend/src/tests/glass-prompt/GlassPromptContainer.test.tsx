@@ -65,36 +65,38 @@ describe("GlassPromptContainer", () => {
     useGlassPromptStore.setState({ isOpen: false });
   });
 
-  // ── Ctrl+K opens ─────────────────────────────────────────────────────────
+  // ── Ctrl+Shift+Space opens ───────────────────────────────────────────────
+  // Note: in Vite/test (non-Tauri) the document keydown listener is active.
+  // In Tauri production the Rust global-shortcut covers the same toggle.
 
-  it("opens Glass Prompt on Ctrl+K when closed", () => {
+  it("opens Glass Prompt on Ctrl+Shift+Space when closed", () => {
     renderContainer();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    fireEvent.keyDown(document, { code: "Space", ctrlKey: true, shiftKey: true });
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("closes Glass Prompt on Ctrl+K when already open", () => {
+  it("closes Glass Prompt on Ctrl+Shift+Space when already open", () => {
     useGlassPromptStore.setState({ isOpen: true });
     renderContainer();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    fireEvent.keyDown(document, { code: "Space", ctrlKey: true, shiftKey: true });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("does not open on Ctrl+K variant with uppercase K", () => {
+  it("does not open on Ctrl+Space without Shift", () => {
     renderContainer();
-    fireEvent.keyDown(document, { key: "K", ctrlKey: true });
+    fireEvent.keyDown(document, { code: "Space", ctrlKey: true, shiftKey: false });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("does not open on plain k without Ctrl", () => {
+  it("does not open on Shift+Space without Ctrl", () => {
     renderContainer();
-    fireEvent.keyDown(document, { key: "k", ctrlKey: false });
+    fireEvent.keyDown(document, { code: "Space", ctrlKey: false, shiftKey: true });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -104,8 +106,8 @@ describe("GlassPromptContainer", () => {
     const { unmount } = renderContainer();
     unmount();
 
-    // After unmount, Ctrl+K must not throw and must not change store state.
-    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    // After unmount, the shortcut must not throw and must not change store state.
+    fireEvent.keyDown(document, { code: "Space", ctrlKey: true, shiftKey: true });
     expect(useGlassPromptStore.getState().isOpen).toBe(false);
   });
 });

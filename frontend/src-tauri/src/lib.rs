@@ -80,19 +80,23 @@ async fn health_check(state: State<'_, Arc<AppState>>) -> Result<HealthResponse,
 /// When the shortcut fires, a `toggle-glass-prompt` event is emitted to all
 /// windows. The frontend listens for this event and toggles the Glass Prompt,
 /// regardless of whether the Tauri window currently has focus.
+/// Registers the global toggle shortcut (Ctrl+Shift+Space).
+///
+/// Ctrl+K is owned exclusively by enterprise apps (Teams, Slack) via Win32
+/// RegisterHotKey, which is process-exclusive. Ctrl+Shift+Space has no known
+/// conflicts with standard enterprise tooling.
 fn register_global_shortcut(app: &tauri::App) {
-    let shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyK);
+    let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
     let handle = app.handle().clone();
 
-    app.global_shortcut()
-        .on_shortcut(shortcut, move |_app, _shortcut, event| {
-            if event.state == ShortcutState::Pressed {
-                let _ = handle.emit("toggle-glass-prompt", ());
-            }
-        })
-        .unwrap_or_else(|e| {
-            eprintln!("[global-shortcut] failed to register Ctrl+K: {}", e);
-        });
+    match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            let _ = handle.emit("toggle-glass-prompt", ());
+        }
+    }) {
+        Ok(()) => println!("[global-shortcut] registered Ctrl+Shift+Space"),
+        Err(e) => eprintln!("[global-shortcut] registration failed: {}", e),
+    }
 }
 
 // ─── Sidecar lifecycle ────────────────────────────────────────────────────────

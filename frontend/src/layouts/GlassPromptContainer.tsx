@@ -11,30 +11,28 @@ const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in windo
 /**
  * Mounts the GlassPrompt overlay and connects it to the glassPromptStore.
  *
- * Ctrl+K is wired at two levels:
+ * The toggle shortcut is wired at two levels:
  *
- * 1. In-window keydown listener (always active while the Tauri window is focused).
- *    Handles the common case with zero latency.
+ * 1. In Tauri: Ctrl+Shift+Space registered via tauri-plugin-global-shortcut
+ *    (lib.rs). Fires even when another app is in the foreground. Ctrl+K was
+ *    abandoned because it is owned exclusively by Teams/Slack via Win32
+ *    RegisterHotKey and cannot be overridden.
  *
- * 2. Tauri `toggle-glass-prompt` event (system-level, fires even when another
- *    app is in the foreground). Emitted by the Rust global-shortcut handler
- *    registered in lib.rs via tauri-plugin-global-shortcut.
+ * 2. In browser / Vite dev mode: Ctrl+Shift+Space via document keydown.
  *
- * Both paths call `toggle()` on the glassPromptStore, so the prompt opens and
- * closes consistently regardless of which trigger fired.
+ * Both paths call `toggle()` on the glassPromptStore.
  */
 export function GlassPromptContainer() {
   const { isOpen, close, toggle } = useGlassPromptStore();
 
-  // ── In-window Ctrl+K ────────────────────────────────────────────────────────
-  // Only active in browser / Vite dev mode. In Tauri the system-level global
-  // shortcut (registered in lib.rs) covers both focused and unfocused states,
-  // so we skip this listener to prevent double-toggle when the window has focus.
+  // ── In-window shortcut (browser / Vite dev only) ────────────────────────────
+  // Skipped in Tauri — the system-level global shortcut covers all states and
+  // a second listener would cause double-toggle when the window has focus.
   useEffect(() => {
     if (IS_TAURI) return;
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.ctrlKey && e.key === "k") {
+      if (e.ctrlKey && e.shiftKey && e.code === "Space") {
         e.preventDefault();
         toggle();
       }
@@ -44,7 +42,7 @@ export function GlassPromptContainer() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [toggle]);
 
-  // ── System-level Ctrl+K via Tauri global shortcut ───────────────────────────
+  // ── System-level Ctrl+Shift+Space via Tauri global shortcut ─────────────────
   useEffect(() => {
     if (!IS_TAURI) return;
 

@@ -102,6 +102,7 @@ export function GlassPromptBody({ className }: { className?: string }) {
       {/* Footer hint */}
       <div className="flex items-center justify-end px-4 pb-3 shrink-0">
         <span className="text-[11px] text-muted-foreground/50 select-none">
+          <kbd className="font-mono">Ctrl+Shift+Space</kbd> to toggle &nbsp;·&nbsp;{" "}
           <kbd className="font-mono">Esc</kbd> to close
         </span>
       </div>
