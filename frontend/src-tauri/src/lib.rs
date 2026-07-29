@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 // ─── App state ────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,28 @@ async fn health_check(state: State<'_, Arc<AppState>>) -> Result<HealthResponse,
         .json::<HealthResponse>()
         .await
         .map_err(|e| format!("Failed to parse health response: {}", e))
+}
+
+// ─── Global shortcut ──────────────────────────────────────────────────────────
+
+/// Registers Ctrl+K as a system-wide shortcut.
+///
+/// When the shortcut fires, a `toggle-glass-prompt` event is emitted to all
+/// windows. The frontend listens for this event and toggles the Glass Prompt,
+/// regardless of whether the Tauri window currently has focus.
+fn register_global_shortcut(app: &tauri::App) {
+    let shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyK);
+    let handle = app.handle().clone();
+
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |_app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let _ = handle.emit("toggle-glass-prompt", ());
+            }
+        })
+        .unwrap_or_else(|e| {
+            eprintln!("[global-shortcut] failed to register Ctrl+K: {}", e);
+        });
 }
 
 // ─── Sidecar lifecycle ────────────────────────────────────────────────────────
@@ -163,10 +186,12 @@ pub fn run() {
     let state_for_setup = Arc::clone(&app_state);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
         .setup(move |app| {
+            register_global_shortcut(app);
             let handle = app.handle().clone();
             start_sidecar(handle, state_for_setup);
             Ok(())

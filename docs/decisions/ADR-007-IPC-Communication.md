@@ -1,8 +1,9 @@
 # ADR-007: Inter-Process Communication (IPC) Strategy
 
-**Status:** Accepted
+**Status:** Accepted — Implemented (Phase 01 Epic 1.2)
 
 **Date:** 2026-07-23
+**Implementation Date:** 2026-07-29
 
 **Decision Makers:** Project Architecture Team
 
@@ -183,6 +184,57 @@ Implementation should ensure that:
 * `docs/architecture/application-layers.md`
 * `docs/architecture/system-overview.md`
 * `docs/architecture/technology-stack.md`
+
+---
+
+# Implementation
+
+## Transport mechanism (Phase 01)
+
+The IPC channel is implemented as a two-layer stack:
+
+```
+React (TypeScript)
+     │
+  IPCClient.ts                 ← single call-site; no component calls invoke() directly
+     │
+  @tauri-apps/api/core invoke  ← Tauri JS ↔ Rust bridge
+     │
+  Tauri Rust command handler   ← thin passthrough; validates command exists
+     │
+  reqwest HTTP POST            ← loopback (127.0.0.1:{dynamic-port})
+     │
+  Python FastAPI handler       ← business logic lives here
+```
+
+### Sidecar startup protocol
+
+The Tauri process spawns `python -m enterprise_ai_companion` as a child process
+on application launch. The Python process prints `READY:{port}` to stdout once
+uvicorn is listening. The Rust layer reads this signal, stores the port in
+`AppState`, and emits a `sidecar-ready` event to the frontend. IPC commands
+that proxy to the sidecar will reject with an error until the port is known.
+
+### Current commands
+
+| Tauri command | HTTP route | Description |
+|---|---|---|
+| `health_check` | `GET /health` | Liveness probe; used by the frontend to verify sidecar is reachable |
+
+### TypeScript boundary
+
+All `invoke()` calls are routed through `frontend/src/services/ipc/IPCClient.ts`.
+No component or service imports `@tauri-apps/api/core` directly.
+
+The `waitForSidecar()` utility in `IPCClient.ts` returns a promise that resolves
+when `sidecar-ready` fires, allowing startup sequences to gate on sidecar
+readiness without polling.
+
+### Port selection
+
+The sidecar selects a free port at startup using `socket.bind(("127.0.0.1", 0))`.
+This avoids hardcoded port conflicts. The port is communicated to Tauri via stdout
+and is not persisted between application launches.
 
 ---
 

@@ -3,20 +3,30 @@ import { useGlassPromptStore } from "@/store/glassPromptStore";
 import { GlassPrompt } from "@/components/glass-prompt/GlassPrompt";
 import { GlassPromptBody } from "@/components/glass-prompt/GlassPromptBody";
 
+// Tauri event API — only available inside a Tauri bundle.
+// In the Vite dev server (browser context) this import is mocked or absent,
+// so we guard every call behind a runtime check.
+const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 /**
  * Mounts the GlassPrompt overlay and connects it to the glassPromptStore.
  *
- * Also owns the Ctrl+K global keyboard shortcut. The listener is registered
- * here (not inside GlassPrompt) because GlassPromptContainer is always
- * mounted, so the shortcut works even when the prompt is closed.
+ * Ctrl+K is wired at two levels:
  *
- * Note: this shortcut fires only while the Tauri window is focused. A
- * system-level shortcut that works from any foreground app is a Phase 01
- * Tauri global-shortcut item.
+ * 1. In-window keydown listener (always active while the Tauri window is focused).
+ *    Handles the common case with zero latency.
+ *
+ * 2. Tauri `toggle-glass-prompt` event (system-level, fires even when another
+ *    app is in the foreground). Emitted by the Rust global-shortcut handler
+ *    registered in lib.rs via tauri-plugin-global-shortcut.
+ *
+ * Both paths call `toggle()` on the glassPromptStore, so the prompt opens and
+ * closes consistently regardless of which trigger fired.
  */
 export function GlassPromptContainer() {
   const { isOpen, close, toggle } = useGlassPromptStore();
 
+  // ── In-window Ctrl+K ────────────────────────────────────────────────────────
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.ctrlKey && e.key === "k") {
@@ -27,6 +37,30 @@ export function GlassPromptContainer() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [toggle]);
+
+  // ── System-level Ctrl+K via Tauri global shortcut ───────────────────────────
+  useEffect(() => {
+    if (!IS_TAURI) return;
+
+    let unlisten: (() => void) | null = null;
+
+    import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen("toggle-glass-prompt", () => {
+          toggle();
+        })
+      )
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch((err: unknown) => {
+        console.warn("[GlassPromptContainer] failed to register Tauri shortcut listener:", err);
+      });
+
+    return () => {
+      unlisten?.();
+    };
   }, [toggle]);
 
   return (

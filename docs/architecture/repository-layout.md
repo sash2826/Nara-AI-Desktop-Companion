@@ -1,8 +1,8 @@
 # Repository Layout
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Active
-**Last Updated:** 2026-07-23
+**Last Updated:** 2026-07-29
 
 ---
 
@@ -44,14 +44,16 @@ Enterprise-AI-Companion/
 │   ├── CLAUDE.md
 │   └── commands/
 │
-├── apps/
-│   ├── desktop/
-│   └── backend/
+├── frontend/                  ← Tauri + React desktop application
+│   ├── src/                   ← React + TypeScript source
+│   ├── src-tauri/             ← Rust Tauri shell
+│   └── package.json
 │
-├── packages/
-│   ├── shared/
-│   ├── types/
-│   └── config/
+├── backend/                   ← Python FastAPI backend service
+│   ├── src/
+│   │   └── enterprise_ai_companion/
+│   ├── tests/
+│   └── pyproject.toml
 │
 ├── database/
 │   ├── migrations/
@@ -77,6 +79,12 @@ Enterprise-AI-Companion/
 ├── CHANGELOG.md
 └── .gitignore
 ```
+
+> **Note:** The original specification used `apps/desktop/` and `apps/backend/`
+> with a `packages/` monorepo layer. The flat `frontend/` / `backend/` layout
+> was adopted during Phase 00 implementation and formally accepted in
+> ADR-013. The `packages/` layer will be introduced when a shared library is
+> extracted that is consumed by both applications.
 
 The repository is organized into applications, reusable packages, documentation, testing, database resources, automation scripts, and project assets.
 
