@@ -33,6 +33,17 @@ pub struct HealthResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct EmbedRequest {
+    pub text: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbedResponse {
+    pub embedding: Vec<f64>,
+    pub dim: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IpcError {
     pub message: String,
 }
@@ -71,6 +82,39 @@ async fn health_check(state: State<'_, Arc<AppState>>) -> Result<HealthResponse,
         .json::<HealthResponse>()
         .await
         .map_err(|e| format!("Failed to parse health response: {}", e))
+}
+
+/// Generates a BGE-M3 embedding vector for the given text.
+///
+/// Proxies to `POST /embeddings` on the Python sidecar. Returns a 1024-dimensional
+/// float vector. Rejects with an error string if the sidecar is not yet ready.
+#[tauri::command]
+async fn generate_embedding(
+    text: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<EmbedResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/embeddings", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&EmbedRequest { text })
+        .send()
+        .await
+        .map_err(|e| format!("Embedding request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Embedding endpoint returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<EmbedResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse embedding response: {}", e))
 }
 
 // ─── Global shortcut ──────────────────────────────────────────────────────────
@@ -200,7 +244,7 @@ pub fn run() {
             start_sidecar(handle, state_for_setup);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![health_check])
+        .invoke_handler(tauri::generate_handler![health_check, generate_embedding])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let state: State<Arc<AppState>> = window.state();

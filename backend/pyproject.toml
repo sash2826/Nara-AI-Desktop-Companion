@@ -9,6 +9,7 @@ description = "Backend service for Enterprise AI Companion"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.140.13",
+    "fastembed>=0.8.0",
     "uvicorn[standard]>=0.51.0",
 ]
 

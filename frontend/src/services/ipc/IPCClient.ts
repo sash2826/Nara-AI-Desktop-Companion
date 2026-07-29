@@ -28,6 +28,11 @@ export interface HealthResponse {
   status: "ok";
 }
 
+export interface EmbedResponse {
+  embedding: number[];
+  dim: number;
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -70,6 +75,18 @@ async function healthCheck(): Promise<HealthResponse> {
   return invoke<HealthResponse>("health_check");
 }
 
+/**
+ * Calls the `generate_embedding` Tauri command.
+ *
+ * Returns a 1024-dimensional BGE-M3 embedding vector for the given text.
+ * Throws a string error message if the sidecar is not ready or the text is empty.
+ */
+async function generateEmbedding(text: string): Promise<number[]> {
+  const response = await invoke<EmbedResponse>("generate_embedding", { text });
+  return response.embedding;
+}
+
 export const IPCClient = {
   healthCheck,
+  generateEmbedding,
 } as const;

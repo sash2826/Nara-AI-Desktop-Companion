@@ -52,6 +52,31 @@ describe("IPCClient.healthCheck", () => {
   });
 });
 
+describe("IPCClient.generateEmbedding", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("resolves with the embedding array when invoke succeeds", async () => {
+    const fakeVector = Array.from({ length: 1024 }, (_, i) => i * 0.001);
+    mockInvoke.mockResolvedValueOnce({ embedding: fakeVector, dim: 1024 });
+
+    const result = await IPCClient.generateEmbedding("hello world");
+
+    expect(result).toEqual(fakeVector);
+    expect(result).toHaveLength(1024);
+    expect(mockInvoke).toHaveBeenCalledWith("generate_embedding", { text: "hello world" });
+  });
+
+  it("propagates errors thrown by invoke", async () => {
+    mockInvoke.mockRejectedValueOnce("Python sidecar is not yet ready");
+
+    await expect(IPCClient.generateEmbedding("test")).rejects.toMatch(
+      "Python sidecar is not yet ready"
+    );
+  });
+});
+
 describe("waitForSidecar", () => {
   beforeEach(() => {
     vi.clearAllMocks();

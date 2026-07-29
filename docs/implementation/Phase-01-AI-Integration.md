@@ -397,13 +397,17 @@ Credentials are never committed to source control.
 
 ## Epic 1.3 — BGE-M3 Embeddings
 
-- ☐ `FlagEmbedding` added to `backend/pyproject.toml`
-- ☐ `EmbeddingService.generate()` implemented
-- ☐ `EmbeddingService.generate_batch()` implemented
-- ☐ `POST /embeddings` FastAPI endpoint
-- ☐ `generate_embedding` IPC command
-- ☐ `useEmbedding` hook created (stub consumer)
-- ☐ `EmbeddingService` unit tests (shape, determinism)
+- ✅ `fastembed` added to `backend/pyproject.toml` (ONNX runtime; no PyTorch required)
+- ✅ `EmbeddingService.generate()` implemented (1024-dim BGE-M3, lazy singleton)
+- ✅ `EmbeddingService.generate_batch()` implemented
+- ✅ `POST /embeddings` FastAPI endpoint (Pydantic validation, 422 on empty text)
+- ✅ `generate_embedding` Tauri IPC command (Rust → reqwest → Python)
+- ✅ `IPCClient.generateEmbedding()` TypeScript wrapper
+- ✅ `useEmbedding` hook created (manages loading/error state; stub consumer for Phase 02)
+- ✅ `EmbeddingService` endpoint tests — 7 tests passing (model mocked for CI speed)
+- ✅ `IPCClient.generateEmbedding` unit tests — 2 tests passing
+- ✅ `useEmbedding` unit tests — 6 tests passing
+- ☐ `EmbeddingService` integration tests with real model (run manually; model ~500 MB)
 
 ## Epic 1.4 — Context Engine
 
