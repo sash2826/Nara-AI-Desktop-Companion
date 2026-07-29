@@ -27,7 +27,12 @@ export function GlassPromptContainer() {
   const { isOpen, close, toggle } = useGlassPromptStore();
 
   // ── In-window Ctrl+K ────────────────────────────────────────────────────────
+  // Only active in browser / Vite dev mode. In Tauri the system-level global
+  // shortcut (registered in lib.rs) covers both focused and unfocused states,
+  // so we skip this listener to prevent double-toggle when the window has focus.
   useEffect(() => {
+    if (IS_TAURI) return;
+
     function handleKeyDown(e: KeyboardEvent) {
       if (e.ctrlKey && e.key === "k") {
         e.preventDefault();
