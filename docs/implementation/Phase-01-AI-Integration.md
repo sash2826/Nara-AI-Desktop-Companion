@@ -379,19 +379,21 @@ Credentials are never committed to source control.
 - ✅ Multi-turn conversation history passed to APIM
 - ✅ SSE parser unit tests (17 tests, all passing)
 - ✅ Error mapping unit tests
-- ☐ Glass Prompt streams real responses end-to-end
+- ✅ Glass Prompt streams real responses end-to-end (confirmed working)
 
 ## Epic 1.2 — IPC Bridge
 
-- ☐ `fastapi` and `uvicorn` added to `backend/pyproject.toml`
-- ☐ FastAPI app with `GET /health` created
-- ☐ `python -m enterprise_ai_companion` starts the server
-- ☐ Python sidecar configured in `tauri.conf.json`
-- ☐ Sidecar starts and stops with Tauri application lifecycle
-- ☐ `IPCClient.ts` created with typed `invoke` wrapper
-- ☐ `health_check` IPC command operational
-- ☐ `IPCClient` unit tests
-- ☐ IPC health check integration test passes
+- ✅ `fastapi` and `uvicorn` added to `backend/pyproject.toml`
+- ✅ FastAPI app with `GET /health` created
+- ✅ `python -m enterprise_ai_companion` starts the server
+- ✅ Python sidecar spawned from Tauri on app launch (std::process::Command)
+- ✅ Sidecar starts and stops with Tauri application lifecycle
+- ✅ `IPCClient.ts` created with typed `invoke` wrapper
+- ✅ `health_check` IPC command operational (Tauri → reqwest → FastAPI)
+- ✅ `waitForSidecar()` utility listens for `sidecar-ready` event
+- ✅ `IPCClient` unit tests (4 tests)
+- ✅ Backend health endpoint unit tests (3 tests)
+- ☐ IPC health check end-to-end integration test (requires running Tauri dev build)
 
 ## Epic 1.3 — BGE-M3 Embeddings
 
