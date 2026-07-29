@@ -164,8 +164,11 @@ export class APIMProvider implements LLMProvider {
         throw new APIMError("APIM returned an empty response body.");
       }
 
-      // Detect SSE vs JSON: SSE responses start with "data:"
-      if (rawText.trimStart().startsWith("data:")) {
+      // Detect SSE vs JSON.
+      // SSE bodies contain "data:" lines — they may be preceded by "event:" or
+      // comment lines, so we check for a "data:" line anywhere in the text
+      // rather than requiring it at the very start.
+      if (/^data:/m.test(rawText)) {
         yield* this.parseSSEText(rawText);
         return;
       }

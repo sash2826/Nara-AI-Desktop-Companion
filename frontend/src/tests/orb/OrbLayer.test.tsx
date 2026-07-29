@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { DesktopPresenceProvider } from "@/providers/DesktopPresenceProvider";
+import { OrbControllerProvider } from "@/providers/OrbControllerProvider";
 import { OrbLayer } from "@/layouts/OrbLayer";
 import { ORB_OVERLAY_ID } from "@/services/desktop/OrbController";
 import { OrbState } from "@/services/orb/OrbState";
@@ -25,7 +26,9 @@ vi.stubGlobal("localStorage", {
 function renderOrbLayer() {
   return render(
     <DesktopPresenceProvider>
-      <OrbLayer />
+      <OrbControllerProvider>
+        <OrbLayer />
+      </OrbControllerProvider>
     </DesktopPresenceProvider>
   );
 }

@@ -211,14 +211,14 @@ describe("APIMProvider — generateResponse", () => {
 // ── Auth header ───────────────────────────────────────────────────────────────
 
 describe("APIMProvider — auth header", () => {
-  it("sends Ocp-Apim-Subscription-Key from config", async () => {
-    fetchSpy.mockResolvedValueOnce(mockSSEResponse(["data: [DONE]"]));
+  it("sends api-key header from config", async () => {
+    fetchSpy.mockResolvedValueOnce(mockJSONResponse({ choices: [{ message: { content: "hi" } }] }));
 
     const provider = makeProvider({ subscriptionKey: "my-secret-key" });
     await collectChunks(provider.streamResponse("hi"));
 
     const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
-    expect(headers["Ocp-Apim-Subscription-Key"]).toBe("my-secret-key");
+    expect(headers["api-key"]).toBe("my-secret-key");
   });
 });
 
@@ -325,35 +325,29 @@ describe("APIMProvider — retry", () => {
 
 describe("APIMProvider — cancellation", () => {
   it("cancel() aborts an in-flight request", async () => {
-    // Simulate a stream that never closes so we can cancel mid-flight.
-    let streamController: ReadableStreamDefaultController<Uint8Array>;
-    const neverEndingStream = new ReadableStream<Uint8Array>({
-      start(c) {
-        streamController = c;
-      },
+    // In dev mode the provider calls response.text() (non-streaming path).
+    // We simulate cancellation by having fetch reject with an AbortError once
+    // the AbortSignal fires — this is what the browser does natively.
+    fetchSpy.mockImplementationOnce((_url: string, init: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        if (init.signal) {
+          (init.signal as AbortSignal).addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }
+      });
     });
 
-    fetchSpy.mockResolvedValueOnce(
-      new Response(neverEndingStream, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      })
-    );
-
-    const provider = makeProvider();
+    const provider = makeProvider({ maxRetries: 0 });
     const gen = provider.streamResponse("hi")[Symbol.asyncIterator]();
 
-    // Start consuming — the first next() will hang waiting for data.
+    // Start consuming — the fetch will hang waiting for the signal.
     const firstChunkPromise = gen.next();
 
-    // Cancel before any chunk arrives.
+    // Cancel mid-flight.
     provider.cancel();
 
-    // The promise should resolve (not reject) — the stream ends cleanly.
-    const result = await firstChunkPromise;
-    expect(result.done).toBe(true);
-
-    // Silence the unused variable lint warning — we just need the reference to exist.
-    void streamController!;
+    // The AbortError propagates through the async generator as a rejection.
+    await expect(firstChunkPromise).rejects.toMatchObject({ name: "AbortError" });
   });
 });
