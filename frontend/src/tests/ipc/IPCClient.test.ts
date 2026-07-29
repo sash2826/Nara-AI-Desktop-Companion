@@ -52,6 +52,77 @@ describe("IPCClient.healthCheck", () => {
   });
 });
 
+describe("IPCClient.saveMessage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("invokes save_message with the correct payload", async () => {
+    const fakeResponse = {
+      id: "msg-1",
+      conversation_id: "conv-1",
+      role: "user",
+      content: "hello",
+      status: "complete",
+      created_at: "2026-07-29T12:00:00Z",
+    };
+    mockInvoke.mockResolvedValueOnce(fakeResponse);
+
+    const result = await IPCClient.saveMessage({
+      messageId: "msg-1",
+      conversationId: "conv-1",
+      role: "user",
+      content: "hello",
+      status: "complete",
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_message", {
+      messageId: "msg-1",
+      conversationId: "conv-1",
+      role: "user",
+      content: "hello",
+      status: "complete",
+    });
+    expect(result.id).toBe("msg-1");
+  });
+
+  it("propagates errors from invoke", async () => {
+    mockInvoke.mockRejectedValueOnce("sidecar not ready");
+    await expect(
+      IPCClient.saveMessage({
+        messageId: "m",
+        conversationId: "c",
+        role: "user",
+        content: "x",
+        status: "complete",
+      })
+    ).rejects.toMatch("sidecar not ready");
+  });
+});
+
+describe("IPCClient.loadConversation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("invokes load_conversation and returns the response", async () => {
+    const fakeResponse = { id: "conv-1", messages: [] };
+    mockInvoke.mockResolvedValueOnce(fakeResponse);
+
+    const result = await IPCClient.loadConversation("conv-1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("load_conversation", {
+      conversationId: "conv-1",
+    });
+    expect(result).toEqual(fakeResponse);
+  });
+
+  it("propagates errors from invoke", async () => {
+    mockInvoke.mockRejectedValueOnce("sidecar not ready");
+    await expect(IPCClient.loadConversation("conv-1")).rejects.toMatch("sidecar not ready");
+  });
+});
+
 describe("IPCClient.generateEmbedding", () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -44,6 +44,31 @@ pub struct EmbedResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct SaveMessageRequest {
+    pub message_id: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub content: String,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MessageResponse {
+    pub id: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub content: String,
+    pub status: String,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ConversationResponse {
+    pub id: String,
+    pub messages: Vec<MessageResponse>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IpcError {
     pub message: String,
 }
@@ -115,6 +140,74 @@ async fn generate_embedding(
         .json::<EmbedResponse>()
         .await
         .map_err(|e| format!("Failed to parse embedding response: {}", e))
+}
+
+/// Persists a message to SQLite via the Python sidecar.
+///
+/// Creates the parent conversation row automatically if it does not exist.
+#[tauri::command]
+async fn save_message(
+    message_id: String,
+    conversation_id: String,
+    role: String,
+    content: String,
+    status: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<MessageResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/conversations/{}/messages", base, conversation_id);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&SaveMessageRequest {
+            message_id,
+            conversation_id,
+            role,
+            content,
+            status,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("save_message request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "save_message returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<MessageResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse save_message response: {}", e))
+}
+
+/// Loads all messages for a conversation from SQLite, oldest first.
+#[tauri::command]
+async fn load_conversation(
+    conversation_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<ConversationResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/conversations/{}", base, conversation_id);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("load_conversation request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "load_conversation returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<ConversationResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse load_conversation response: {}", e))
 }
 
 // ─── Global shortcut ──────────────────────────────────────────────────────────
@@ -244,7 +337,12 @@ pub fn run() {
             start_sidecar(handle, state_for_setup);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![health_check, generate_embedding])
+        .invoke_handler(tauri::generate_handler![
+            health_check,
+            generate_embedding,
+            save_message,
+            load_conversation
+        ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let state: State<Arc<AppState>> = window.state();

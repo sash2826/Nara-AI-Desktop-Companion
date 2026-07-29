@@ -411,26 +411,28 @@ Credentials are never committed to source control.
 
 ## Epic 1.4 — Context Engine
 
-- ☐ `WorkspaceContextEngine` created
-- ☐ `activeProjectFolder` derived from active file path
-- ☐ `recentDocuments` tracks last 5 paths (FIFO, session-only)
-- ☐ `WorkspaceContextEngine` wired into `ConversationServiceProvider`
-- ☐ Context injected as system message in `buildRequestBody()`
-- ☐ `WorkspaceContextEngine` unit tests
+- ✅ `WorkspaceContextEngine` created
+- ✅ `activeProjectFolder` derived from active file path
+- ✅ `recentDocuments` tracks last 5 paths (FIFO, session-only)
+- ✅ `WorkspaceContextEngine` wired into `ConversationServiceProvider`
+- ✅ Context injected as system message in `buildRequestBody()`
+- ✅ `WorkspaceContextEngine` unit tests (14 tests, all passing)
 
 ## Epic 1.5 — Conversation Persistence
 
-- ☐ `database/schemas/conversations.sql` created
-- ☐ `aiosqlite` added to `backend/pyproject.toml`
-- ☐ `database.py` connection management
-- ☐ `ConversationRepository` CRUD implemented
-- ☐ `POST /conversations`, `POST /conversations/{id}/messages`, `GET /conversations/{id}` endpoints
-- ☐ `save_message` and `load_conversation` IPC commands
-- ☐ `IPCClient.saveMessage()` and `IPCClient.loadConversation()` implemented
-- ☐ `useConversation` persists messages via IPC after each turn
-- ☐ `ConversationServiceProvider` hydrates store from SQLite on mount
-- ☐ `ConversationRepository` unit tests (in-memory SQLite)
-- ☐ `useConversation` persistence unit tests
+- ✅ `database/schemas/conversations.sql` created (conversations + messages tables, WAL, FK, index)
+- ✅ `aiosqlite` added to `backend/pyproject.toml`
+- ✅ `database.py` — open/close, WAL mode, FK enforcement, schema auto-apply, `EAC_DB_PATH` override
+- ✅ `ConversationRepository` — `get_or_create_conversation`, `save_message` (upsert), `load_conversation`, `list_conversations`
+- ✅ FastAPI lifespan wires DB into `app.state.db`; router uses `Depends(get_db)`
+- ✅ `POST /conversations/{id}/messages`, `GET /conversations/{id}`, `GET /conversations` endpoints
+- ✅ `save_message` and `load_conversation` Tauri IPC commands (Rust → reqwest → Python)
+- ✅ `IPCClient.saveMessage()` and `IPCClient.loadConversation()` TypeScript wrappers
+- ✅ `useConversation` persists user message immediately and assistant message on stream complete (fire-and-forget, Tauri-only)
+- ✅ `ConversationServiceProvider` hydrates store from SQLite on mount (Tauri-only, skipped when store has messages)
+- ✅ 12 `ConversationRepository` unit tests (in-memory SQLite via `EAC_DB_PATH=:memory:`)
+- ✅ 7 conversation endpoint tests (repo mocked)
+- ✅ 4 `IPCClient.saveMessage` / `loadConversation` unit tests
 
 ---
 

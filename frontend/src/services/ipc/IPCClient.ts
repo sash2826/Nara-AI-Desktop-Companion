@@ -33,6 +33,28 @@ export interface EmbedResponse {
   dim: number;
 }
 
+export interface SaveMessagePayload {
+  messageId: string;
+  conversationId: string;
+  role: "user" | "assistant";
+  content: string;
+  status: "complete" | "streaming" | "error";
+}
+
+export interface PersistedMessage {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  status: "complete" | "streaming" | "error";
+  created_at: string;
+}
+
+export interface PersistedConversation {
+  id: string;
+  messages: PersistedMessage[];
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -86,7 +108,35 @@ async function generateEmbedding(text: string): Promise<number[]> {
   return response.embedding;
 }
 
+/**
+ * Calls the `save_message` Tauri command.
+ *
+ * Persists a message to SQLite via the Python sidecar, creating the parent
+ * conversation row automatically if it does not exist.
+ */
+async function saveMessage(payload: SaveMessagePayload): Promise<PersistedMessage> {
+  return invoke<PersistedMessage>("save_message", {
+    messageId: payload.messageId,
+    conversationId: payload.conversationId,
+    role: payload.role,
+    content: payload.content,
+    status: payload.status,
+  });
+}
+
+/**
+ * Calls the `load_conversation` Tauri command.
+ *
+ * Returns all messages for the conversation, oldest first.
+ * Returns an empty messages array when the conversation does not yet exist.
+ */
+async function loadConversation(conversationId: string): Promise<PersistedConversation> {
+  return invoke<PersistedConversation>("load_conversation", { conversationId });
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
+  saveMessage,
+  loadConversation,
 } as const;
