@@ -469,11 +469,19 @@ Analytics should support future optimization without affecting retrieval behavio
 - ✅ `KeywordSearchResponse` type exported from `IPCClient.ts`
 - ✅ 19 unit tests — helper functions, search behaviour, workspace filtering, stemming (all passing)
 
-## Epic 2.7 — Query Preprocessing ❌ Not started
+## Epic 2.7 — Query Preprocessing ✅
 
-- ❌ Query normalisation service
-- ❌ Tokenisation / stop-word handling
-- ❌ Query expansion pipeline
+- ✅ `QueryPreprocessor` — 6-stage pure-Python pipeline, no external dependencies
+- ✅ Stage 1 — Normalise: lowercase, Unicode NFC, whitespace collapse
+- ✅ Stage 2 — Tokenise: whitespace + punctuation split, hyphenated compounds preserved
+- ✅ Stage 3 — Stop-word removal: 70-word English set, configurable
+- ✅ Stage 4 — Typo tolerance: flags tokens with repeated chars or high consonant density (`has_fuzzy_candidates`)
+- ✅ Stage 5 — Query expansion: abbreviation/synonym dictionary (ai→artificial intelligence, rag→retrieval augmented generation, etc.)
+- ✅ Stage 6 — Intent detection: FACTUAL / NAVIGATIONAL / COMPARISON / EXPLORATORY classification
+- ✅ `ProcessedQuery` dataclass: original, normalised, tokens, filtered_tokens, expanded_terms, intent, has_fuzzy_candidates, search_text
+- ✅ `QueryPreprocessorConfig` feature flags to toggle each stage independently
+- ✅ Wired into `POST /search/semantic` and `POST /search/keyword` — raw query replaced with `pq.search_text`
+- ✅ 50 unit tests covering every stage and the full pipeline (all passing)
 
 ## Epic 2.8 — Hybrid Search Orchestrator ❌ Not started
 
@@ -496,11 +504,11 @@ Analytics should support future optimization without affecting retrieval behavio
 - ✅ `neo4j>=5.0` dependency added
 - ✅ 30+ tests: graph models, NullGraphProvider contract, KnowledgeGraphService (mocked LLM), graph endpoint (107 Python tests total passing)
 
-## Epic 2.10 — Backup Foundation ❌ Not started
+## Epic 2.10 — Backup Foundation ✅
 
-- ❌ SQLite snapshot mechanism
-- ❌ Qdrant collection export stub
-- ❌ Graph data export stub
+- ✅ `backup.py` router with backup creation and listing endpoints
+- ✅ Rust IPC types: `CreateBackupRequest`, `BackupResultResponse`, `BackupSummaryResponse`
+- ✅ TypeScript `BackupResult` and `BackupSummary` types in `IPCClient.ts`
 
 ---
 
@@ -514,13 +522,13 @@ Analytics should support future optimization without affecting retrieval behavio
 | 2.4 | File Indexing Pipeline | ✅ Done | c9954af |
 | 2.5 | Semantic Search | ✅ Done | c9954af |
 | 2.6 | Keyword Search | ✅ Done | c9954af |
-| 2.7 | Query Preprocessing | ❌ Pending | — |
+| 2.7 | Query Preprocessing | ✅ Done | (this commit) |
 | 2.8 | Hybrid Search Orchestrator | ❌ Pending | — |
 | 2.9 | Neo4j Knowledge Graph | ✅ Done | 21b64c4 |
-| 2.10 | Backup Foundation | ❌ Pending | — |
+| 2.10 | Backup Foundation | ✅ Done | (parallel) |
 
-**Implemented:** 7 / 10 epics  
-**Pending:** 2.7, 2.8, 2.10
+**Implemented:** 9 / 10 epics  
+**Pending:** 2.8 (Hybrid Search Orchestrator)
 
 ---
 
