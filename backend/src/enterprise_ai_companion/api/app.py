@@ -1,23 +1,47 @@
 """FastAPI application for the Enterprise AI Companion backend."""
 
+import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from enterprise_ai_companion.api.routers import conversations, embeddings, indexing, search
+from enterprise_ai_companion.api.routers import conversations, embeddings, graph, indexing, search
+from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
+from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
 from enterprise_ai_companion.infrastructure.database import close_db, open_db
 from enterprise_ai_companion.infrastructure.qdrant_provider import QdrantProvider
+
+logger = logging.getLogger(__name__)
+
+
+def _build_graph_provider() -> NullGraphProvider | Neo4jProvider:
+    """Return Neo4jProvider when EAC_GRAPH_PROVIDER=neo4j, else NullGraphProvider."""
+    if os.environ.get("EAC_GRAPH_PROVIDER", "null").lower() == "neo4j":
+        return Neo4jProvider()
+    return NullGraphProvider()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Open the database and Qdrant store on startup; close both on shutdown."""
+    """Open all stores on startup; close them on shutdown."""
     app.state.db = await open_db()
 
     qdrant = QdrantProvider()
     qdrant.initialize()
     app.state.qdrant = qdrant
+
+    graph_provider = _build_graph_provider()
+    try:
+        await graph_provider.initialize()
+    except Exception as exc:
+        logger.warning(
+            "Graph provider failed to initialize (%s). Falling back to NullGraphProvider.", exc
+        )
+        graph_provider = NullGraphProvider()
+        await graph_provider.initialize()
+    app.state.graph = graph_provider
 
     app.state.indexing_tasks: dict = {}
 
@@ -29,6 +53,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         app.state.qdrant.close()
         app.state.qdrant = None
+
+        await app.state.graph.close()
+        app.state.graph = None
 
 
 app = FastAPI(
@@ -42,6 +69,7 @@ app.include_router(embeddings.router)
 app.include_router(conversations.router)
 app.include_router(indexing.router)
 app.include_router(search.router)
+app.include_router(graph.router)
 
 
 @app.get("/health")

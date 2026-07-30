@@ -88,6 +88,36 @@ export interface SemanticSearchResponse {
   results: SearchResultItem[];
 }
 
+export interface KeywordSearchResponse {
+  results: SearchResultItem[];
+}
+
+export interface GraphEntityItem {
+  id: string;
+  name: string;
+  entity_type: string;
+  source_document_id: string;
+  properties: Record<string, unknown>;
+}
+
+export interface GraphRelationshipItem {
+  source_id: string;
+  target_id: string;
+  relationship_type: string;
+  properties: Record<string, unknown>;
+}
+
+export interface GraphContextResponse {
+  entity: GraphEntityItem;
+  related_entities: GraphEntityItem[];
+  relationships: GraphRelationshipItem[];
+}
+
+export interface GraphHealthResponse {
+  connected: boolean;
+  provider: string;
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -208,6 +238,42 @@ async function searchSemantic(
   });
 }
 
+/**
+ * Performs a full-text keyword search over indexed document chunks.
+ * Returns scored fragments ordered by BM25 relevance.
+ */
+async function searchKeyword(
+  query: string,
+  topK: number = 10,
+  workspacePath?: string
+): Promise<KeywordSearchResponse> {
+  return invoke<KeywordSearchResponse>("search_keyword", {
+    query,
+    topK,
+    workspacePath: workspacePath ?? null,
+  });
+}
+
+/**
+ * Retrieves a named entity and its neighbourhood from the knowledge graph.
+ *
+ * @param entityName Exact entity name to look up.
+ * @param depth Neighbourhood traversal depth (1–3, default 1).
+ */
+async function getGraphEntity(
+  entityName: string,
+  depth: number = 1
+): Promise<GraphContextResponse> {
+  return invoke<GraphContextResponse>("get_graph_entity", { entityName, depth });
+}
+
+/**
+ * Returns the health status of the graph provider backend.
+ */
+async function graphHealth(): Promise<GraphHealthResponse> {
+  return invoke<GraphHealthResponse>("graph_health");
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
@@ -217,4 +283,7 @@ export const IPCClient = {
   indexWorkspace,
   getIndexingStatus,
   searchSemantic,
+  searchKeyword,
+  getGraphEntity,
+  graphHealth,
 } as const;

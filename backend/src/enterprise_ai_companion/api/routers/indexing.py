@@ -68,13 +68,14 @@ async def _run_indexing(
     tasks: dict[str, Any],
     db: aiosqlite.Connection,
     qdrant_provider: Any,
+    graph_provider: Any,
 ) -> None:
     tasks[task_id]["status"] = "running"
     try:
         doc_repo = DocumentRepository(db)
         chunk_repo = ChunkRepository(db, qdrant_provider.get_client())
         embedding_service = EmbeddingService()
-        indexer = FileIndexer(doc_repo, chunk_repo, embedding_service)
+        indexer = FileIndexer(doc_repo, chunk_repo, embedding_service, graph_provider=graph_provider)
 
         result = await indexer.index_workspace(workspace_path)
 
@@ -117,6 +118,7 @@ async def start_indexing(body: StartIndexingRequest, request: Request) -> StartI
             tasks=tasks,
             db=_get_db(request),
             qdrant_provider=request.app.state.qdrant,
+            graph_provider=request.app.state.graph,
         )
     )
 

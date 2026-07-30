@@ -1,4 +1,4 @@
-"""Indexes local workspace files into SQLite and Qdrant for retrieval."""
+"""Indexes local workspace files into SQLite, Qdrant, and the knowledge graph."""
 
 from __future__ import annotations
 
@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvider
+from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import KnowledgeGraphService
+from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
 from enterprise_ai_companion.capabilities.indexing.chunk_repository import (
     Chunk,
     ChunkRepository,
@@ -41,8 +44,10 @@ class FileIndexer:
     """Recursively indexes text files in a workspace directory.
 
     For each file that is new or has changed (detected by SHA-256 hash), the
-    indexer chunks the content, generates embeddings, and persists both to
-    SQLite (via DocumentRepository / ChunkRepository) and Qdrant.
+    indexer chunks the content, generates embeddings, persists both to SQLite
+    (via DocumentRepository / ChunkRepository) and Qdrant, then builds graph
+    entities via KnowledgeGraphService (best-effort — graph failures never abort
+    indexing).
     """
 
     def __init__(
@@ -51,11 +56,13 @@ class FileIndexer:
         chunk_repo: ChunkRepository,
         embedding_service: EmbeddingService,
         chunker: TextChunker | None = None,
+        graph_provider: GraphProvider | None = None,
     ) -> None:
         self._doc_repo = doc_repo
         self._chunk_repo = chunk_repo
         self._embedding_service = embedding_service
         self._chunker = chunker or TextChunker()
+        self._graph_service = KnowledgeGraphService(graph_provider or NullGraphProvider())
 
     async def index_workspace(self, workspace_path: str) -> IndexingResult:
         """Index all supported files under workspace_path. Returns a summary."""
@@ -101,9 +108,10 @@ class FileIndexer:
         if existing and existing.file_hash == file_hash:
             return False  # unchanged
 
-        # Remove stale chunks before re-indexing.
+        # Remove stale chunks and graph nodes before re-indexing.
         if existing:
             await self._chunk_repo.delete_by_document(existing.id)
+            await self._graph_service.delete_document(existing.id)
 
         raw_chunks = self._chunker.chunk(text)
         if not raw_chunks:
@@ -137,6 +145,15 @@ class FileIndexer:
         await self._doc_repo.upsert(doc)
 
         await self._chunk_repo.save_batch(chunks, embeddings)
+
+        # Graph building is best-effort — failure here must not abort indexing.
+        try:
+            await self._graph_service.build_from_chunks(
+                doc_id,
+                [c.content for c in chunks],
+            )
+        except Exception as exc:
+            logger.warning("Graph build failed for %s: %s", file_path.name, exc)
 
         logger.debug("Indexed %s (%d chunks)", file_path.name, len(chunks))
         return True

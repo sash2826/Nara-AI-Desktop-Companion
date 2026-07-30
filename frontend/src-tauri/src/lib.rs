@@ -123,6 +123,48 @@ pub struct SemanticSearchResponse {
     pub results: Vec<SearchResultItem>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KeywordSearchRequest {
+    pub query: String,
+    pub top_k: u32,
+    pub workspace_path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KeywordSearchResponse {
+    pub results: Vec<SearchResultItem>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphEntityResponse {
+    pub id: String,
+    pub name: String,
+    pub entity_type: String,
+    pub source_document_id: String,
+    pub properties: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphRelationshipResponse {
+    pub source_id: String,
+    pub target_id: String,
+    pub relationship_type: String,
+    pub properties: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphContextResponse {
+    pub entity: GraphEntityResponse,
+    pub related_entities: Vec<GraphEntityResponse>,
+    pub relationships: Vec<GraphRelationshipResponse>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphHealthResponse {
+    pub connected: bool,
+    pub provider: String,
+}
+
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
 
 fn sidecar_base(state: &AppState) -> Result<String, String> {
@@ -379,6 +421,97 @@ async fn search_semantic(
         .map_err(|e| format!("Failed to parse search_semantic response: {}", e))
 }
 
+/// Performs a full-text keyword search over indexed document chunks using FTS5.
+#[tauri::command]
+async fn search_keyword(
+    query: String,
+    top_k: u32,
+    workspace_path: Option<String>,
+    state: State<'_, Arc<AppState>>,
+) -> Result<KeywordSearchResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/search/keyword", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&KeywordSearchRequest {
+            query,
+            top_k,
+            workspace_path,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("search_keyword request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "search_keyword returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<KeywordSearchResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse search_keyword response: {}", e))
+}
+
+/// Retrieves a named entity and its neighbourhood from the knowledge graph.
+#[tauri::command]
+async fn get_graph_entity(
+    entity_name: String,
+    depth: u32,
+    state: State<'_, Arc<AppState>>,
+) -> Result<GraphContextResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!(
+        "{}/graph/entity/{}?depth={}",
+        base,
+        urlencoding::encode(&entity_name),
+        depth
+    );
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("get_graph_entity request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_graph_entity returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<GraphContextResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse graph entity response: {}", e))
+}
+
+/// Returns the health status of the graph provider.
+#[tauri::command]
+async fn graph_health(state: State<'_, Arc<AppState>>) -> Result<GraphHealthResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/graph/health", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("graph_health request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "graph_health returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<GraphHealthResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse graph health response: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -514,7 +647,10 @@ pub fn run() {
             list_conversations,
             index_workspace,
             get_indexing_status,
-            search_semantic
+            search_semantic,
+            search_keyword,
+            get_graph_entity,
+            graph_health
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
