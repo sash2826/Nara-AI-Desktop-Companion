@@ -61,6 +61,33 @@ export interface ConversationSummary {
   message_count: number;
 }
 
+export interface IndexWorkspaceResponse {
+  task_id: string;
+  status: string;
+}
+
+export interface IndexingStatus {
+  task_id: string;
+  status: string;
+  files_found: number;
+  files_indexed: number;
+  files_skipped: number;
+  errors: string[];
+}
+
+export interface SearchResultItem {
+  chunk_id: string;
+  document_id: string;
+  document_path: string;
+  chunk_index: number;
+  content: string;
+  score: number;
+}
+
+export interface SemanticSearchResponse {
+  results: SearchResultItem[];
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -150,10 +177,44 @@ async function listConversations(): Promise<ConversationSummary[]> {
   return invoke<ConversationSummary[]>("list_conversations");
 }
 
+/**
+ * Starts indexing a workspace directory in the background.
+ * Returns a task_id to poll with `getIndexingStatus`.
+ */
+async function indexWorkspace(workspacePath: string): Promise<IndexWorkspaceResponse> {
+  return invoke<IndexWorkspaceResponse>("index_workspace", { workspacePath });
+}
+
+/**
+ * Returns the current status of an indexing task.
+ */
+async function getIndexingStatus(taskId: string): Promise<IndexingStatus> {
+  return invoke<IndexingStatus>("get_indexing_status", { taskId });
+}
+
+/**
+ * Performs a semantic search over indexed document chunks.
+ * Returns scored fragments ordered by similarity.
+ */
+async function searchSemantic(
+  query: string,
+  topK: number = 5,
+  workspacePath?: string
+): Promise<SemanticSearchResponse> {
+  return invoke<SemanticSearchResponse>("search_semantic", {
+    query,
+    topK,
+    workspacePath: workspacePath ?? null,
+  });
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
   saveMessage,
   loadConversation,
   listConversations,
+  indexWorkspace,
+  getIndexingStatus,
+  searchSemantic,
 } as const;

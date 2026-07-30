@@ -75,6 +75,7 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: null,
       recentDocuments: [],
       explicitContext: null,
+      retrievedContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, emptyContext);
     expect(capturedOptions()?.systemMessage).toBeUndefined();
@@ -87,6 +88,7 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: "/projects/my-app/src",
       recentDocuments: [],
       explicitContext: null,
+      retrievedContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     expect(capturedOptions()?.systemMessage).toContain("Active folder: /projects/my-app/src");
@@ -99,6 +101,7 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: null,
       recentDocuments: ["/projects/a.ts", "/projects/b.ts"],
       explicitContext: null,
+      retrievedContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     const msg = capturedOptions()?.systemMessage ?? "";
@@ -113,6 +116,7 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: null,
       recentDocuments: [],
       explicitContext: "Focus on TypeScript best practices.",
+      retrievedContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     expect(capturedOptions()?.systemMessage).toContain("Focus on TypeScript best practices.");
@@ -125,6 +129,7 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: "/projects/app",
       recentDocuments: ["/projects/app/main.ts"],
       explicitContext: "Be concise.",
+      retrievedContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     const msg = capturedOptions()?.systemMessage ?? "";
@@ -133,16 +138,17 @@ describe("ConversationService — system message injection", () => {
     expect(msg).toContain("Be concise.");
   });
 
-  it("system message ends with a period", async () => {
+  it("system message contains activeProjectFolder text", async () => {
     const { provider, capturedOptions } = makeProvider();
     const service = new ConversationService(provider);
     const context: ContextSnapshot = {
       activeProjectFolder: "/projects/app",
       recentDocuments: [],
+      retrievedContext: null,
       explicitContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
-    expect(capturedOptions()?.systemMessage?.endsWith(".")).toBe(true);
+    expect(capturedOptions()?.systemMessage).toContain("Active folder: /projects/app");
   });
 });
 

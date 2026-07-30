@@ -166,8 +166,11 @@ export class ConversationService {
     if (context.explicitContext) {
       parts.push(context.explicitContext);
     }
+    if (context.retrievedContext) {
+      parts.push(`Relevant documents:\n${context.retrievedContext}`);
+    }
 
-    return parts.length > 0 ? parts.join(". ") + "." : undefined;
+    return parts.length > 0 ? parts.join("\n\n") : undefined;
   }
 
   /**

@@ -10,6 +10,11 @@ import type { ContextEngine, ContextSnapshot } from "./ContextEngine";
  */
 export class NullContextEngine implements ContextEngine {
   async getSnapshot(): Promise<ContextSnapshot> {
-    return { activeProjectFolder: null, recentDocuments: [], explicitContext: null };
+    return {
+      activeProjectFolder: null,
+      recentDocuments: [],
+      explicitContext: null,
+      retrievedContext: null,
+    };
   }
 }

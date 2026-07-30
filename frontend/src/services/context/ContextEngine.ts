@@ -12,6 +12,8 @@ export interface ContextSnapshot {
   recentDocuments: string[];
   /** Context the user has explicitly provided for this session (e.g. a pasted document). */
   explicitContext: string | null;
+  /** Retrieved document fragments injected by the retrieval pipeline, or null when no index exists yet. */
+  retrievedContext: string | null;
 }
 
 /**

@@ -33,6 +33,7 @@ export class WorkspaceContextEngine implements ContextEngine {
       activeProjectFolder,
       recentDocuments: [...this.recentDocuments],
       explicitContext: null,
+      retrievedContext: null,
     };
   }
 

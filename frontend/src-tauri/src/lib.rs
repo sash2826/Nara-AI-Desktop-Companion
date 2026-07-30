@@ -80,6 +80,49 @@ pub struct IpcError {
     pub message: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IndexWorkspaceRequest {
+    pub workspace_path: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IndexWorkspaceResponse {
+    pub task_id: String,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IndexingStatusResponse {
+    pub task_id: String,
+    pub status: String,
+    pub files_found: u32,
+    pub files_indexed: u32,
+    pub files_skipped: u32,
+    pub errors: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SemanticSearchRequest {
+    pub query: String,
+    pub top_k: u32,
+    pub workspace_path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SearchResultItem {
+    pub chunk_id: String,
+    pub document_id: String,
+    pub document_path: String,
+    pub chunk_index: u32,
+    pub content: String,
+    pub score: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SemanticSearchResponse {
+    pub results: Vec<SearchResultItem>,
+}
+
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
 
 fn sidecar_base(state: &AppState) -> Result<String, String> {
@@ -242,6 +285,100 @@ async fn load_conversation(
         .map_err(|e| format!("Failed to parse load_conversation response: {}", e))
 }
 
+/// Starts indexing a workspace directory in the background.
+///
+/// Returns immediately with a task_id. Poll `get_indexing_status` for progress.
+#[tauri::command]
+async fn index_workspace(
+    workspace_path: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<IndexWorkspaceResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/indexing/start", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&IndexWorkspaceRequest { workspace_path })
+        .send()
+        .await
+        .map_err(|e| format!("index_workspace request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "index_workspace returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<IndexWorkspaceResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse index_workspace response: {}", e))
+}
+
+/// Returns the current status of an indexing task.
+#[tauri::command]
+async fn get_indexing_status(
+    task_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<IndexingStatusResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/indexing/status/{}", base, task_id);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("get_indexing_status request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_indexing_status returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<IndexingStatusResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse indexing status response: {}", e))
+}
+
+/// Performs a semantic similarity search over indexed document chunks.
+#[tauri::command]
+async fn search_semantic(
+    query: String,
+    top_k: u32,
+    workspace_path: Option<String>,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SemanticSearchResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/search/semantic", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&SemanticSearchRequest {
+            query,
+            top_k,
+            workspace_path,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("search_semantic request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "search_semantic returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<SemanticSearchResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse search_semantic response: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -374,7 +511,10 @@ pub fn run() {
             generate_embedding,
             save_message,
             load_conversation,
-            list_conversations
+            list_conversations,
+            index_workspace,
+            get_indexing_status,
+            search_semantic
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

@@ -63,7 +63,25 @@ export function useConversation() {
       }
 
       // Snapshot workspace context before sending.
-      const context = contextEngine ? await contextEngine.getSnapshot() : undefined;
+      const baseContext = contextEngine ? await contextEngine.getSnapshot() : undefined;
+
+      // Retrieve semantically relevant document fragments (Tauri only).
+      // Non-fatal — retrieval failures never block the conversation.
+      let retrievedContext: string | null = null;
+      if (IS_TAURI && conversationId) {
+        try {
+          const searchResponse = await IPCClient.searchSemantic(trimmed, 5);
+          if (searchResponse.results.length > 0) {
+            retrievedContext = searchResponse.results
+              .map((r) => `[${r.document_path}]\n${r.content}`)
+              .join("\n\n---\n\n");
+          }
+        } catch {
+          // No index yet or search failed — proceed without retrieved context.
+        }
+      }
+
+      const context = baseContext ? { ...baseContext, retrievedContext } : undefined;
 
       let assistantMessageId: string | null = null;
       let finalContent = "";

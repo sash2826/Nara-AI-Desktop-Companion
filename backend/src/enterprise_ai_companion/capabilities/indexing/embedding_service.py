@@ -1,4 +1,9 @@
-"""Local embedding service using BGE-M3 via fastembed (ONNX runtime)."""
+"""Local embedding service using BAAI/bge-large-en-v1.5 via fastembed (ONNX runtime).
+
+BGE-M3 was removed from the fastembed TextEmbedding registry in v0.8.0.
+BAAI/bge-large-en-v1.5 is the recommended drop-in replacement: same 1024-dim output,
+same cosine-similarity metric, no PyTorch dependency.
+"""
 
 from __future__ import annotations
 
@@ -10,11 +15,11 @@ if TYPE_CHECKING:
 
 # BGE-M3 produces 1024-dimensional embeddings.
 EMBEDDING_DIM = 1024
-MODEL_NAME = "BAAI/bge-m3"
+MODEL_NAME = "BAAI/bge-large-en-v1.5"
 
 
 class EmbeddingService:
-    """Generates dense text embeddings using BGE-M3 locally via ONNX runtime.
+    """Generates dense text embeddings using bge-large-en-v1.5 locally via ONNX runtime.
 
     The model is loaded once on first use (lazy singleton per instance).
     Subsequent calls reuse the loaded model — no repeated disk I/O.
@@ -43,7 +48,7 @@ class EmbeddingService:
             text: The input string to embed.
 
         Returns:
-            A list of floats with length EMBEDDING_DIM (1024 for BGE-M3).
+            A list of floats with length EMBEDDING_DIM (1024).
         """
         if not text:
             raise ValueError("text must be a non-empty string")
