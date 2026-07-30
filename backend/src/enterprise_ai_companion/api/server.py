@@ -2,11 +2,20 @@
 
 import os
 import socket
+import ssl
 import uvicorn
 
 # Disable HuggingFace Xet CDN — uses byte-range HTTP requests that are blocked
 # by corporate proxies. Standard HTTP chunked download is used instead.
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
+# Inject the Windows system certificate store (including corporate proxy CAs)
+# into Python's SSL context so model downloads succeed behind SSL-inspecting proxies.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
 
 
 def find_free_port() -> int:
