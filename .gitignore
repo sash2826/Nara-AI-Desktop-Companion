@@ -39,3 +39,8 @@ htmlcov/
 # Temporary
 *.tmp
 *.bak
+
+# Runtime data (generated at runtime, never committed)
+qdrant_data/
+*.sqlite
+!database/migrations/*.sql

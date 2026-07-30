@@ -9,7 +9,7 @@ import pytest
 
 from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
 from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
-from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
+from enterprise_ai_companion.capabilities.indexing.embedding_service import EMBEDDING_DIM, EmbeddingService
 from enterprise_ai_companion.capabilities.indexing.file_indexer import FileIndexer
 from enterprise_ai_companion.infrastructure.database import open_db
 
@@ -35,10 +35,10 @@ def mock_qdrant():
 
 @pytest.fixture
 def mock_embedding_service():
-    """Returns deterministic 1024-dim vectors without loading the ONNX model."""
+    """Returns deterministic vectors without loading the ONNX model."""
     svc = MagicMock(spec=EmbeddingService)
-    svc.generate.return_value = [0.1] * 1024
-    svc.generate_batch.return_value = [[0.1] * 1024]
+    svc.generate.return_value = [0.1] * EMBEDDING_DIM
+    svc.generate_batch.return_value = [[0.1] * EMBEDDING_DIM]
     return svc
 
 

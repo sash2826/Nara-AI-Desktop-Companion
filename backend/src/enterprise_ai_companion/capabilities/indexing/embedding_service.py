@@ -1,8 +1,9 @@
-"""Local embedding service using BAAI/bge-large-en-v1.5 via fastembed (ONNX runtime).
+"""Local embedding service using BAAI/bge-small-en-v1.5 via fastembed (ONNX runtime).
 
-BGE-M3 was removed from the fastembed TextEmbedding registry in v0.8.0.
-BAAI/bge-large-en-v1.5 is the recommended drop-in replacement: same 1024-dim output,
-same cosine-similarity metric, no PyTorch dependency.
+bge-small-en-v1.5 is chosen over the large variant because:
+- 66 MB ONNX file — downloads via standard HTTP (no HuggingFace Xet CDN range requests)
+- Compatible with corporate proxies that strip byte-range headers
+- 384-dimensional output — fast inference, still high semantic quality for RAG retrieval
 """
 
 from __future__ import annotations
@@ -13,9 +14,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from fastembed import TextEmbedding
 
-# BGE-M3 produces 1024-dimensional embeddings.
-EMBEDDING_DIM = 1024
-MODEL_NAME = "BAAI/bge-large-en-v1.5"
+EMBEDDING_DIM = 384
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
 class EmbeddingService:

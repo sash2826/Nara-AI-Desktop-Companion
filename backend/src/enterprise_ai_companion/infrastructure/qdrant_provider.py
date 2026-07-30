@@ -16,7 +16,7 @@ from qdrant_client.models import Distance, VectorParams
 logger = logging.getLogger(__name__)
 
 CHUNKS_COLLECTION = "document_chunks"
-EMBEDDING_DIM = 1024  # BGE-M3 output dimension
+EMBEDDING_DIM = 384  # bge-small-en-v1.5 output dimension
 
 
 def _qdrant_data_dir() -> Path:
@@ -34,7 +34,12 @@ class QdrantProvider:
         self._client: QdrantClient | None = None
 
     def initialize(self) -> None:
-        """Open the local Qdrant store and ensure the collection exists."""
+        """Open the local Qdrant store and ensure the collection exists with correct dims.
+
+        If the collection exists with a different vector size (e.g. left over from a
+        previous embedding model), it is deleted and recreated so the dimension always
+        matches EMBEDDING_DIM. This makes model switches safe without manual cleanup.
+        """
         data_dir = _qdrant_data_dir()
         data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -42,12 +47,23 @@ class QdrantProvider:
         logger.info("Qdrant provider initialised at %s", data_dir)
 
         existing = {c.name for c in self._client.get_collections().collections}
+        if CHUNKS_COLLECTION in existing:
+            info = self._client.get_collection(CHUNKS_COLLECTION)
+            stored_dim = info.config.params.vectors.size  # type: ignore[union-attr]
+            if stored_dim != EMBEDDING_DIM:
+                logger.warning(
+                    "Collection '%s' has dim=%d but model requires dim=%d — recreating.",
+                    CHUNKS_COLLECTION, stored_dim, EMBEDDING_DIM,
+                )
+                self._client.delete_collection(CHUNKS_COLLECTION)
+                existing.discard(CHUNKS_COLLECTION)
+
         if CHUNKS_COLLECTION not in existing:
             self._client.create_collection(
                 collection_name=CHUNKS_COLLECTION,
                 vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
             )
-            logger.info("Created Qdrant collection '%s'", CHUNKS_COLLECTION)
+            logger.info("Created Qdrant collection '%s' (dim=%d)", CHUNKS_COLLECTION, EMBEDDING_DIM)
 
     def get_client(self) -> QdrantClient:
         if self._client is None:
