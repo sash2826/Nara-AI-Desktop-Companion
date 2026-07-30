@@ -723,6 +723,7 @@ fn start_sidecar(app_handle: AppHandle, state: Arc<AppState>) {
         let mut child = match Command::new(&python_cmd)
             .args(["-m", "enterprise_ai_companion"])
             .current_dir(&backend_dir)
+            .env("HF_HUB_DISABLE_XET", "1")
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()

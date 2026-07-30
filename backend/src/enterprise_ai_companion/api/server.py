@@ -1,7 +1,12 @@
 """Uvicorn startup and shutdown for the Enterprise AI Companion backend."""
 
+import os
 import socket
 import uvicorn
+
+# Disable HuggingFace Xet CDN — uses byte-range HTTP requests that are blocked
+# by corporate proxies. Standard HTTP chunked download is used instead.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 
 def find_free_port() -> int:
