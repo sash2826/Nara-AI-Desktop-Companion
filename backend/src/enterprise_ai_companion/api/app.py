@@ -7,7 +7,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from enterprise_ai_companion.api.routers import conversations, embeddings, graph, indexing, search
+from enterprise_ai_companion.api.routers import backup, conversations, embeddings, graph, indexing, search
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
 from enterprise_ai_companion.infrastructure.database import close_db, open_db
@@ -70,6 +70,7 @@ app.include_router(conversations.router)
 app.include_router(indexing.router)
 app.include_router(search.router)
 app.include_router(graph.router)
+app.include_router(backup.router)
 
 
 @app.get("/health")

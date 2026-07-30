@@ -136,6 +136,32 @@ pub struct KeywordSearchResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct HybridSearchRequest {
+    pub query: String,
+    pub top_k: u32,
+    pub workspace_path: Option<String>,
+    pub semantic_weight: f64,
+    pub keyword_weight: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HybridSearchResultItem {
+    pub chunk_id: String,
+    pub document_id: String,
+    pub document_path: String,
+    pub chunk_index: u32,
+    pub content: String,
+    pub rrf_score: f64,
+    pub keyword_rank: Option<u32>,
+    pub semantic_rank: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HybridSearchResponse {
+    pub results: Vec<HybridSearchResultItem>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GraphEntityResponse {
     pub id: String,
     pub name: String,
@@ -163,6 +189,30 @@ pub struct GraphContextResponse {
 pub struct GraphHealthResponse {
     pub connected: bool,
     pub provider: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateBackupRequest {
+    pub notes: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BackupResultResponse {
+    pub backup_id: String,
+    pub backup_path: String,
+    pub created_at: String,
+    pub sqlite_size_bytes: u64,
+    pub qdrant_collections: Vec<String>,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BackupSummaryResponse {
+    pub backup_id: String,
+    pub backup_path: String,
+    pub created_at: String,
+    pub status: String,
+    pub sqlite_size_bytes: u64,
 }
 
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
@@ -512,6 +562,101 @@ async fn graph_health(state: State<'_, Arc<AppState>>) -> Result<GraphHealthResp
         .map_err(|e| format!("Failed to parse graph health response: {}", e))
 }
 
+/// Runs keyword + semantic search concurrently and merges results via RRF.
+#[tauri::command]
+async fn search_hybrid(
+    query: String,
+    top_k: u32,
+    workspace_path: Option<String>,
+    semantic_weight: f64,
+    keyword_weight: f64,
+    state: State<'_, Arc<AppState>>,
+) -> Result<HybridSearchResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/search/hybrid", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&HybridSearchRequest {
+            query,
+            top_k,
+            workspace_path,
+            semantic_weight,
+            keyword_weight,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("search_hybrid request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "search_hybrid returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<HybridSearchResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse search_hybrid response: {}", e))
+}
+
+/// Creates a timestamped backup of SQLite and Qdrant metadata.
+#[tauri::command]
+async fn create_backup(
+    notes: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<BackupResultResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/backup/create", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&CreateBackupRequest { notes })
+        .send()
+        .await
+        .map_err(|e| format!("create_backup request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "create_backup returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<BackupResultResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse create_backup response: {}", e))
+}
+
+/// Returns all backups ordered most recent first.
+#[tauri::command]
+async fn list_backups(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<BackupSummaryResponse>, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/backup/list", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("list_backups request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "list_backups returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<Vec<BackupSummaryResponse>>()
+        .await
+        .map_err(|e| format!("Failed to parse list_backups response: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -649,8 +794,11 @@ pub fn run() {
             get_indexing_status,
             search_semantic,
             search_keyword,
+            search_hybrid,
             get_graph_entity,
-            graph_health
+            graph_health,
+            create_backup,
+            list_backups
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

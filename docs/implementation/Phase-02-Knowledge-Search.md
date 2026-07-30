@@ -2,7 +2,7 @@
 
 **Phase:** 02
 
-**Status:** In Progress
+**Status:** Complete
 
 **Estimated Duration:** 3-5 Days
 
@@ -483,11 +483,18 @@ Analytics should support future optimization without affecting retrieval behavio
 - ✅ Wired into `POST /search/semantic` and `POST /search/keyword` — raw query replaced with `pq.search_text`
 - ✅ 50 unit tests covering every stage and the full pipeline (all passing)
 
-## Epic 2.8 — Hybrid Search Orchestrator ❌ Not started
+## Epic 2.8 — Hybrid Search Orchestrator ✅
 
-- ❌ `HybridSearchOrchestrator` combining keyword + semantic results
-- ❌ Reciprocal Rank Fusion or weighted score merge
-- ❌ `POST /search/hybrid` API endpoint and IPC command
+- ✅ `HybridSearchOrchestrator` — runs keyword (FTS5) and semantic (Qdrant) search concurrently via `asyncio.gather`
+- ✅ Reciprocal Rank Fusion (RRF, k=60) merge with configurable `semantic_weight` and `keyword_weight` per-provider
+- ✅ `_rrf_merge()` — pure function; deduplicates by chunk_id, records per-provider rank, sorts by descending RRF score
+- ✅ Fetch multiplier (3×) ensures RRF has sufficient material after deduplication
+- ✅ Provider-isolation: one provider failing never prevents the other from returning results
+- ✅ `HybridSearchResult` dataclass: chunk_id, document_id, document_path, chunk_index, content, rrf_score, keyword_rank, semantic_rank
+- ✅ `POST /search/hybrid` endpoint wired to `QueryPreprocessor` + `HybridSearchOrchestrator`
+- ✅ `HybridSearchRequest` — query, top_k (1–50), workspace_path, semantic_weight (0–10), keyword_weight (0–10)
+- ✅ `search_hybrid` Rust IPC command (Tauri) and `searchHybrid()` TypeScript function in `IPCClient.ts`
+- ✅ 32 unit tests: 13 `_rrf_merge` tests, 9 orchestrator tests, 10 endpoint tests (all passing)
 
 ## Epic 2.9 — Neo4j Knowledge Graph ✅
 
@@ -506,9 +513,14 @@ Analytics should support future optimization without affecting retrieval behavio
 
 ## Epic 2.10 — Backup Foundation ✅
 
-- ✅ `backup.py` router with backup creation and listing endpoints
-- ✅ Rust IPC types: `CreateBackupRequest`, `BackupResultResponse`, `BackupSummaryResponse`
-- ✅ TypeScript `BackupResult` and `BackupSummary` types in `IPCClient.ts`
+- ✅ `BackupService` — `create_backup()` (VACUUM INTO SQLite snapshot + Qdrant metadata), `list_backups()`, `delete_backup()`
+- ✅ Timestamped backup directories: `sqlite.db`, `qdrant_meta.json`, `manifest.json` per backup
+- ✅ `BackupManifest`, `BackupResult`, `BackupSummary` dataclasses; `_backup_root()` reads `EAC_BACKUP_DIR` env var
+- ✅ `POST /backup/create`, `GET /backup/list`, `DELETE /backup/{backup_id}` API endpoints
+- ✅ Wired into `app.py` lifespan (db_conn + qdrant_client injected per request)
+- ✅ Rust IPC: `CreateBackupRequest`, `BackupResultResponse`, `BackupSummaryResponse` structs; `create_backup`, `list_backups` commands
+- ✅ TypeScript: `BackupResult`, `BackupSummary` types; `createBackup()`, `listBackups()` in `IPCClient.ts`
+- ✅ 15 unit tests covering `create_backup`, `list_backups`, `delete_backup` (all passing)
 
 ---
 
@@ -534,7 +546,7 @@ Analytics should support future optimization without affecting retrieval behavio
 
 # Next Phase
 
-After completing the remaining epics (2.7, 2.8, 2.10), proceed to:
+After completing the remaining epic (2.8), proceed to:
 
 **Phase 03 – Workspace Features**
 

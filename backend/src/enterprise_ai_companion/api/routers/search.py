@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, field_validator
 
 from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
+from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import HybridSearchOrchestrator
 from enterprise_ai_companion.capabilities.retrieval.keyword_search import KeywordSearchProvider
 from enterprise_ai_companion.capabilities.retrieval.qdrant_search import QdrantSearchProvider
 from enterprise_ai_companion.capabilities.retrieval.query_preprocessor import QueryPreprocessor
@@ -61,6 +62,36 @@ class KeywordSearchRequest(BaseModel):
 
 class KeywordSearchResponse(BaseModel):
     results: list[SearchResultItem]
+
+
+class HybridSearchRequest(BaseModel):
+    query: str
+    top_k: int = Field(default=10, ge=1, le=50)
+    workspace_path: str | None = None
+    semantic_weight: float = Field(default=1.0, ge=0.0, le=10.0)
+    keyword_weight: float = Field(default=1.0, ge=0.0, le=10.0)
+
+    @field_validator("query")
+    @classmethod
+    def must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("query must not be empty")
+        return v.strip()
+
+
+class HybridSearchResultItem(BaseModel):
+    chunk_id: str
+    document_id: str
+    document_path: str
+    chunk_index: int
+    content: str
+    rrf_score: float
+    keyword_rank: int | None
+    semantic_rank: int | None
+
+
+class HybridSearchResponse(BaseModel):
+    results: list[HybridSearchResultItem]
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +158,47 @@ async def keyword_search(
                 chunk_index=r.chunk_index,
                 content=r.content,
                 score=r.score,
+            )
+            for r in results
+        ]
+    )
+
+
+@router.post("/hybrid", response_model=HybridSearchResponse)
+async def hybrid_search(
+    body: HybridSearchRequest, request: Request
+) -> HybridSearchResponse:
+    """Return top_k document chunks ranked by Reciprocal Rank Fusion over keyword + semantic results.
+
+    Runs keyword (FTS5) and semantic (Qdrant) search concurrently, then merges
+    the two ranked lists using RRF. Chunks appearing in both lists are boosted.
+
+    Use ``semantic_weight`` and ``keyword_weight`` to bias the blend (both default 1.0).
+    """
+    pq = _preprocessor.process(body.query)
+    orchestrator = HybridSearchOrchestrator(
+        conn=_get_db(request),
+        qdrant_client=request.app.state.qdrant.get_client(),
+        embedding_service=EmbeddingService(),
+    )
+    results = await orchestrator.search(
+        query=pq.search_text,
+        top_k=body.top_k,
+        workspace_path=body.workspace_path,
+        semantic_weight=body.semantic_weight,
+        keyword_weight=body.keyword_weight,
+    )
+    return HybridSearchResponse(
+        results=[
+            HybridSearchResultItem(
+                chunk_id=r.chunk_id,
+                document_id=r.document_id,
+                document_path=r.document_path,
+                chunk_index=r.chunk_index,
+                content=r.content,
+                rrf_score=r.rrf_score,
+                keyword_rank=r.keyword_rank,
+                semantic_rank=r.semantic_rank,
             )
             for r in results
         ]

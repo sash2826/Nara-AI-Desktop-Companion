@@ -92,6 +92,21 @@ export interface KeywordSearchResponse {
   results: SearchResultItem[];
 }
 
+export interface HybridSearchResultItem {
+  chunk_id: string;
+  document_id: string;
+  document_path: string;
+  chunk_index: number;
+  content: string;
+  rrf_score: number;
+  keyword_rank: number | null;
+  semantic_rank: number | null;
+}
+
+export interface HybridSearchResponse {
+  results: HybridSearchResultItem[];
+}
+
 export interface GraphEntityItem {
   id: string;
   name: string;
@@ -116,6 +131,23 @@ export interface GraphContextResponse {
 export interface GraphHealthResponse {
   connected: boolean;
   provider: string;
+}
+
+export interface BackupResult {
+  backup_id: string;
+  backup_path: string;
+  created_at: string;
+  sqlite_size_bytes: number;
+  qdrant_collections: string[];
+  status: string;
+}
+
+export interface BackupSummary {
+  backup_id: string;
+  backup_path: string;
+  created_at: string;
+  status: string;
+  sqlite_size_bytes: number;
 }
 
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
@@ -255,6 +287,28 @@ async function searchKeyword(
 }
 
 /**
+ * Runs keyword + semantic search concurrently and merges results via RRF.
+ *
+ * @param semanticWeight Multiplier for the semantic provider's RRF contribution (default 1.0).
+ * @param keywordWeight  Multiplier for the keyword provider's RRF contribution (default 1.0).
+ */
+async function searchHybrid(
+  query: string,
+  topK: number = 10,
+  workspacePath?: string,
+  semanticWeight: number = 1.0,
+  keywordWeight: number = 1.0
+): Promise<HybridSearchResponse> {
+  return invoke<HybridSearchResponse>("search_hybrid", {
+    query,
+    topK,
+    workspacePath: workspacePath ?? null,
+    semanticWeight,
+    keywordWeight,
+  });
+}
+
+/**
  * Retrieves a named entity and its neighbourhood from the knowledge graph.
  *
  * @param entityName Exact entity name to look up.
@@ -274,6 +328,20 @@ async function graphHealth(): Promise<GraphHealthResponse> {
   return invoke<GraphHealthResponse>("graph_health");
 }
 
+/**
+ * Creates a timestamped backup of SQLite and Qdrant collection metadata.
+ */
+async function createBackup(notes: string = ""): Promise<BackupResult> {
+  return invoke<BackupResult>("create_backup", { notes });
+}
+
+/**
+ * Returns all backups ordered most recent first.
+ */
+async function listBackups(): Promise<BackupSummary[]> {
+  return invoke<BackupSummary[]>("list_backups");
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
@@ -284,6 +352,9 @@ export const IPCClient = {
   getIndexingStatus,
   searchSemantic,
   searchKeyword,
+  searchHybrid,
   getGraphEntity,
   graphHealth,
+  createBackup,
+  listBackups,
 } as const;
