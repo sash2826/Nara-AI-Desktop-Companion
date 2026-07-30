@@ -2,7 +2,7 @@
 
 **Phase:** 02
 
-**Status:** Planned
+**Status:** In Progress
 
 **Estimated Duration:** 3-5 Days
 
@@ -427,9 +427,106 @@ Analytics should support future optimization without affecting retrieval behavio
 
 ---
 
+# Phase 02 Completion Checklist
+
+## Epic 2.1 — Infrastructure & Providers ✅
+
+- ✅ SQL migration runner (`schema_migrations` table, ordered `.sql` files)
+- ✅ Qdrant local file-mode provider (`qdrant_provider.py`) with auto-collection creation
+- ✅ `database.py` expanded with connection management and `open_db` / `close_db`
+- ✅ `qdrant-client>=1.9` dependency added
+
+## Epic 2.2 — Repository Abstraction ✅
+
+- ✅ `DocumentRepository` — SQLite upsert, SHA-256 hash-based change detection, list by workspace
+- ✅ `ChunkRepository` — dual write to SQLite + Qdrant, FTS5 mirror, batch ops, delete by document
+
+## Epic 2.3 — SQLite Schema Expansion ✅
+
+- ✅ Migration `001_conversations.sql` — conversations and messages schema
+- ✅ Migration `002_knowledge_schema.sql` — documents, chunks, `chunks_fts` FTS5 virtual table with Porter stemming
+
+## Epic 2.4 — File Indexing Pipeline ✅
+
+- ✅ `TextChunker` — sentence-boundary chunking with configurable overlap (chunk_size=1500, overlap=200)
+- ✅ `FileIndexer` — recursive .txt/.md discovery, SHA-256 dedup, background re-index on change, graph build wired
+- ✅ `POST /indexing/start` (202 accepted) and `GET /indexing/status/{task_id}` API endpoints
+- ✅ `index_workspace` and `get_indexing_status` IPC commands (Rust + TypeScript)
+
+## Epic 2.5 — Semantic Search ✅
+
+- ✅ `QdrantSearchProvider` — embed query → Qdrant nearest-neighbour → SQLite hydration
+- ✅ `POST /search/semantic` API endpoint (top_k, workspace_path filter)
+- ✅ `search_semantic` IPC command (Rust + TypeScript)
+- ✅ Top-5 retrieved fragments injected as system context into every LLM call via `retrievedContext` field
+
+## Epic 2.6 — Keyword Search ✅
+
+- ✅ `KeywordSearchProvider` — FTS5 BM25 query with Porter stemming, safe token escaping (no FTS5 injection)
+- ✅ BM25 score normalised to [0, 1] using `1 / (1 + |raw|)` for consistent ranking
+- ✅ `POST /search/keyword` API endpoint (workspace filter, top_k 1–50)
+- ✅ `search_keyword` IPC command (Rust + TypeScript)
+- ✅ `KeywordSearchResponse` type exported from `IPCClient.ts`
+- ✅ 19 unit tests — helper functions, search behaviour, workspace filtering, stemming (all passing)
+
+## Epic 2.7 — Query Preprocessing ❌ Not started
+
+- ❌ Query normalisation service
+- ❌ Tokenisation / stop-word handling
+- ❌ Query expansion pipeline
+
+## Epic 2.8 — Hybrid Search Orchestrator ❌ Not started
+
+- ❌ `HybridSearchOrchestrator` combining keyword + semantic results
+- ❌ Reciprocal Rank Fusion or weighted score merge
+- ❌ `POST /search/hybrid` API endpoint and IPC command
+
+## Epic 2.9 — Neo4j Knowledge Graph ✅
+
+- ✅ `GraphProvider` abstract interface (7 methods: initialize, upsert_entity, upsert_relationship, get_context, delete_by_document, health, close)
+- ✅ `NullGraphProvider` — no-op stub; app runs fully without Docker or Neo4j
+- ✅ `Neo4jProvider` — async Bolt driver, uniqueness constraint + name index, MERGE-based upsert, depth-limited traversal
+- ✅ `KnowledgeGraphService` — per-chunk LLM entity extraction (best-effort; failures never abort indexing)
+- ✅ `llm_client.py` — httpx async wrapper for Volvo GenAI Hub; credentials from env vars only
+- ✅ `FileIndexer` updated: graph build wired after chunk/embed persist; stale nodes deleted on re-index
+- ✅ `GET /graph/entity/{name}` and `GET /graph/health` API endpoints
+- ✅ `get_graph_entity` and `graph_health` IPC commands (Rust + TypeScript, `urlencoding` dep added)
+- ✅ `docker-compose.yml` — `neo4j:5-community` service (Bolt 7687, Browser 7474)
+- ✅ App startup: `EAC_GRAPH_PROVIDER=neo4j` opt-in; auto-falls back to Null on connection failure
+- ✅ `neo4j>=5.0` dependency added
+- ✅ 30+ tests: graph models, NullGraphProvider contract, KnowledgeGraphService (mocked LLM), graph endpoint (107 Python tests total passing)
+
+## Epic 2.10 — Backup Foundation ❌ Not started
+
+- ❌ SQLite snapshot mechanism
+- ❌ Qdrant collection export stub
+- ❌ Graph data export stub
+
+---
+
+## Phase 02 Summary
+
+| Epic | Title | Status | Commit |
+|------|-------|--------|--------|
+| 2.1 | Infrastructure & Providers | ✅ Done | c9954af |
+| 2.2 | Repository Abstraction | ✅ Done | c9954af |
+| 2.3 | SQLite Schema Expansion | ✅ Done | c9954af |
+| 2.4 | File Indexing Pipeline | ✅ Done | c9954af |
+| 2.5 | Semantic Search | ✅ Done | c9954af |
+| 2.6 | Keyword Search | ✅ Done | c9954af |
+| 2.7 | Query Preprocessing | ❌ Pending | — |
+| 2.8 | Hybrid Search Orchestrator | ❌ Pending | — |
+| 2.9 | Neo4j Knowledge Graph | ✅ Done | 21b64c4 |
+| 2.10 | Backup Foundation | ❌ Pending | — |
+
+**Implemented:** 7 / 10 epics  
+**Pending:** 2.7, 2.8, 2.10
+
+---
+
 # Next Phase
 
-After completing this phase, proceed to:
+After completing the remaining epics (2.7, 2.8, 2.10), proceed to:
 
 **Phase 03 – Workspace Features**
 
