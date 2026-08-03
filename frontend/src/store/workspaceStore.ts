@@ -1,0 +1,88 @@
+import { create } from "zustand";
+import type {
+  WatchedFolder,
+  WatcherStatus,
+  IndexedDocument,
+  DocumentFilter,
+  DocumentSort,
+} from "@/types/workspace";
+
+const DEFAULT_FILTER: DocumentFilter = {
+  workspacePath: null,
+  extension: null,
+  search: "",
+};
+
+const DEFAULT_SORT: DocumentSort = {
+  key: "indexed_at",
+  direction: "desc",
+};
+
+interface WorkspaceStore {
+  // Watcher
+  folders: WatchedFolder[];
+  watcherStatus: WatcherStatus | null;
+  watcherLoading: boolean;
+  watcherError: string | null;
+
+  // Documents
+  documents: IndexedDocument[];
+  documentsLoading: boolean;
+  documentsError: string | null;
+  filter: DocumentFilter;
+  sort: DocumentSort;
+
+  // Active tab
+  activeTab: "folders" | "documents" | "indexing";
+
+  // Watcher actions
+  setFolders: (folders: WatchedFolder[]) => void;
+  addFolder: (folder: WatchedFolder) => void;
+  removeFolder: (folderId: string) => void;
+  setWatcherStatus: (status: WatcherStatus) => void;
+  setWatcherLoading: (loading: boolean) => void;
+  setWatcherError: (error: string | null) => void;
+
+  // Document actions
+  setDocuments: (documents: IndexedDocument[]) => void;
+  setDocumentsLoading: (loading: boolean) => void;
+  setDocumentsError: (error: string | null) => void;
+  setFilter: (filter: Partial<DocumentFilter>) => void;
+  setSort: (sort: DocumentSort) => void;
+  resetFilter: () => void;
+
+  // Tab
+  setActiveTab: (tab: "folders" | "documents" | "indexing") => void;
+}
+
+export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
+  folders: [],
+  watcherStatus: null,
+  watcherLoading: false,
+  watcherError: null,
+
+  documents: [],
+  documentsLoading: false,
+  documentsError: null,
+  filter: DEFAULT_FILTER,
+  sort: DEFAULT_SORT,
+
+  activeTab: "folders",
+
+  setFolders: (folders) => set({ folders }),
+  addFolder: (folder) => set((state) => ({ folders: [...state.folders, folder] })),
+  removeFolder: (folderId) =>
+    set((state) => ({ folders: state.folders.filter((f) => f.id !== folderId) })),
+  setWatcherStatus: (watcherStatus) => set({ watcherStatus }),
+  setWatcherLoading: (watcherLoading) => set({ watcherLoading }),
+  setWatcherError: (watcherError) => set({ watcherError }),
+
+  setDocuments: (documents) => set({ documents }),
+  setDocumentsLoading: (documentsLoading) => set({ documentsLoading }),
+  setDocumentsError: (documentsError) => set({ documentsError }),
+  setFilter: (filter) => set((state) => ({ filter: { ...state.filter, ...filter } })),
+  setSort: (sort) => set({ sort }),
+  resetFilter: () => set({ filter: DEFAULT_FILTER }),
+
+  setActiveTab: (activeTab) => set({ activeTab }),
+}));

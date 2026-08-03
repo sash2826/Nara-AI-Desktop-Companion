@@ -235,6 +235,16 @@ pub struct AddFolderRequest {
     pub path: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IndexedDocumentResponse {
+    pub id: String,
+    pub workspace_path: String,
+    pub file_path: String,
+    pub char_count: u32,
+    pub chunk_count: u32,
+    pub indexed_at: String,
+}
+
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
 
 fn sidecar_base(state: &AppState) -> Result<String, String> {
@@ -783,6 +793,48 @@ async fn get_watcher_status(
         .map_err(|e| format!("Failed to parse get_watcher_status response: {}", e))
 }
 
+/// Lists all indexed documents, optionally filtered by workspace path.
+#[tauri::command]
+async fn list_documents(
+    workspace_path: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<IndexedDocumentResponse>, String> {
+    let base = sidecar_base(&state)?;
+    let mut url = format!("{}/documents", base);
+
+    let mut params: Vec<String> = Vec::new();
+    if let Some(wp) = workspace_path {
+        params.push(format!("workspace_path={}", urlencoding::encode(&wp)));
+    }
+    if let Some(l) = limit {
+        params.push(format!("limit={}", l));
+    }
+    if let Some(o) = offset {
+        params.push(format!("offset={}", o));
+    }
+    if !params.is_empty() {
+        url = format!("{}?{}", url, params.join("&"));
+    }
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("list_documents request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "list_documents returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<Vec<IndexedDocumentResponse>>()
+        .await
+        .map_err(|e| format!("Failed to parse list_documents response: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -929,7 +981,8 @@ pub fn run() {
             add_watched_folder,
             remove_watched_folder,
             list_watched_folders,
-            get_watcher_status
+            get_watcher_status,
+            list_documents
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

@@ -150,6 +150,15 @@ export interface BackupSummary {
   sqlite_size_bytes: number;
 }
 
+export interface IndexedDocument {
+  id: string;
+  workspace_path: string;
+  file_path: string;
+  char_count: number;
+  chunk_count: number;
+  indexed_at: string;
+}
+
 export interface WatchedFolder {
   id: string;
   path: string;
@@ -356,6 +365,22 @@ async function listBackups(): Promise<BackupSummary[]> {
 }
 
 /**
+ * Returns all indexed documents, ordered most recently indexed first.
+ * Optionally filtered by workspace path.
+ */
+async function listDocuments(
+  workspacePath?: string,
+  limit: number = 500,
+  offset: number = 0
+): Promise<IndexedDocument[]> {
+  return invoke<IndexedDocument[]>("list_documents", {
+    workspacePath: workspacePath ?? null,
+    limit,
+    offset,
+  });
+}
+
+/**
  * Registers a folder for automatic background indexing.
  */
 async function addWatchedFolder(path: string): Promise<WatchedFolder> {
@@ -391,6 +416,7 @@ export const IPCClient = {
   listConversations,
   indexWorkspace,
   getIndexingStatus,
+  listDocuments,
   searchSemantic,
   searchKeyword,
   searchHybrid,

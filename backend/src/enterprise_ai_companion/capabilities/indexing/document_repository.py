@@ -67,6 +67,15 @@ class DocumentRepository:
             rows = await cur.fetchall()
         return [IndexedDocument(**dict(row)) for row in rows]
 
+    async def list_all(self, limit: int = 500, offset: int = 0) -> list[IndexedDocument]:
+        async with self._conn.execute(
+            "SELECT id, workspace_path, file_path, file_hash, char_count, chunk_count, indexed_at "
+            "FROM documents ORDER BY indexed_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ) as cur:
+            rows = await cur.fetchall()
+        return [IndexedDocument(**dict(row)) for row in rows]
+
     async def delete_by_path(self, file_path: str) -> None:
         await self._conn.execute("DELETE FROM documents WHERE file_path = ?", (file_path,))
         await self._conn.commit()

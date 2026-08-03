@@ -114,6 +114,79 @@ python-docx>=1.0  # DOCX text extraction
 
 ---
 
+# Epic 3.2 (Track 2) — Search Interface ✅
+
+**Status:** Complete
+
+## Deliverables
+
+### Store — `src/store/searchStore.ts`
+
+Zustand store holding `query`, `mode` (`"semantic" | "keyword"`), `filters` (`topK`, `workspacePath`), `results`, `isSearching`, `error`, `hasSearched`. Full set/clear actions.
+
+### Service — `src/services/search/SearchService.ts`
+
+`SearchService.search()` delegates to `IPCClient.searchSemantic` or `IPCClient.searchKeyword` based on mode. Returns `SearchResponse` with results, mode, and `durationMs` measured via `performance.now()`.
+
+### Hook — `src/hooks/useSearch.ts`
+
+`useSearch()` wires the store and service. Cancels in-flight requests via `AbortController` on each new search. Exposes `search()`, `clear()`, and all store state as a flat API for components.
+
+### Components — `src/components/search/`
+
+| File | Description |
+|---|---|
+| `SearchInput.tsx` | Controlled input with animated search/spinner icon, clear button, Enter-to-search, Escape-to-clear |
+| `SearchModeSelector.tsx` | Segmented control (Semantic / Keyword) with icon + ARIA tab role |
+| `SearchFilters.tsx` | Result count selector (5/10/20/50) + workspace path text filter |
+| `SearchResultCard.tsx` | Ranked result card — filename, score %, content excerpt with query term highlighting, truncated path, chunk index |
+| `EmptySearchState.tsx` | Two states: pre-search prompt and no-results message |
+
+### Page — `src/pages/SearchPage.tsx`
+
+Replaces placeholder. Layout: search bar + mode selector row → filters row → optional error banner → scrollable results list or empty state. Zero layout shift between states.
+
+## No Backend Changes
+
+All IPC commands (`searchSemantic`, `searchKeyword`) were already implemented in Phase 02.
+
+---
+
+# Epic 3.3 (Track 3) — Settings Page ✅
+
+**Status:** Complete
+
+## Deliverables
+
+### Store — `src/store/settingsStore.ts`
+
+Zustand store holding `AppSettings` (theme, sidebarCollapsed, aiProvider, indexing). Hydrates from `eac-settings` localStorage key on first load with deep-merge against defaults. `saveSettings()` persists; `resetToDefaults()` wipes back to defaults. `isDirty` flag enables the Save button only when there are unsaved changes.
+
+### Service — `src/services/settings/SettingsService.ts`
+
+Thin wrapper around `IPCClient.createBackup` / `IPCClient.listBackups`. Pure preference persistence is handled by the store directly.
+
+### Hook — `src/hooks/useSettings.ts`
+
+`useSettings()` bridges the store with `ThemeProvider` so theme changes in the Settings panel are applied immediately to the document. Exposes `save()`, `reset()`, and typed `update*` helpers.
+
+### Components — `src/components/settings/`
+
+| File | Description |
+|---|---|
+| `GeneralSettings.tsx` | Three-option theme picker (Light / Dark / System) with icon tiles |
+| `AIProviderSettings.tsx` | Endpoint URL, masked subscription key (show/hide toggle), model ID, timeout, max retries. Shows env var hint. |
+| `IndexingSettings.tsx` | Chunk size, chunk overlap, max file size, auto-index on startup checkbox |
+| `BackupSettings.tsx` | Create Backup button, Refresh, scrollable backup list with status badges and file sizes. Live feedback on success/error. |
+
+### Page — `src/pages/SettingsPage.tsx`
+
+Replaces placeholder. Left sidebar tab navigation (General / AI Provider / Indexing / Backup) with Save and Reset buttons anchored at the bottom. Vertical divider separates nav from the active panel. Unsaved changes disable the Save button until `isDirty` is true.
+
+## No New Backend Work
+
+Backup IPC commands (`createBackup`, `listBackups`) were already implemented in Phase 02 Epic 2.10.
+
 ---
 
 # Workspace Architecture

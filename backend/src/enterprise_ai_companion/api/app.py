@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from enterprise_ai_companion.api.routers import backup, conversations, embeddings, graph, indexing, search
+from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, search
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
@@ -98,6 +98,7 @@ app.include_router(indexing.router)
 app.include_router(search.router)
 app.include_router(graph.router)
 app.include_router(backup.router)
+app.include_router(documents.router)
 app.include_router(watcher_router_module.router, prefix="/watcher", tags=["watcher"])
 
 
