@@ -835,6 +835,16 @@ async fn list_documents(
         .map_err(|e| format!("Failed to parse list_documents response: {}", e))
 }
 
+/// Opens a file or folder in the OS default application.
+///
+/// Uses the tauri-plugin-opener which is already registered in the app builder.
+/// On Windows this is equivalent to ShellExecute with "open".
+#[tauri::command]
+async fn open_file(path: String) -> Result<(), String> {
+    tauri_plugin_opener::open_path(path, None::<&str>)
+        .map_err(|e| format!("Failed to open file: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -982,7 +992,8 @@ pub fn run() {
             remove_watched_folder,
             list_watched_folders,
             get_watcher_status,
-            list_documents
+            list_documents,
+            open_file
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

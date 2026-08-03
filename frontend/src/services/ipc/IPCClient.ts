@@ -408,6 +408,14 @@ async function getWatcherStatus(): Promise<WatcherStatus> {
   return invoke<WatcherStatus>("get_watcher_status");
 }
 
+/**
+ * Opens a file or folder in the OS default application.
+ * On Windows this is equivalent to double-clicking the file in Explorer.
+ */
+async function openFile(path: string): Promise<void> {
+  return invoke<void>("open_file", { path });
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
@@ -428,4 +436,5 @@ export const IPCClient = {
   removeWatchedFolder,
   listWatchedFolders,
   getWatcherStatus,
+  openFile,
 } as const;

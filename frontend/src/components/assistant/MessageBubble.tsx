@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { AssistantAvatar } from "./AssistantAvatar";
 import { CopyButton } from "@/components/common/CopyButton";
+import { renderWithFilePaths } from "./filePathUtils";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/conversation";
 
@@ -79,7 +80,18 @@ const MARKDOWN_COMPONENTS: Components = {
   },
 
   p({ children }) {
-    return <p className="mb-2 last:mb-0 text-sm leading-relaxed">{children}</p>;
+    // Walk child nodes: expand plain-text strings into path chips where present,
+    // pass all other nodes (bold, code, etc.) through unchanged.
+    const processed = Array.isArray(children)
+      ? children.flatMap((child, i) =>
+          typeof child === "string"
+            ? renderWithFilePaths(child).map((node, j) => <span key={`${i}-${j}`}>{node}</span>)
+            : [child]
+        )
+      : typeof children === "string"
+        ? renderWithFilePaths(children)
+        : children;
+    return <p className="mb-2 last:mb-0 text-sm leading-relaxed">{processed}</p>;
   },
 
   ul({ children }) {
