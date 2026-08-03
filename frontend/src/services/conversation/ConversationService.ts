@@ -167,7 +167,12 @@ export class ConversationService {
       parts.push(context.explicitContext);
     }
     if (context.retrievedContext) {
-      parts.push(`Relevant documents:\n${context.retrievedContext}`);
+      parts.push(
+        `The following document excerpts were retrieved from the user's indexed knowledge base.\n` +
+          `Each excerpt is prefixed with its full file path in brackets.\n` +
+          `When answering, cite the exact file path so the user knows which document the information came from.\n\n` +
+          `Retrieved excerpts:\n${context.retrievedContext}`
+      );
     }
 
     return parts.length > 0 ? parts.join("\n\n") : undefined;
