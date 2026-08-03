@@ -7,6 +7,7 @@ import { IPCClient } from "@/services/ipc/IPCClient";
 import type {
   ConversationCallbacks,
   ConversationTurn,
+  ContextSnapshot,
 } from "@/services/conversation/ConversationService";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -66,9 +67,10 @@ export function useConversation() {
       const baseContext = contextEngine ? await contextEngine.getSnapshot() : undefined;
 
       // Retrieve semantically relevant document fragments (Tauri only).
-      // Non-fatal — retrieval failures never block the conversation.
+      // Not gated on conversationId — retrieval is independent of persistence.
+      // Non-fatal — failures never block the conversation.
       let retrievedContext: string | null = null;
-      if (IS_TAURI && conversationId) {
+      if (IS_TAURI) {
         try {
           const searchResponse = await IPCClient.searchSemantic(trimmed, 5);
           if (searchResponse.results.length > 0) {
@@ -81,7 +83,16 @@ export function useConversation() {
         }
       }
 
-      const context = baseContext ? { ...baseContext, retrievedContext } : undefined;
+      // Always build context so retrievedContext is injected even when no
+      // workspace signals (activeProjectFolder / recentDocuments) are present.
+      const context: ContextSnapshot = baseContext
+        ? { ...baseContext, retrievedContext }
+        : {
+            activeProjectFolder: null,
+            recentDocuments: [],
+            explicitContext: null,
+            retrievedContext,
+          };
 
       let assistantMessageId: string | null = null;
       let finalContent = "";
