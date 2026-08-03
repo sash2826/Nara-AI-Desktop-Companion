@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import platform
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -25,7 +26,26 @@ from enterprise_ai_companion.capabilities.indexing.text_chunker import TextChunk
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {".txt", ".md"}
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+
+# FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS (0x400000) — Windows sets this on
+# OneDrive Files On-Demand stubs that are not yet downloaded locally.
+_ONEDRIVE_STUB_ATTR = 0x400000
+
+
+def _is_cloud_stub(path: Path) -> bool:
+    """Return True if the file is a OneDrive cloud-only placeholder.
+
+    On non-Windows platforms this always returns False.
+    """
+    if platform.system() != "Windows":
+        return False
+    try:
+        import ctypes
+        attrs = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+        return attrs != -1 and bool(attrs & _ONEDRIVE_STUB_ATTR)
+    except Exception:
+        return False
 
 
 @dataclass
@@ -80,6 +100,10 @@ class FileIndexer:
         result.files_found = len(files)
 
         for file_path in files:
+            if _is_cloud_stub(file_path):
+                logger.debug("Skipping cloud-only stub: %s", file_path.name)
+                result.files_skipped += 1
+                continue
             try:
                 indexed = await self._index_file(file_path, workspace_path)
                 if indexed:
@@ -99,9 +123,25 @@ class FileIndexer:
         )
         return result
 
+    def _extract_text(self, file_path: Path) -> str:
+        """Extract plain text from a file based on its extension."""
+        ext = file_path.suffix.lower()
+        if ext in {".txt", ".md"}:
+            return file_path.read_text(encoding="utf-8", errors="replace")
+        if ext == ".pdf":
+            import pypdf  # noqa: PLC0415
+            reader = pypdf.PdfReader(str(file_path))
+            pages = [page.extract_text() or "" for page in reader.pages]
+            return "\n\n".join(pages)
+        if ext == ".docx":
+            import docx  # noqa: PLC0415
+            doc = docx.Document(str(file_path))
+            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        return file_path.read_text(encoding="utf-8", errors="replace")
+
     async def _index_file(self, file_path: Path, workspace_path: str) -> bool:
         """Index a single file. Returns True if indexed, False if unchanged."""
-        text = file_path.read_text(encoding="utf-8", errors="replace")
+        text = self._extract_text(file_path)
         file_hash = hashlib.sha256(text.encode()).hexdigest()
 
         existing = await self._doc_repo.get_by_path(str(file_path))

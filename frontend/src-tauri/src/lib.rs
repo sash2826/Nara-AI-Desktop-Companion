@@ -215,6 +215,26 @@ pub struct BackupSummaryResponse {
     pub sqlite_size_bytes: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WatchedFolderResponse {
+    pub id: String,
+    pub path: String,
+    pub auto_index: bool,
+    pub added_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WatcherStatusResponse {
+    pub running: bool,
+    pub watched_count: u32,
+    pub folders: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AddFolderRequest {
+    pub path: String,
+}
+
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
 
 fn sidecar_base(state: &AppState) -> Result<String, String> {
@@ -657,6 +677,112 @@ async fn list_backups(
         .map_err(|e| format!("Failed to parse list_backups response: {}", e))
 }
 
+/// Registers a folder for automatic background indexing.
+#[tauri::command]
+async fn add_watched_folder(
+    path: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<WatchedFolderResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/watcher/folders", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&AddFolderRequest { path })
+        .send()
+        .await
+        .map_err(|e| format!("add_watched_folder request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "add_watched_folder returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<WatchedFolderResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse add_watched_folder response: {}", e))
+}
+
+/// Removes a watched folder by its ID.
+#[tauri::command]
+async fn remove_watched_folder(
+    folder_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/watcher/folders/{}", base, folder_id);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(&url)
+        .send()
+        .await
+        .map_err(|e| format!("remove_watched_folder request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "remove_watched_folder returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Lists all registered watched folders.
+#[tauri::command]
+async fn list_watched_folders(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<WatchedFolderResponse>, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/watcher/folders", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("list_watched_folders request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "list_watched_folders returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<Vec<WatchedFolderResponse>>()
+        .await
+        .map_err(|e| format!("Failed to parse list_watched_folders response: {}", e))
+}
+
+/// Returns the current state of the file watcher service.
+#[tauri::command]
+async fn get_watcher_status(
+    state: State<'_, Arc<AppState>>,
+) -> Result<WatcherStatusResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/watcher/status", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("get_watcher_status request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_watcher_status returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<WatcherStatusResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse get_watcher_status response: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -799,7 +925,11 @@ pub fn run() {
             get_graph_entity,
             graph_health,
             create_backup,
-            list_backups
+            list_backups,
+            add_watched_folder,
+            remove_watched_folder,
+            list_watched_folders,
+            get_watcher_status
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

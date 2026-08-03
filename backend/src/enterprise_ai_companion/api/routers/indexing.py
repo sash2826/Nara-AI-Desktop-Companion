@@ -7,13 +7,9 @@ import logging
 import uuid
 from typing import Any
 
-import aiosqlite
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
-from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
-from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
 from enterprise_ai_companion.capabilities.indexing.file_indexer import FileIndexer
 
 logger = logging.getLogger(__name__)
@@ -51,14 +47,6 @@ class IndexingStatusResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Dependency helpers
-# ---------------------------------------------------------------------------
-
-def _get_db(request: Request) -> aiosqlite.Connection:
-    return request.app.state.db  # type: ignore[no-any-return]
-
-
-# ---------------------------------------------------------------------------
 # Background task runner
 # ---------------------------------------------------------------------------
 
@@ -66,19 +54,11 @@ async def _run_indexing(
     task_id: str,
     workspace_path: str,
     tasks: dict[str, Any],
-    db: aiosqlite.Connection,
-    qdrant_provider: Any,
-    graph_provider: Any,
+    indexer: FileIndexer,
 ) -> None:
     tasks[task_id]["status"] = "running"
     try:
-        doc_repo = DocumentRepository(db)
-        chunk_repo = ChunkRepository(db, qdrant_provider.get_client())
-        embedding_service = EmbeddingService()
-        indexer = FileIndexer(doc_repo, chunk_repo, embedding_service, graph_provider=graph_provider)
-
         result = await indexer.index_workspace(workspace_path)
-
         tasks[task_id].update(
             {
                 "status": result.status,
@@ -116,9 +96,7 @@ async def start_indexing(body: StartIndexingRequest, request: Request) -> StartI
             task_id=task_id,
             workspace_path=body.workspace_path,
             tasks=tasks,
-            db=_get_db(request),
-            qdrant_provider=request.app.state.qdrant,
-            graph_provider=request.app.state.graph,
+            indexer=request.app.state.file_indexer,
         )
     )
 

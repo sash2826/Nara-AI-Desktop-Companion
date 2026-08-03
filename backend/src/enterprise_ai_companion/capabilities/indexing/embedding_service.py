@@ -19,7 +19,7 @@ MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
 class EmbeddingService:
-    """Generates dense text embeddings using bge-large-en-v1.5 locally via ONNX runtime.
+    """Generates dense text embeddings using bge-small-en-v1.5 locally via ONNX runtime.
 
     The model is loaded once on first use (lazy singleton per instance).
     Subsequent calls reuse the loaded model — no repeated disk I/O.

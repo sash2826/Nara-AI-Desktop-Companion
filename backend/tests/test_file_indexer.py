@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import aiosqlite
 import pytest
@@ -60,7 +60,7 @@ class TestIndexWorkspace:
     ) -> None:
         (tmp_path / "doc.md").write_text("# Hello\nThis is a test document.", encoding="utf-8")
         (tmp_path / "notes.txt").write_text("Some plain text notes.", encoding="utf-8")
-        (tmp_path / "ignore.pdf").write_bytes(b"%PDF")
+        (tmp_path / "ignore.jpg").write_bytes(b"\xff\xd8\xff")  # unsupported extension
 
         result = await indexer.index_workspace(str(tmp_path))
         assert result.files_found == 2
@@ -113,3 +113,65 @@ class TestIndexWorkspace:
 
         assert result.status == "completed_with_errors"
         assert len(result.errors) == 1
+
+
+class TestExtractText:
+    """Unit tests for the _extract_text dispatcher."""
+
+    async def test_extracts_txt_file(self, indexer: FileIndexer, tmp_path: Path) -> None:
+        f = tmp_path / "note.txt"
+        f.write_text("Hello plain text", encoding="utf-8")
+        text = indexer._extract_text(f)
+        assert "Hello plain text" in text
+
+    async def test_extracts_md_file(self, indexer: FileIndexer, tmp_path: Path) -> None:
+        f = tmp_path / "doc.md"
+        f.write_text("# Title\n\nBody text.", encoding="utf-8")
+        text = indexer._extract_text(f)
+        assert "Title" in text
+
+    async def test_extracts_pdf_file(self, indexer: FileIndexer, tmp_path: Path) -> None:
+        f = tmp_path / "report.pdf"
+        f.write_bytes(b"%PDF-1.4 fake")
+        mock_reader = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "PDF page content"
+        mock_reader.pages = [mock_page]
+        with patch("pypdf.PdfReader", return_value=mock_reader):
+            text = indexer._extract_text(f)
+        assert "PDF page content" in text
+
+    async def test_extracts_docx_file(self, indexer: FileIndexer, tmp_path: Path) -> None:
+        f = tmp_path / "letter.docx"
+        f.write_bytes(b"PK fake docx")
+        mock_doc = MagicMock()
+        mock_para = MagicMock()
+        mock_para.text = "DOCX paragraph content"
+        mock_doc.paragraphs = [mock_para]
+        with patch("docx.Document", return_value=mock_doc):
+            text = indexer._extract_text(f)
+        assert "DOCX paragraph content" in text
+
+    async def test_indexes_pdf_end_to_end(self, indexer: FileIndexer, tmp_path: Path) -> None:
+        f = tmp_path / "report.pdf"
+        f.write_bytes(b"%PDF-1.4 fake")
+        mock_reader = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Annual report content " * 20
+        mock_reader.pages = [mock_page]
+        with patch("pypdf.PdfReader", return_value=mock_reader):
+            result = await indexer.index_workspace(str(tmp_path))
+        assert result.files_indexed == 1
+        assert result.errors == []
+
+    async def test_indexes_docx_end_to_end(self, indexer: FileIndexer, tmp_path: Path) -> None:
+        f = tmp_path / "memo.docx"
+        f.write_bytes(b"PK fake docx")
+        mock_doc = MagicMock()
+        mock_para = MagicMock()
+        mock_para.text = "Meeting memo content " * 20
+        mock_doc.paragraphs = [mock_para]
+        with patch("docx.Document", return_value=mock_doc):
+            result = await indexer.index_workspace(str(tmp_path))
+        assert result.files_indexed == 1
+        assert result.errors == []

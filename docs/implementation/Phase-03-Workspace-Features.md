@@ -47,6 +47,75 @@ Before beginning this phase:
 
 ---
 
+# Epic 3.0 — Background Indexing Service ✅
+
+**Status:** Complete
+
+This epic extends the Phase 02 indexing pipeline with automatic background indexing, persisted watched folder management, and support for additional file types. It is a prerequisite for the workspace management UI in Epic 3.1+.
+
+## Deliverables
+
+### Watched Folders (SQLite migration 003)
+
+A new `watched_folders` table persists user-configured indexing paths across restarts:
+
+```sql
+CREATE TABLE IF NOT EXISTS watched_folders (
+    id TEXT PRIMARY KEY, path TEXT NOT NULL UNIQUE,
+    auto_index INTEGER NOT NULL DEFAULT 1, added_at TEXT NOT NULL
+);
+```
+
+### WatcherService (`capabilities/indexing/file_watcher.py`)
+
+- `WatcherService` — manages a `watchdog.Observer` that monitors registered folders in a background OS thread
+- `DebounceHandler` — collapses rapid filesystem events (editor save pattern) into a single index call after a 2-second quiet window
+- `EXCLUDED_DIRS` — skips system/hidden directories (`Windows`, `AppData`, `.git`, `node_modules`, etc.)
+- Thread boundary bridged via `asyncio.run_coroutine_threadsafe` so the async `FileIndexer` can be called safely from the watchdog thread
+- Folder operations (`add_folder`, `remove_folder`, `list_folders`) persist to SQLite and register/unregister live watches immediately
+
+### Extended File Type Support
+
+`FileIndexer._extract_text()` dispatcher added — supports:
+
+| Extension | Extraction method |
+|---|---|
+| `.txt`, `.md` | `Path.read_text()` |
+| `.pdf` | `pypdf.PdfReader` — extracts all page text |
+| `.docx` | `python-docx Document` — joins all paragraph text |
+
+### API Endpoints (`api/routers/watcher.py`)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/watcher/folders` | Register folder; triggers immediate initial index |
+| `DELETE` | `/watcher/folders/{id}` | Unregister folder |
+| `GET` | `/watcher/folders` | List all watched folders |
+| `GET` | `/watcher/status` | Running state, watched count, folder paths |
+
+### IPC Commands (Tauri + TypeScript)
+
+Four new Rust commands registered in `invoke_handler` and matching TypeScript functions in `IPCClient.ts`:
+`addWatchedFolder`, `removeWatchedFolder`, `listWatchedFolders`, `getWatcherStatus`
+
+### Dependencies Added
+
+```
+watchdog>=4.0   # filesystem event monitoring
+pypdf>=4.0      # PDF text extraction
+python-docx>=1.0  # DOCX text extraction
+```
+
+## Tests
+
+- `tests/test_file_watcher.py` — 20 tests: `_is_excluded`, `DebounceHandler`, `WatcherService` lifecycle + CRUD
+- `tests/test_watcher_api.py` — 8 endpoint tests via `TestClient`
+- `tests/test_file_indexer.py` — extended with 6 PDF/DOCX extraction tests (total: 248 passing)
+
+---
+
+---
+
 # Workspace Architecture
 
 Workspace features should follow the frontend feature-oriented architecture established in Phase 00.

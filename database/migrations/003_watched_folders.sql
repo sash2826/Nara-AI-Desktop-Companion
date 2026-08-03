@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS watched_folders (
+    id          TEXT PRIMARY KEY,
+    path        TEXT NOT NULL UNIQUE,
+    auto_index  INTEGER NOT NULL DEFAULT 1,
+    added_at    TEXT NOT NULL
+);

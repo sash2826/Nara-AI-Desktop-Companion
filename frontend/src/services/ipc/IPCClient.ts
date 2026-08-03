@@ -150,6 +150,19 @@ export interface BackupSummary {
   sqlite_size_bytes: number;
 }
 
+export interface WatchedFolder {
+  id: string;
+  path: string;
+  auto_index: boolean;
+  added_at: string;
+}
+
+export interface WatcherStatus {
+  running: boolean;
+  watched_count: number;
+  folders: string[];
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -342,6 +355,34 @@ async function listBackups(): Promise<BackupSummary[]> {
   return invoke<BackupSummary[]>("list_backups");
 }
 
+/**
+ * Registers a folder for automatic background indexing.
+ */
+async function addWatchedFolder(path: string): Promise<WatchedFolder> {
+  return invoke<WatchedFolder>("add_watched_folder", { path });
+}
+
+/**
+ * Unregisters a watched folder by its ID.
+ */
+async function removeWatchedFolder(folderId: string): Promise<void> {
+  return invoke<void>("remove_watched_folder", { folderId });
+}
+
+/**
+ * Returns all registered watched folders.
+ */
+async function listWatchedFolders(): Promise<WatchedFolder[]> {
+  return invoke<WatchedFolder[]>("list_watched_folders");
+}
+
+/**
+ * Returns the current state of the file watcher service.
+ */
+async function getWatcherStatus(): Promise<WatcherStatus> {
+  return invoke<WatcherStatus>("get_watcher_status");
+}
+
 export const IPCClient = {
   healthCheck,
   generateEmbedding,
@@ -357,4 +398,8 @@ export const IPCClient = {
   graphHealth,
   createBackup,
   listBackups,
+  addWatchedFolder,
+  removeWatchedFolder,
+  listWatchedFolders,
+  getWatcherStatus,
 } as const;

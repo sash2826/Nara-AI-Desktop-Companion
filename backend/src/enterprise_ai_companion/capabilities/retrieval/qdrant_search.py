@@ -60,13 +60,14 @@ class QdrantSearchProvider:
             # We filter post-hoc via document lookup since workspace_path lives in SQLite.
             pass
 
-        hits = self._qdrant.search(
+        response = self._qdrant.query_points(
             collection_name=CHUNKS_COLLECTION,
-            query_vector=query_vector,
+            query=query_vector,
             limit=top_k * 2 if workspace_path else top_k,
             query_filter=qdrant_filter,
             with_payload=True,
         )
+        hits = response.points
 
         if not hits:
             return []
