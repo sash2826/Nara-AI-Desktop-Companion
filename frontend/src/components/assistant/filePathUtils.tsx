@@ -2,8 +2,14 @@ import type { ReactNode } from "react";
 import { FilePathChip } from "./FilePathChip";
 
 // Matches Windows absolute paths (C:\... or C:/...) and Unix absolute paths
-// (/home/...). Stops at whitespace and common markdown/punctuation delimiters.
-const FILE_PATH_REGEX = /([A-Za-z]:[/\\][^\s"'`*[\](){}|<>]+|\/[^\s"'`*[\](){}|<>]{2,})/g;
+// (/home/...). Allows spaces inside paths (e.g. "OneDrive - Volvo Group").
+// Stops at newlines, quotes, backticks, and markdown punctuation.
+const FILE_PATH_REGEX = /([A-Za-z]:[/\\][^"'`\n*[\](){}|<>]+|\/[^"'`\n*[\](){}|<>]{2,})/g;
+
+/** Returns true when the entire string looks like a Windows or Unix absolute path. */
+export function isAbsolutePath(text: string): boolean {
+  return /^[A-Za-z]:[/\\]/.test(text) || /^\/[^\s]/.test(text);
+}
 
 /**
  * Splits a text string on absolute file paths and returns a React node array

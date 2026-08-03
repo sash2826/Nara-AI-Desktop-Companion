@@ -4,7 +4,8 @@ import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { AssistantAvatar } from "./AssistantAvatar";
 import { CopyButton } from "@/components/common/CopyButton";
-import { renderWithFilePaths } from "./filePathUtils";
+import { renderWithFilePaths, isAbsolutePath } from "./filePathUtils";
+import { FilePathChip } from "./FilePathChip";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/conversation";
 
@@ -21,6 +22,11 @@ const MARKDOWN_COMPONENTS: Components = {
     const code = String(children).replace(/\n$/, "");
 
     if (isInline) {
+      // If the entire inline code span is an absolute path, render a chip
+      // instead of a plain code element so the user can open it directly.
+      if (isAbsolutePath(code)) {
+        return <FilePathChip path={code} />;
+      }
       return (
         <code
           className="rounded-sm bg-muted px-1 py-0.5 font-mono text-xs text-foreground"
