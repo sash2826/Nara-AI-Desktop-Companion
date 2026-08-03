@@ -21,25 +21,12 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from enterprise_ai_companion.capabilities.indexing.file_indexer import (
+    EXCLUDED_DIRS,
     FileIndexer,
     SUPPORTED_EXTENSIONS,
 )
 
 logger = logging.getLogger(__name__)
-
-# Directories whose names are never watched or re-indexed regardless of depth.
-EXCLUDED_DIRS: frozenset[str] = frozenset({
-    "node_modules",
-    ".git",
-    ".venv",
-    "__pycache__",
-    "$Recycle.Bin",
-    "Windows",
-    "Program Files",
-    "Program Files (x86)",
-    "AppData",
-    "System Volume Information",
-})
 
 _DEBOUNCE_SECONDS = 2.0
 

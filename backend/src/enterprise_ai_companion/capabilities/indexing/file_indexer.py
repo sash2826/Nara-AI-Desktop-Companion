@@ -28,9 +28,49 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 
+# Directory names that are never traversed during indexing, regardless of depth.
+# Shared with file_watcher.py which imports this constant.
+EXCLUDED_DIRS: frozenset[str] = frozenset({
+    "node_modules",
+    ".git",
+    ".venv",
+    ".claude",
+    "__pycache__",
+    "target",          # Rust build output
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    "$Recycle.Bin",
+    "Windows",
+    "Program Files",
+    "Program Files (x86)",
+    "AppData",
+    "System Volume Information",
+})
+
 # FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS (0x400000) — Windows sets this on
 # OneDrive Files On-Demand stubs that are not yet downloaded locally.
 _ONEDRIVE_STUB_ATTR = 0x400000
+
+
+def _collect_files(root: Path) -> list[Path]:
+    """Walk root recursively, skipping any directory in EXCLUDED_DIRS.
+
+    Using os.walk instead of Path.rglob so we can prune entire subtrees
+    (e.g. node_modules) without descending into them first.
+    """
+    import os
+
+    collected: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Prune excluded dirs in-place so os.walk does not recurse into them.
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS]
+        for name in filenames:
+            p = Path(dirpath) / name
+            if p.suffix.lower() in SUPPORTED_EXTENSIONS:
+                collected.append(p)
+    return collected
 
 
 def _is_cloud_stub(path: Path) -> bool:
@@ -93,10 +133,7 @@ class FileIndexer:
             result.errors.append(f"Workspace path does not exist or is not a directory: {root}")
             return result
 
-        files = [
-            p for p in root.rglob("*")
-            if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
-        ]
+        files = _collect_files(root)
         result.files_found = len(files)
 
         for file_path in files:
