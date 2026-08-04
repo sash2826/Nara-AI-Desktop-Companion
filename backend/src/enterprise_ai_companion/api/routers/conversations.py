@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Annotated, Literal
 
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
+from enterprise_ai_companion.capabilities.ai.conversation_memory import ConversationMemoryService
 from enterprise_ai_companion.capabilities.indexing.conversation_repository import (
     ConversationRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -66,6 +71,12 @@ class ConversationSummaryResponse(BaseModel):
     message_count: int
 
 
+class ConversationMemoryResponse(BaseModel):
+    conversation_id: str
+    turn_count: int
+    summary: str | None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 
@@ -88,7 +99,13 @@ async def save_message(
     body: SaveMessageRequest,
     db: DB,
 ) -> MessageResponse:
-    """Persist a message, creating the conversation row if it does not exist."""
+    """Persist a message, creating the conversation row if it does not exist.
+
+    When an assistant message is saved, the turn counter is incremented
+    and summarisation is triggered asynchronously when the threshold is
+    reached. The summarisation task runs in the background and never
+    delays this response.
+    """
     if not conversation_id.strip():
         raise HTTPException(status_code=422, detail="conversation_id must not be empty")
 
@@ -104,6 +121,15 @@ async def save_message(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    # Fire-and-forget: increment turn count and conditionally summarise.
+    # Runs after the response is already being sent — never blocks the client.
+    if body.role == "assistant" and body.status == "complete":
+        memory_service = ConversationMemoryService(repo)
+        asyncio.create_task(
+            memory_service.on_assistant_turn_saved(conversation_id),
+            name=f"memory-{conversation_id}",
+        )
+
     return MessageResponse(
         id=msg.id,
         conversation_id=msg.conversation_id,
@@ -111,6 +137,28 @@ async def save_message(
         content=msg.content,
         status=msg.status,
         created_at=msg.created_at,
+    )
+
+
+@router.get("/{conversation_id}/memory", response_model=ConversationMemoryResponse)
+async def get_conversation_memory(
+    conversation_id: str,
+    db: DB,
+) -> ConversationMemoryResponse:
+    """Return turn_count and compressed summary for a conversation.
+
+    The frontend calls this once per conversation load to inject the
+    stored summary into the first system message of the session.
+    """
+    if not conversation_id.strip():
+        raise HTTPException(status_code=422, detail="conversation_id must not be empty")
+
+    repo = ConversationRepository(db)
+    state = await repo.get_memory_state(conversation_id)
+    return ConversationMemoryResponse(
+        conversation_id=state.conversation_id,
+        turn_count=state.turn_count,
+        summary=state.summary,
     )
 
 

@@ -1,6 +1,6 @@
-# Phase 08: Automation
+# Phase 07: Automation
 
-**Phase:** 08
+**Phase:** 07
 
 **Status:** Planned
 
@@ -41,7 +41,7 @@ Automation should remain modular and extensible without coupling business capabi
 
 Before beginning this phase:
 
-* Phase 01 through Phase 07 must be completed.
+* Phase 00 through Phase 06 must be completed.
 * Background task manager should be operational.
 * AI services should be available.
 * Knowledge graph should be functioning.
@@ -261,20 +261,17 @@ This phase is complete when:
 
 Requires:
 
+* Phase 00
 * Phase 01
 * Phase 02
 * Phase 03
 * Phase 04
 * Phase 05
 * Phase 06
-* Phase 07
 
 Provides automation capabilities for:
 
-* Phase 09
-* Phase 10
-* Phase 11
-* Phase 12
+* Phase 08
 
 ---
 
@@ -291,6 +288,6 @@ Provides automation capabilities for:
 
 After completing this phase, proceed to:
 
-**Phase 09: Plugin System**
+**Phase 08: Polish & Release**
 
-The next phase implements the extensibility framework, allowing third-party and first-party plugins to add capabilities, UI components, AI tools, automation actions, and integrations without modifying the core application. This establishes the Enterprise AI Companion as a platform rather than a monolithic application.
+The next phase establishes comprehensive test suites, CI quality gates, production builds, cross-platform packaging, and the release automation process that prepares the Enterprise AI Companion for production deployment.

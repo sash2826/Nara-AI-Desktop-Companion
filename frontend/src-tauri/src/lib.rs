@@ -76,6 +76,13 @@ pub struct ConversationSummaryResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ConversationMemoryResponse {
+    pub conversation_id: String,
+    pub turn_count: u32,
+    pub summary: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IpcError {
     pub message: String,
 }
@@ -243,6 +250,47 @@ pub struct IndexedDocumentResponse {
     pub char_count: u32,
     pub chunk_count: u32,
     pub indexed_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IndexingErrorRecord {
+    pub id: String,
+    pub workspace_path: String,
+    pub file_path: String,
+    pub error_message: String,
+    pub failed_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecentFileResponse {
+    pub id: String,
+    pub file_path: String,
+    pub workspace_path: String,
+    pub chunk_count: u32,
+    pub char_count: u32,
+    pub indexed_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DashboardStatsResponse {
+    pub document_count: u32,
+    pub chunk_count: u32,
+    pub total_chars: u64,
+    pub conversation_count: u32,
+    pub watched_folder_count: u32,
+    pub indexing_error_count: u32,
+    pub recent_files: Vec<RecentFileResponse>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SuggestionsRequest {
+    pub recent_file_paths: Vec<String>,
+    pub max_suggestions: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SuggestionsResponse {
+    pub suggestions: Vec<String>,
 }
 
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
@@ -835,6 +883,165 @@ async fn list_documents(
         .map_err(|e| format!("Failed to parse list_documents response: {}", e))
 }
 
+/// Removes a document and all its chunks from SQLite, Qdrant, and the knowledge graph.
+#[tauri::command]
+async fn delete_document(
+    document_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/documents/{}", base, document_id);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(&url)
+        .send()
+        .await
+        .map_err(|e| format!("delete_document request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "delete_document returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Removes multiple documents in a single backend call.
+#[tauri::command]
+async fn bulk_delete_documents(
+    document_ids: Vec<String>,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/documents/bulk", base);
+
+    let body = serde_json::json!({ "document_ids": document_ids });
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("bulk_delete_documents request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "bulk_delete_documents returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Cancels a running or queued indexing task.
+#[tauri::command]
+async fn cancel_indexing(
+    task_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/indexing/cancel/{}", base, task_id);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(&url)
+        .send()
+        .await
+        .map_err(|e| format!("cancel_indexing request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "cancel_indexing returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Returns all persisted per-file indexing errors.
+#[tauri::command]
+async fn list_indexing_errors(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<IndexingErrorRecord>, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/indexing/errors", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("list_indexing_errors request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "list_indexing_errors returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<Vec<IndexingErrorRecord>>()
+        .await
+        .map_err(|e| format!("Failed to parse indexing errors response: {}", e))
+}
+
+/// Clears all persisted indexing errors.
+#[tauri::command]
+async fn clear_indexing_errors(
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/indexing/errors", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .delete(&url)
+        .send()
+        .await
+        .map_err(|e| format!("clear_indexing_errors request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "clear_indexing_errors returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Returns the turn count and compressed conversation summary.
+///
+/// Called on conversation load so the frontend can inject stored memory
+/// into the system message without re-reading the full message history.
+#[tauri::command]
+async fn get_conversation_memory(
+    conversation_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<ConversationMemoryResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/conversations/{}/memory", base, conversation_id);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("get_conversation_memory request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_conversation_memory returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<ConversationMemoryResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse conversation memory response: {}", e))
+}
+
 /// Opens a file or folder in the OS default application.
 ///
 /// Uses the tauri-plugin-opener which is already registered in the app builder.
@@ -843,6 +1050,63 @@ async fn list_documents(
 async fn open_file(path: String) -> Result<(), String> {
     tauri_plugin_opener::open_path(path, None::<&str>)
         .map_err(|e| format!("Failed to open file: {}", e))
+}
+
+/// Returns aggregated workspace statistics for the home dashboard.
+#[tauri::command]
+async fn get_stats(state: State<'_, Arc<AppState>>) -> Result<DashboardStatsResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/stats", base);
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("get_stats request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_stats returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<DashboardStatsResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse get_stats response: {}", e))
+}
+
+/// Returns AI-generated search query suggestions based on recent file names.
+#[tauri::command]
+async fn get_suggested_queries(
+    recent_file_paths: Vec<String>,
+    max_suggestions: u32,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SuggestionsResponse, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/stats/suggestions", base);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&SuggestionsRequest {
+            recent_file_paths,
+            max_suggestions,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("get_suggested_queries request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_suggested_queries returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<SuggestionsResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse get_suggested_queries response: {}", e))
 }
 
 // ─── Global shortcut ──────────────────────────────────────────────────────────
@@ -979,6 +1243,7 @@ pub fn run() {
             save_message,
             load_conversation,
             list_conversations,
+            get_conversation_memory,
             index_workspace,
             get_indexing_status,
             search_semantic,
@@ -993,7 +1258,14 @@ pub fn run() {
             list_watched_folders,
             get_watcher_status,
             list_documents,
-            open_file
+            delete_document,
+            bulk_delete_documents,
+            cancel_indexing,
+            list_indexing_errors,
+            clear_indexing_errors,
+            open_file,
+            get_stats,
+            get_suggested_queries
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

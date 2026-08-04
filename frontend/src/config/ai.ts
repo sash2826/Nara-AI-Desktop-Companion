@@ -81,7 +81,7 @@ function resolveAPIMConfig(): APIMConfig | undefined {
   if (!apimEndpoint || !apimKey) return undefined;
   return {
     endpoint: apimEndpoint,
-    model: "gpt-5.4-mini_gb_2026-03-17",
+    model: "gpt-41-mini_gb_2025-04-14",
     subscriptionKey: apimKey,
     timeoutMs: 30_000,
     maxRetries: 3,

@@ -1,4 +1,3 @@
-import { ContextBar } from "./ContextBar";
 import { PromptComposer } from "./PromptComposer";
 import { cn } from "@/lib/utils";
 
@@ -21,8 +20,6 @@ export function AssistantFooter({
 }: AssistantFooterProps) {
   return (
     <footer className={cn("flex flex-shrink-0 flex-col", className)} aria-label="Assistant footer">
-      <ContextBar />
-
       <PromptComposer
         value={inputValue}
         isStreaming={isStreaming}

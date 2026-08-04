@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PromptInput } from "./PromptInput";
-import { AttachmentButton } from "./AttachmentButton";
 import { SendButton } from "./SendButton";
 import { QuickActions } from "./QuickActions";
 import { cn } from "@/lib/utils";
@@ -55,8 +54,6 @@ export function PromptComposer({
 
       {/* Input row */}
       <div className="flex items-end gap-2 border-t border-border px-4 py-3">
-        <AttachmentButton />
-
         <PromptInput
           value={value}
           onChange={onChange}

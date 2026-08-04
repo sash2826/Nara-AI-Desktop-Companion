@@ -61,6 +61,12 @@ export interface ConversationSummary {
   message_count: number;
 }
 
+export interface ConversationMemory {
+  conversation_id: string;
+  turn_count: number;
+  summary: string | null;
+}
+
 export interface IndexWorkspaceResponse {
   task_id: string;
   status: string;
@@ -172,6 +178,37 @@ export interface WatcherStatus {
   folders: string[];
 }
 
+export interface IndexingError {
+  id: string;
+  workspace_path: string;
+  file_path: string;
+  error_message: string;
+  failed_at: string;
+}
+
+export interface RecentFile {
+  id: string;
+  file_path: string;
+  workspace_path: string;
+  chunk_count: number;
+  char_count: number;
+  indexed_at: string;
+}
+
+export interface DashboardStats {
+  document_count: number;
+  chunk_count: number;
+  total_chars: number;
+  conversation_count: number;
+  watched_folder_count: number;
+  indexing_error_count: number;
+  recent_files: RecentFile[];
+}
+
+export interface SuggestionsResponse {
+  suggestions: string[];
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -249,6 +286,16 @@ async function saveMessage(payload: SaveMessagePayload): Promise<PersistedMessag
  */
 async function loadConversation(conversationId: string): Promise<PersistedConversation> {
   return invoke<PersistedConversation>("load_conversation", { conversationId });
+}
+
+/**
+ * Returns the turn count and compressed summary for a conversation.
+ *
+ * Used on conversation load to inject prior-session memory into the system
+ * message without re-reading the full message history.
+ */
+async function getConversationMemory(conversationId: string): Promise<ConversationMemory> {
+  return invoke<ConversationMemory>("get_conversation_memory", { conversationId });
 }
 
 /**
@@ -409,11 +456,68 @@ async function getWatcherStatus(): Promise<WatcherStatus> {
 }
 
 /**
+ * Removes a document and all its chunks from SQLite, Qdrant, and the knowledge graph.
+ */
+async function deleteDocument(documentId: string): Promise<void> {
+  return invoke<void>("delete_document", { documentId });
+}
+
+/**
+ * Removes multiple documents and all their chunks in a single backend call.
+ */
+async function bulkDeleteDocuments(documentIds: string[]): Promise<void> {
+  return invoke<void>("bulk_delete_documents", { documentIds });
+}
+
+/**
+ * Cancels a running or queued indexing task.
+ */
+async function cancelIndexing(taskId: string): Promise<void> {
+  return invoke<void>("cancel_indexing", { taskId });
+}
+
+/**
+ * Returns all persisted per-file indexing errors, most recent first.
+ */
+async function listIndexingErrors(): Promise<IndexingError[]> {
+  return invoke<IndexingError[]>("list_indexing_errors");
+}
+
+/**
+ * Deletes all persisted indexing errors.
+ */
+async function clearIndexingErrors(): Promise<void> {
+  return invoke<void>("clear_indexing_errors");
+}
+
+/**
  * Opens a file or folder in the OS default application.
  * On Windows this is equivalent to double-clicking the file in Explorer.
  */
 async function openFile(path: string): Promise<void> {
   return invoke<void>("open_file", { path });
+}
+
+/**
+ * Returns aggregated workspace statistics for the home dashboard.
+ */
+async function getStats(): Promise<DashboardStats> {
+  return invoke<DashboardStats>("get_stats");
+}
+
+/**
+ * Returns AI-generated search query suggestions based on recently indexed file paths.
+ * The client is responsible for caching the result (1-hour TTL recommended).
+ */
+async function getSuggestedQueries(
+  recentFilePaths: string[],
+  maxSuggestions: number = 5
+): Promise<string[]> {
+  const response = await invoke<SuggestionsResponse>("get_suggested_queries", {
+    recentFilePaths,
+    maxSuggestions,
+  });
+  return response.suggestions;
 }
 
 export const IPCClient = {
@@ -422,6 +526,7 @@ export const IPCClient = {
   saveMessage,
   loadConversation,
   listConversations,
+  getConversationMemory,
   indexWorkspace,
   getIndexingStatus,
   listDocuments,
@@ -436,5 +541,12 @@ export const IPCClient = {
   removeWatchedFolder,
   listWatchedFolders,
   getWatcherStatus,
+  deleteDocument,
+  bulkDeleteDocuments,
+  cancelIndexing,
+  listIndexingErrors,
+  clearIndexingErrors,
   openFile,
+  getStats,
+  getSuggestedQueries,
 } as const;

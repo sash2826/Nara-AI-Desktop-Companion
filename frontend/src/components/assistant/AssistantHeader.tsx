@@ -1,12 +1,14 @@
-import { MoreHorizontal, RefreshCw } from "lucide-react";
+import { MoreHorizontal, RefreshCw, Square } from "lucide-react";
 import { AssistantAvatar } from "./AssistantAvatar";
 import { AssistantStatus } from "./AssistantStatus";
+import { useSettingsStore } from "@/store/settingsStore";
 import { cn } from "@/lib/utils";
 
 interface AssistantHeaderProps {
   isTyping: boolean;
   isStreaming: boolean;
   onClearConversation: () => void;
+  onCancelStream: () => void;
   className?: string;
 }
 
@@ -20,9 +22,11 @@ export function AssistantHeader({
   isTyping,
   isStreaming,
   onClearConversation,
+  onCancelStream,
   className,
 }: AssistantHeaderProps) {
   const status = resolveStatus(isTyping, isStreaming);
+  const model = useSettingsStore((s) => s.settings.aiProvider.model);
 
   return (
     <header
@@ -38,13 +42,28 @@ export function AssistantHeader({
         <span className="text-sm font-semibold text-foreground">AI Companion</span>
         <div className="flex items-center gap-2">
           <AssistantStatus status={status} />
-          {/* AI provider placeholder */}
-          <span className="text-2xs text-muted-foreground/60">· GPT (placeholder)</span>
+          <span className="text-2xs text-muted-foreground/60" title={model}>
+            · {model}
+          </span>
         </div>
       </div>
 
       {/* Conversation actions */}
       <div className="flex items-center gap-1">
+        {/* Stop button — only shown while the model is generating */}
+        {(isTyping || isStreaming) && (
+          <button
+            onClick={onCancelStream}
+            aria-label="Stop generation"
+            title="Stop generation"
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-fast",
+              "text-destructive hover:bg-destructive/10"
+            )}
+          >
+            <Square size={13} strokeWidth={2} fill="currentColor" />
+          </button>
+        )}
         <button
           onClick={onClearConversation}
           aria-label="Clear conversation"

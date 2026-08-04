@@ -6,6 +6,7 @@ import hashlib
 import logging
 import platform
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +23,9 @@ from enterprise_ai_companion.capabilities.indexing.document_repository import (
     IndexedDocument,
 )
 from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
+from enterprise_ai_companion.capabilities.indexing.indexing_error_repository import (
+    IndexingErrorRepository,
+)
 from enterprise_ai_companion.capabilities.indexing.text_chunker import TextChunker
 
 logger = logging.getLogger(__name__)
@@ -117,15 +121,25 @@ class FileIndexer:
         embedding_service: EmbeddingService,
         chunker: TextChunker | None = None,
         graph_provider: GraphProvider | None = None,
+        error_repo: IndexingErrorRepository | None = None,
     ) -> None:
         self._doc_repo = doc_repo
         self._chunk_repo = chunk_repo
         self._embedding_service = embedding_service
         self._chunker = chunker or TextChunker()
         self._graph_service = KnowledgeGraphService(graph_provider or NullGraphProvider())
+        self._error_repo = error_repo
 
-    async def index_workspace(self, workspace_path: str) -> IndexingResult:
-        """Index all supported files under workspace_path. Returns a summary."""
+    async def index_workspace(
+        self,
+        workspace_path: str,
+        progress_cb: Callable[[IndexingResult], None] | None = None,
+    ) -> IndexingResult:
+        """Index all supported files under workspace_path. Returns a summary.
+
+        progress_cb is called after every file is processed so callers can track
+        live progress rather than waiting for the full run to finish.
+        """
         root = Path(workspace_path).resolve()
         result = IndexingResult()
 
@@ -140,6 +154,8 @@ class FileIndexer:
             if _is_cloud_stub(file_path):
                 logger.debug("Skipping cloud-only stub: %s", file_path.name)
                 result.files_skipped += 1
+                if progress_cb:
+                    progress_cb(result)
                 continue
             try:
                 indexed = await self._index_file(file_path, workspace_path)
@@ -150,6 +166,13 @@ class FileIndexer:
             except Exception as exc:
                 logger.warning("Failed to index %s: %s", file_path, exc)
                 result.errors.append(f"{file_path}: {exc}")
+                if self._error_repo is not None:
+                    try:
+                        await self._error_repo.save(workspace_path, str(file_path), str(exc))
+                    except Exception as repo_exc:
+                        logger.warning("Failed to persist indexing error: %s", repo_exc)
+            if progress_cb:
+                progress_cb(result)
 
         logger.info(
             "Indexing complete: %d found, %d indexed, %d skipped, %d errors",

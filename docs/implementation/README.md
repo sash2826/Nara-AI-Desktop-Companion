@@ -2,7 +2,7 @@
 
 **Version:** 2.0.0
 **Status:** Active
-**Last Updated:** 2026-07-24
+**Last Updated:** 2026-08-04
 
 ---
 
@@ -58,16 +58,17 @@ Implementation guides should never contradict the architecture or accepted Archi
 
 Development is organized into the following phases.
 
-| Phase    | Name                  | Objective                                                        |
-| -------- | --------------------- | ---------------------------------------------------------------- |
-| Phase 00 | Assistant Experience  | Desktop application, Character Widget, conversation architecture |
-| Phase 01 | AI Integration        | APIM provider, RAG pipeline, embeddings, streaming responses     |
-| Phase 02 | Knowledge & Search    | Data layer (SQLite, Neo4j, Qdrant) and hybrid search engine      |
-| Phase 03 | Workspace Features    | Workspace management, document browser, search UI                |
-| Phase 04 | Intelligence Layer    | Knowledge graph, entity extraction, relationship discovery       |
-| Phase 05 | Productivity Features | Workflow automation, task scheduling, event-driven processing    |
-| Phase 06 | Enterprise Features   | Plugin system, security, authentication, audit logging           |
-| Phase 07 | Polish & Release      | Testing, quality assurance, packaging, and production release    |
+| Phase    | Name                   | Objective                                                         |
+| -------- | ---------------------- | ----------------------------------------------------------------- |
+| Phase 00 | Assistant Experience   | Desktop application, Character Widget, conversation architecture  |
+| Phase 01 | AI Integration         | APIM provider, RAG pipeline, embeddings, streaming responses      |
+| Phase 02 | Knowledge & Search     | Data layer (SQLite, Neo4j, Qdrant) and hybrid search engine       |
+| Phase 03 | Workspace Features     | Workspace management, document browser, search UI                 |
+| Phase 04 | AI Context & Intelligence | Context assembly, conversation memory, reranking, source citation |
+| Phase 05 | Knowledge Graph        | Graph-augmented retrieval, entity/relationship extraction          |
+| Phase 06 | Enterprise Features    | Plugin system, security, authentication, audit logging            |
+| Phase 07 | Automation             | Workflow engine, task scheduling, event-driven processing         |
+| Phase 08 | Polish & Release       | Testing, quality assurance, packaging, and production release     |
 
 Each phase should be completed before progressing to the next unless dependencies explicitly allow parallel development.
 

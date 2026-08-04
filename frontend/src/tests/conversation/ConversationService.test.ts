@@ -75,7 +75,9 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: null,
       recentDocuments: [],
       explicitContext: null,
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
     };
     await service.send("hello", makeCallbacks(), undefined, emptyContext);
     expect(capturedOptions()?.systemMessage).toBeUndefined();
@@ -88,10 +90,14 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: "/projects/my-app/src",
       recentDocuments: [],
       explicitContext: null,
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
-    expect(capturedOptions()?.systemMessage).toContain("Active folder: /projects/my-app/src");
+    expect(capturedOptions()?.systemMessage).toContain(
+      "Active workspace folder: /projects/my-app/src"
+    );
   });
 
   it("includes recentDocuments in the system message", async () => {
@@ -101,7 +107,9 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: null,
       recentDocuments: ["/projects/a.ts", "/projects/b.ts"],
       explicitContext: null,
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     const msg = capturedOptions()?.systemMessage ?? "";
@@ -116,7 +124,9 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: null,
       recentDocuments: [],
       explicitContext: "Focus on TypeScript best practices.",
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     expect(capturedOptions()?.systemMessage).toContain("Focus on TypeScript best practices.");
@@ -129,11 +139,13 @@ describe("ConversationService — system message injection", () => {
       activeProjectFolder: "/projects/app",
       recentDocuments: ["/projects/app/main.ts"],
       explicitContext: "Be concise.",
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
     const msg = capturedOptions()?.systemMessage ?? "";
-    expect(msg).toContain("Active folder: /projects/app");
+    expect(msg).toContain("Active workspace folder: /projects/app");
     expect(msg).toContain("/projects/app/main.ts");
     expect(msg).toContain("Be concise.");
   });
@@ -144,11 +156,13 @@ describe("ConversationService — system message injection", () => {
     const context: ContextSnapshot = {
       activeProjectFolder: "/projects/app",
       recentDocuments: [],
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
       explicitContext: null,
     };
     await service.send("hello", makeCallbacks(), undefined, context);
-    expect(capturedOptions()?.systemMessage).toContain("Active folder: /projects/app");
+    expect(capturedOptions()?.systemMessage).toContain("Active workspace folder: /projects/app");
   });
 });
 

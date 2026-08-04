@@ -14,7 +14,9 @@ export class NullContextEngine implements ContextEngine {
       activeProjectFolder: null,
       recentDocuments: [],
       explicitContext: null,
+      retrievedChunks: null,
       retrievedContext: null,
+      conversationSummary: null,
     };
   }
 }

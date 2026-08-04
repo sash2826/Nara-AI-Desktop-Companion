@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { Logo } from "@/components/common/Logo";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { useNavigationStore } from "@/store/navigationStore";
 import { cn } from "@/lib/utils";
 import { TOP_BAR_HEIGHT } from "@/layouts/constants";
 
@@ -10,6 +11,8 @@ interface TopBarProps {
 }
 
 export function TopBar({ workspaceTitle = "Workspace", className }: TopBarProps) {
+  const setActiveItem = useNavigationStore((s) => s.setActiveItem);
+
   return (
     <header
       style={{ height: TOP_BAR_HEIGHT }}
@@ -29,9 +32,10 @@ export function TopBar({ workspaceTitle = "Workspace", className }: TopBarProps)
         <span className="truncate text-sm font-semibold text-foreground">{workspaceTitle}</span>
       </div>
 
-      {/* Search placeholder */}
+      {/* Search button — navigates to the Search page */}
       <button
         aria-label="Open search"
+        onClick={() => setActiveItem("search")}
         className={cn(
           "flex h-8 w-56 items-center gap-2 rounded-lg border border-border bg-muted px-3",
           "text-sm text-muted-foreground transition-colors duration-fast",

@@ -33,7 +33,10 @@ interface WorkspaceStore {
   sort: DocumentSort;
 
   // Active tab
-  activeTab: "folders" | "documents" | "indexing";
+  activeTab: "folders" | "documents" | "indexing" | "errors";
+
+  // Error badge
+  errorCount: number;
 
   // Watcher actions
   setFolders: (folders: WatchedFolder[]) => void;
@@ -51,8 +54,17 @@ interface WorkspaceStore {
   setSort: (sort: DocumentSort) => void;
   resetFilter: () => void;
 
+  // Document selection
+  selectedDocumentIds: Set<string>;
+  toggleDocumentSelection: (id: string) => void;
+  selectAllDocuments: (ids: string[]) => void;
+  clearDocumentSelection: () => void;
+
   // Tab
-  setActiveTab: (tab: "folders" | "documents" | "indexing") => void;
+  setActiveTab: (tab: "folders" | "documents" | "indexing" | "errors") => void;
+
+  // Error badge
+  setErrorCount: (count: number) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
@@ -68,6 +80,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   sort: DEFAULT_SORT,
 
   activeTab: "folders",
+  errorCount: 0,
+  selectedDocumentIds: new Set<string>(),
 
   setFolders: (folders) => set({ folders }),
   addFolder: (folder) => set((state) => ({ folders: [...state.folders, folder] })),
@@ -84,5 +98,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   setSort: (sort) => set({ sort }),
   resetFilter: () => set({ filter: DEFAULT_FILTER }),
 
+  toggleDocumentSelection: (id) =>
+    set((state) => {
+      const next = new Set(state.selectedDocumentIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return { selectedDocumentIds: next };
+    }),
+  selectAllDocuments: (ids) => set({ selectedDocumentIds: new Set(ids) }),
+  clearDocumentSelection: () => set({ selectedDocumentIds: new Set() }),
+
   setActiveTab: (activeTab) => set({ activeTab }),
+  setErrorCount: (errorCount) => set({ errorCount }),
 }));

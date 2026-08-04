@@ -1,4 +1,19 @@
 /**
+ * A single retrieved document chunk included in the context payload.
+ * Carries both content and provenance so the system message can include
+ * accurate citations that the LLM is instructed to reproduce.
+ */
+export interface RetrievedChunk {
+  chunkId: string;
+  documentId: string;
+  documentPath: string;
+  chunkIndex: number;
+  content: string;
+  /** RRF score from the hybrid search pipeline (higher = more relevant). */
+  rrfScore: number;
+}
+
+/**
  * Snapshot of the user's current workspace context, produced by the Context Engine
  * and consumed by the Conversation Service on each request.
  *
@@ -12,8 +27,25 @@ export interface ContextSnapshot {
   recentDocuments: string[];
   /** Context the user has explicitly provided for this session (e.g. a pasted document). */
   explicitContext: string | null;
-  /** Retrieved document fragments injected by the retrieval pipeline, or null when no index exists yet. */
+  /**
+   * Typed retrieved chunks from the hybrid search pipeline.
+   * Replaces the former flat `retrievedContext` string so downstream consumers
+   * can access per-chunk metadata (path, score, index) for citation display.
+   * Null when no index exists yet or retrieval failed.
+   */
+  retrievedChunks: RetrievedChunk[] | null;
+  /**
+   * @deprecated Use retrievedChunks. Kept for NullContextEngine compatibility
+   * during the Epic 4.0 transition; will be removed in Epic 4.3.
+   */
   retrievedContext: string | null;
+  /**
+   * Compressed summary of older conversation turns, fetched from the backend
+   * on conversation load. Null until the first summarisation threshold is hit
+   * (10 assistant turns). Prepended to the system message ahead of retrieved
+   * context so the LLM can reference earlier conclusions.
+   */
+  conversationSummary: string | null;
 }
 
 /**

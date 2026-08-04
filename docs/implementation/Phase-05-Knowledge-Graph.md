@@ -1,6 +1,6 @@
-# Phase 07: Knowledge Graph
+# Phase 05: Knowledge Graph
 
-**Phase:** 07
+**Phase:** 05
 
 **Status:** Planned
 
@@ -41,10 +41,11 @@ Business capabilities should interact with knowledge through the centralized gra
 
 Before beginning this phase:
 
-* Phase 01 through Phase 06 must be completed.
+* Phase 00 through Phase 04 must be completed.
 * AI services should be operational.
 * Search engine should be available.
 * Neo4j provider should be initialized.
+* `ContextAssembler` from Phase 04 should be stable.
 * Background task processing should be functioning.
 
 ---
@@ -248,20 +249,17 @@ This phase is complete when:
 
 Requires:
 
+* Phase 00
 * Phase 01
 * Phase 02
 * Phase 03
 * Phase 04
-* Phase 05
-* Phase 06
 
 Provides the knowledge foundation for:
 
+* Phase 06
+* Phase 07
 * Phase 08
-* Phase 09
-* Phase 10
-* Phase 11
-* Phase 12
 
 ---
 
@@ -280,6 +278,6 @@ Provides the knowledge foundation for:
 
 After completing this phase, proceed to:
 
-**Phase 08: Automation**
+**Phase 06: Enterprise Features**
 
-The next phase introduces workflow automation, scheduled tasks, event-driven processing, agent orchestration, and user-defined automation rules. This enables the Enterprise AI Companion to move beyond reactive interactions and perform intelligent background work on behalf of the user.
+The next phase introduces authentication, authorisation, credential storage, encryption, audit logging, and data privacy controls. This hardens the platform for enterprise deployment before productivity automation is added in Phase 07.

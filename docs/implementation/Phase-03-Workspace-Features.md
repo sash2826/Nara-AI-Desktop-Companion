@@ -339,6 +339,7 @@ Provides workspace UI for:
 * Phase 05
 * Phase 06
 * Phase 07
+* Phase 08
 
 ---
 

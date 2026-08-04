@@ -149,7 +149,14 @@ export class ConversationService {
   }
 
   /**
-   * Builds an optional system message from a context snapshot.
+   * Builds a structured system message from a context snapshot.
+   *
+   * When retrieved chunks are present the message instructs the LLM to:
+   * - Synthesise across all provided excerpts rather than echoing one.
+   * - Cite every factual claim using the exact source path in the format
+   *   `[path/to/file]` immediately after the claim.
+   * - Distinguish clearly between knowledge-base facts and general knowledge.
+   *
    * Returns undefined when the snapshot carries no meaningful signals so
    * the provider sends no system message rather than an empty one.
    */
@@ -157,21 +164,67 @@ export class ConversationService {
     if (!context) return undefined;
 
     const parts: string[] = [];
-    if (context.activeProjectFolder) {
-      parts.push(`Active folder: ${context.activeProjectFolder}`);
+
+    // Prepend compressed prior-session memory so the LLM can reference earlier
+    // conclusions without re-reading the full message history.
+    if (context.conversationSummary) {
+      parts.push(
+        `CONVERSATION MEMORY (compressed summary of earlier turns):\n${context.conversationSummary}`
+      );
     }
-    if (context.recentDocuments.length > 0) {
-      parts.push(`Recent files: ${context.recentDocuments.join(", ")}`);
+
+    if (context.activeProjectFolder) {
+      parts.push(`Active workspace folder: ${context.activeProjectFolder}`);
     }
     if (context.explicitContext) {
       parts.push(context.explicitContext);
     }
-    if (context.retrievedContext) {
+
+    // Prefer typed chunks (Epic 4.0+) — fall back to the legacy flat string
+    // so this method stays compatible with callers that predate Epic 4.0.
+    const hasChunks = context.retrievedChunks && context.retrievedChunks.length > 0;
+    const hasLegacyContext = !hasChunks && Boolean(context.retrievedContext);
+
+    if (hasChunks && context.retrievedChunks) {
+      const excerptBlock = context.retrievedChunks
+        .map((c, i) => `[${i + 1}] File: ${c.documentPath} (chunk ${c.chunkIndex})\n${c.content}`)
+        .join("\n\n---\n\n");
+
+      // List the EXACT paths the model is allowed to cite — prevents hallucination
+      const allowedPaths = [...new Set(context.retrievedChunks.map((c) => c.documentPath))]
+        .map((p) => `  - ${p}`)
+        .join("\n");
+
+      parts.push(
+        `You are an AI assistant with access to the user's indexed knowledge base.\n` +
+          `The following document excerpts were retrieved and ranked by relevance to the user's query.\n` +
+          `Excerpt [1] is the most relevant; lower-numbered excerpts should be weighted accordingly,\n` +
+          `but you MUST synthesise across all of them — do not ignore later excerpts.\n\n` +
+          `CITATION RULES — you MUST follow ALL of these exactly:\n` +
+          `1. You may ONLY cite file paths from the list below. Do NOT invent, guess, or paraphrase any file path.\n` +
+          `   Allowed source paths:\n${allowedPaths}\n` +
+          `2. Cite a path immediately after the claim it supports, in square brackets: [exact/path/here]\n` +
+          `3. Synthesise across ALL provided excerpts — do not rely on only the first one.\n` +
+          `4. If excerpts conflict, surface the contradiction explicitly.\n` +
+          `5. Clearly distinguish between information from the excerpts and your general knowledge.\n` +
+          `6. If the excerpts do not contain enough information to answer, say so — do NOT fill gaps with invented details.\n\n` +
+          `Retrieved excerpts (ordered by relevance, most relevant first):\n\n${excerptBlock}`
+      );
+    } else if (hasLegacyContext && context.retrievedContext) {
       parts.push(
         `The following document excerpts were retrieved from the user's indexed knowledge base.\n` +
-          `Each excerpt is prefixed with its full file path in brackets.\n` +
-          `When answering, cite the exact file path so the user knows which document the information came from.\n\n` +
+          `You may ONLY cite file paths that appear verbatim in the excerpts below — do not invent any paths.\n` +
+          `When answering, cite the exact file path in square brackets after each factual claim.\n\n` +
           `Retrieved excerpts:\n${context.retrievedContext}`
+      );
+    } else {
+      // No retrieved context — tell the model to be honest rather than answering from general knowledge.
+      parts.push(
+        `You are an AI assistant connected to the user's indexed knowledge base.\n` +
+          `A search was performed but no relevant documents were found for this query.\n` +
+          `Respond with a brief, honest message telling the user that no matching documents were found in their knowledge base.\n` +
+          `Do NOT answer from general knowledge. Do NOT invent or reference any file names or paths.\n` +
+          `Keep the response to one or two sentences.`
       );
     }
 

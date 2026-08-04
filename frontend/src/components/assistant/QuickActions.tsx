@@ -8,11 +8,31 @@ interface QuickAction {
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { id: "summarise", label: "Summarise", prompt: "Summarise my recent documents" },
-  { id: "search", label: "Search Workspace", prompt: "Search my workspace for " },
-  { id: "explain", label: "Explain", prompt: "Explain this concept: " },
-  { id: "notes", label: "Generate Notes", prompt: "Generate notes from " },
-  { id: "translate", label: "Translate", prompt: "Translate the following text: " },
+  {
+    id: "catchup",
+    label: "Catch me up",
+    prompt: "Summarise the key decisions and action items from my recent documents",
+  },
+  {
+    id: "status",
+    label: "What's in progress?",
+    prompt: "What projects or tasks are currently in progress based on my documents?",
+  },
+  {
+    id: "decisions",
+    label: "Recent decisions",
+    prompt: "What important decisions have been made recently across my documents?",
+  },
+  {
+    id: "actions",
+    label: "My action items",
+    prompt: "List any action items or tasks assigned to me across my documents",
+  },
+  {
+    id: "risks",
+    label: "Risks & blockers",
+    prompt: "What risks, blockers, or open issues are mentioned in my documents?",
+  },
 ];
 
 interface QuickActionsProps {

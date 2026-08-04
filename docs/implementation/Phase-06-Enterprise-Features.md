@@ -58,6 +58,7 @@ Requires:
 Provides extensibility and security foundations for:
 
 * Phase 07
+* Phase 08
 
 ---
 
@@ -412,6 +413,6 @@ Monitoring should integrate with the centralized observability infrastructure.
 
 After completing this phase, proceed to:
 
-**Phase 07 – Polish & Release**
+**Phase 07 – Automation**
 
 The final phase establishes the quality assurance strategy, automates testing and release pipelines, and prepares the Enterprise AI Companion for production deployment.

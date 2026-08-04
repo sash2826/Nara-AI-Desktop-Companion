@@ -1,5 +1,14 @@
-import { useState } from "react";
-import { Loader2, Play, CheckCircle, AlertCircle, Activity } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import {
+  Loader2,
+  Play,
+  CheckCircle,
+  AlertCircle,
+  Activity,
+  Square,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { IPCClient } from "@/services/ipc/IPCClient";
@@ -17,6 +26,49 @@ export function IndexingStatusPanel() {
   const [tasks, setTasks] = useState<IndexingTaskState[]>([]);
   const [customPath, setCustomPath] = useState("");
 
+  // Interval handles stored in a ref so we can cancel them imperatively
+  // without causing re-renders or stale closures.
+  const intervalMapRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
+  const clearTaskInterval = useCallback((taskId: string) => {
+    const handle = intervalMapRef.current.get(taskId);
+    if (handle !== undefined) {
+      clearInterval(handle);
+      intervalMapRef.current.delete(taskId);
+    }
+  }, []);
+
+  const pollTask = useCallback(
+    (taskId: string) => {
+      const handle = setInterval(async () => {
+        try {
+          const status = await IPCClient.getIndexingStatus(taskId);
+          const isDone =
+            status.status !== "running" &&
+            status.status !== "queued" &&
+            status.status !== "cancelled";
+          const isCancelled = status.status === "cancelled";
+
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.taskId === taskId ? { ...t, status, polling: !isDone && !isCancelled } : t
+            )
+          );
+
+          if (isDone || isCancelled) {
+            clearTaskInterval(taskId);
+          }
+        } catch {
+          clearTaskInterval(taskId);
+          setTasks((prev) => prev.map((t) => (t.taskId === taskId ? { ...t, polling: false } : t)));
+        }
+      }, 2000);
+
+      intervalMapRef.current.set(taskId, handle);
+    },
+    [clearTaskInterval]
+  );
+
   const startIndex = async (workspacePath: string) => {
     try {
       const response = await IPCClient.indexWorkspace(workspacePath);
@@ -33,25 +85,20 @@ export function IndexingStatusPanel() {
     }
   };
 
-  const pollTask = (taskId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const status = await IPCClient.getIndexingStatus(taskId);
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.taskId === taskId
-              ? { ...t, status, polling: status.status === "running" || status.status === "queued" }
-              : t
-          )
-        );
-        if (status.status !== "running" && status.status !== "queued") {
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-        setTasks((prev) => prev.map((t) => (t.taskId === taskId ? { ...t, polling: false } : t)));
-      }
-    }, 2000);
+  const stopTask = async (taskId: string) => {
+    try {
+      await IPCClient.cancelIndexing(taskId);
+    } catch {
+      // Server-side cancel may still fail gracefully; stop polling regardless.
+    }
+    clearTaskInterval(taskId);
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.taskId === taskId
+          ? { ...t, polling: false, status: t.status ? { ...t.status, status: "cancelled" } : null }
+          : t
+      )
+    );
   };
 
   return (
@@ -130,7 +177,7 @@ export function IndexingStatusPanel() {
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Recent tasks</p>
           {tasks.map((task) => (
-            <IndexingTaskCard key={task.taskId} task={task} />
+            <IndexingTaskCard key={task.taskId} task={task} onStop={stopTask} />
           ))}
         </div>
       )}
@@ -147,16 +194,24 @@ export function IndexingStatusPanel() {
   );
 }
 
-function IndexingTaskCard({ task }: { task: IndexingTaskState }) {
-  const isRunning =
-    task.polling || task.status?.status === "running" || task.status?.status === "queued";
+interface IndexingTaskCardProps {
+  task: IndexingTaskState;
+  onStop: (taskId: string) => void;
+}
+
+function IndexingTaskCard({ task, onStop }: IndexingTaskCardProps) {
+  const [errorsExpanded, setErrorsExpanded] = useState(false);
+
+  const statusValue = task.status?.status ?? "queued";
+  const isRunning = task.polling || statusValue === "running" || statusValue === "queued";
+  const isCancelled = statusValue === "cancelled";
   const hasErrors = (task.status?.errors?.length ?? 0) > 0;
-  const isComplete =
-    task.status?.status === "completed" || task.status?.status === "completed_with_errors";
+  const isComplete = statusValue === "completed" || statusValue === "completed_with_errors";
 
   const found = task.status?.files_found ?? 0;
   const indexed = task.status?.files_indexed ?? 0;
   const skipped = task.status?.files_skipped ?? 0;
+  const errorCount = task.status?.errors?.length ?? 0;
 
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2.5 space-y-1.5">
@@ -165,12 +220,33 @@ function IndexingTaskCard({ task }: { task: IndexingTaskState }) {
           <Loader2 size={13} className="flex-shrink-0 animate-spin text-primary" />
         ) : isComplete && !hasErrors ? (
           <CheckCircle size={13} className="flex-shrink-0 text-success" />
-        ) : hasErrors ? (
-          <AlertCircle size={13} className="flex-shrink-0 text-warning" />
+        ) : hasErrors || isCancelled ? (
+          <AlertCircle
+            size={13}
+            className={cn("flex-shrink-0", isCancelled ? "text-muted-foreground" : "text-warning")}
+          />
         ) : null}
+
         <p className="min-w-0 flex-1 truncate text-xs text-foreground" title={task.workspacePath}>
           {task.workspacePath}
         </p>
+
+        {/* Stop button — only visible while running or queued */}
+        {isRunning && (
+          <button
+            onClick={() => onStop(task.taskId)}
+            title="Stop indexing"
+            className={cn(
+              "inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-2xs font-medium",
+              "border border-destructive/30 bg-destructive/10 text-destructive",
+              "transition-colors hover:bg-destructive/20"
+            )}
+          >
+            <Square size={9} strokeWidth={1.5} />
+            Stop
+          </button>
+        )}
+
         <span
           className={cn(
             "flex-shrink-0 rounded-full px-1.5 py-0.5 text-2xs font-medium capitalize",
@@ -180,10 +256,12 @@ function IndexingTaskCard({ task }: { task: IndexingTaskState }) {
                 ? "bg-success/10 text-success"
                 : hasErrors
                   ? "bg-warning/10 text-warning"
-                  : "bg-muted text-muted-foreground"
+                  : isCancelled
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-muted text-muted-foreground"
           )}
         >
-          {task.status?.status ?? "queued"}
+          {statusValue}
         </span>
       </div>
 
@@ -192,7 +270,15 @@ function IndexingTaskCard({ task }: { task: IndexingTaskState }) {
           <span>{found} found</span>
           <span>{indexed} indexed</span>
           <span>{skipped} skipped</span>
-          {hasErrors && <span className="text-warning">{task.status.errors.length} errors</span>}
+          {hasErrors && (
+            <button
+              onClick={() => setErrorsExpanded((v) => !v)}
+              className="flex items-center gap-0.5 text-warning hover:underline"
+            >
+              {errorsExpanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
+              {errorCount} {errorCount === 1 ? "error" : "errors"}
+            </button>
+          )}
         </div>
       )}
 
@@ -201,10 +287,28 @@ function IndexingTaskCard({ task }: { task: IndexingTaskState }) {
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              isRunning ? "bg-primary" : "bg-success"
+              isCancelled ? "bg-muted-foreground" : isRunning ? "bg-primary" : "bg-success"
             )}
-            style={{ width: `${found > 0 ? Math.round(((indexed + skipped) / found) * 100) : 0}%` }}
+            style={{
+              width: `${found > 0 ? Math.round(((indexed + skipped) / found) * 100) : 0}%`,
+            }}
           />
+        </div>
+      )}
+
+      {/* Inline error list — collapsible */}
+      {errorsExpanded && task.status?.errors && task.status.errors.length > 0 && (
+        <div className="mt-1.5 space-y-1 rounded-md border border-warning/20 bg-warning/5 p-2">
+          {task.status.errors.slice(0, 20).map((err, i) => (
+            <p key={i} className="break-all font-mono text-2xs text-warning leading-relaxed">
+              {err}
+            </p>
+          ))}
+          {task.status.errors.length > 20 && (
+            <p className="text-2xs text-muted-foreground">
+              …and {task.status.errors.length - 20} more (see Errors tab)
+            </p>
+          )}
         </div>
       )}
     </div>

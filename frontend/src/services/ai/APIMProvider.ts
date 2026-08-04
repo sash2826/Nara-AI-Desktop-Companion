@@ -169,7 +169,7 @@ export class APIMProvider implements LLMProvider {
       // comment lines, so we check for a "data:" line anywhere in the text
       // rather than requiring it at the very start.
       if (/^data:/m.test(rawText)) {
-        yield* this.parseSSEText(rawText);
+        yield* this.parseSSEText(rawText, signal);
         return;
       }
 
@@ -217,12 +217,17 @@ export class APIMProvider implements LLMProvider {
   }
 
   /**
-   * Parses a complete SSE response string (not a stream).
-   * Used in dev when APIM returns SSE despite stream:false being requested.
+   * Parses a complete SSE response string chunk-by-chunk.
+   *
+   * Yields a microtask between each SSE event so that an AbortSignal fired
+   * mid-parse (e.g. from the Stop button) is honoured promptly rather than
+   * being processed only after the entire string has been consumed.
    */
-  private async *parseSSEText(text: string): AsyncIterable<LLMStreamChunk> {
+  private async *parseSSEText(text: string, signal?: AbortSignal): AsyncIterable<LLMStreamChunk> {
     const lines = text.split("\n");
     for (const line of lines) {
+      if (signal?.aborted) return;
+
       const trimmed = line.trimEnd();
       if (!trimmed.startsWith("data: ")) continue;
 
@@ -240,6 +245,8 @@ export class APIMProvider implements LLMProvider {
       const content = parsed.choices?.[0]?.delta?.content;
       if (content) {
         yield { content, done: false };
+        // Yield to the event loop so abort signals and UI updates land between chunks.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
     }
   }

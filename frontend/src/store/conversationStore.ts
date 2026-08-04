@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Message, MessageRole, MessageStatus } from "@/types/conversation";
+import type { CitationMeta, Message, MessageRole, MessageStatus } from "@/types/conversation";
 import { MAX_INPUT_CHARACTERS } from "@/types/conversation";
 
 let _messageCounter = 0;
@@ -19,6 +19,8 @@ interface ConversationStore {
   addMessage: (role: MessageRole, content: string, status?: MessageStatus) => string;
   updateMessageContent: (id: string, content: string) => void;
   updateMessageStatus: (id: string, status: MessageStatus) => void;
+  updateMessageCitations: (id: string, citations: CitationMeta[]) => void;
+  updateMessageTokenCount: (id: string, tokenCount: number) => void;
   setTyping: (typing: boolean) => void;
   setStreaming: (streaming: boolean, messageId?: string | null) => void;
   setInputValue: (value: string) => void;
@@ -63,6 +65,16 @@ export const useConversationStore = create<ConversationStore>((set) => ({
   updateMessageStatus: (id, status) =>
     set((state) => ({
       messages: state.messages.map((m) => (m.id === id ? { ...m, status } : m)),
+    })),
+
+  updateMessageCitations: (id, citations) =>
+    set((state) => ({
+      messages: state.messages.map((m) => (m.id === id ? { ...m, citations } : m)),
+    })),
+
+  updateMessageTokenCount: (id, tokenCount) =>
+    set((state) => ({
+      messages: state.messages.map((m) => (m.id === id ? { ...m, tokenCount } : m)),
     })),
 
   setTyping: (typing) => set({ isTyping: typing }),

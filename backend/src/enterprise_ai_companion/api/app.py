@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, search
+from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, search, stats
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
@@ -17,6 +17,7 @@ from enterprise_ai_companion.capabilities.indexing.document_repository import Do
 from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
 from enterprise_ai_companion.capabilities.indexing.file_indexer import FileIndexer
 from enterprise_ai_companion.capabilities.indexing.file_watcher import WatcherService
+from enterprise_ai_companion.capabilities.indexing.indexing_error_repository import IndexingErrorRepository
 from enterprise_ai_companion.infrastructure.database import close_db, open_db
 from enterprise_ai_companion.infrastructure.qdrant_provider import QdrantProvider
 
@@ -54,8 +55,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     doc_repo = DocumentRepository(app.state.db)
     chunk_repo = ChunkRepository(app.state.db, qdrant.get_client())
     embedding_service = EmbeddingService()
+    error_repo = IndexingErrorRepository(app.state.db)
+    app.state.indexing_error_repo = error_repo
     app.state.file_indexer = FileIndexer(
-        doc_repo, chunk_repo, embedding_service, graph_provider=graph_provider
+        doc_repo, chunk_repo, embedding_service,
+        graph_provider=graph_provider,
+        error_repo=error_repo,
     )
 
     # Background file watcher — monitors watched_folders table on startup.
@@ -100,6 +105,7 @@ app.include_router(graph.router)
 app.include_router(backup.router)
 app.include_router(documents.router)
 app.include_router(watcher_router_module.router, prefix="/watcher", tags=["watcher"])
+app.include_router(stats.router)
 
 
 @app.get("/health")

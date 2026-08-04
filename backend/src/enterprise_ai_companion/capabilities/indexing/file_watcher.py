@@ -189,6 +189,19 @@ class WatcherService:
 
     async def add_folder(self, path: str) -> WatchedFolder:
         """Register a new folder for watching. Triggers an immediate initial index."""
+        folder = await self.register_folder(path)
+        asyncio.create_task(self._indexer.index_workspace(folder.path))
+        logger.info("Watched folder added: %s", folder.path)
+        return folder
+
+    async def register_folder(self, path: str) -> WatchedFolder:
+        """Persist a folder as watched and start the filesystem watch.
+
+        Unlike add_folder, does NOT trigger an indexing run. Use this when the
+        caller has already initiated indexing independently (e.g. the manual
+        indexing endpoint) and only needs the folder registered for future
+        auto-watch without duplicating the index job.
+        """
         resolved = str(Path(path).resolve())
         if not Path(resolved).is_dir():
             raise ValueError(f"Path does not exist or is not a directory: {resolved}")
@@ -209,9 +222,7 @@ class WatcherService:
         if self._running and folder.path not in self._watches:
             self._schedule_watch(folder.path)
 
-        # Trigger initial index without blocking the response.
-        asyncio.create_task(self._indexer.index_workspace(folder.path))
-        logger.info("Watched folder added: %s", folder.path)
+        logger.info("Watched folder registered: %s", folder.path)
         return folder
 
     async def remove_folder(self, folder_id: str) -> None:

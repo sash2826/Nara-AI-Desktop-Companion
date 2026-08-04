@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Square } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -6,6 +7,7 @@ import { AssistantAvatar } from "./AssistantAvatar";
 import { CopyButton } from "@/components/common/CopyButton";
 import { renderWithFilePaths, isAbsolutePath } from "./filePathUtils";
 import { FilePathChip } from "./FilePathChip";
+import { CitationChip } from "./CitationChip";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/conversation";
 
@@ -152,6 +154,7 @@ function UserBubble({ message }: { message: Message }) {
 
 function AssistantBubble({ message }: { message: Message }) {
   const isStreaming = message.status === "streaming";
+  const isCancelled = message.status === "cancelled";
 
   return (
     <motion.div
@@ -174,20 +177,56 @@ function AssistantBubble({ message }: { message: Message }) {
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
                 {message.content}
               </ReactMarkdown>
-              {/* Streaming cursor */}
+              {/* Live token counter replaces cursor during streaming */}
               {isStreaming && (
-                <motion.span
-                  className="inline-block h-3.5 w-0.5 rounded-full bg-foreground align-middle"
-                  animate={{ opacity: [1, 0] }}
-                  transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
-                  aria-hidden="true"
-                />
+                <span className="ml-1 inline-flex items-center gap-1 align-middle">
+                  <motion.span
+                    className="inline-block h-3.5 w-0.5 rounded-full bg-foreground"
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
+                    aria-hidden="true"
+                  />
+                  {(message.tokenCount ?? 0) > 0 && (
+                    <span className="text-2xs text-muted-foreground" aria-live="polite">
+                      {message.tokenCount} tokens
+                    </span>
+                  )}
+                </span>
+              )}
+              {/* Cancelled indicator — partial response preserved */}
+              {isCancelled && (
+                <span className="ml-1 inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 align-middle text-2xs text-muted-foreground">
+                  <Square size={9} fill="currentColor" />
+                  stopped
+                </span>
               )}
             </>
           ) : (
             <span className="text-sm text-muted-foreground">…</span>
           )}
         </div>
+
+        {/* Citations bar — deduplicated by file, shown once streaming is complete */}
+        {!isStreaming &&
+          message.citations &&
+          message.citations.length > 0 &&
+          (() => {
+            // Keep one chip per unique file path — highest rrfScore wins.
+            const seen = new Map<string, (typeof message.citations)[number]>();
+            for (const c of message.citations) {
+              const existing = seen.get(c.documentPath);
+              if (!existing || c.rrfScore > existing.rrfScore) seen.set(c.documentPath, c);
+            }
+            const unique = Array.from(seen.values());
+            return (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-2xs text-muted-foreground/70">Sources:</span>
+                {unique.map((citation, i) => (
+                  <CitationChip key={citation.documentPath} citation={citation} index={i + 1} />
+                ))}
+              </div>
+            );
+          })()}
 
         {!isStreaming && message.content && (
           <div className="flex items-center gap-2 opacity-0 transition-opacity duration-fast group-hover:opacity-100">
