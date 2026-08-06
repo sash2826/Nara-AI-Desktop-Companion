@@ -44,7 +44,7 @@ export function FolderRow({ folder, onRemove, onReindex }: FolderRowProps) {
           Added {new Date(folder.added_at).toLocaleDateString()}
         </p>
       </div>
-      <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="flex flex-shrink-0 items-center gap-1">
         <button
           onClick={handleReindex}
           disabled={reindexing}

@@ -55,7 +55,7 @@ async def chat_complete(
     payload = {
         "model": _model_id(),
         "messages": messages,
-        "max_tokens": max_tokens,
+        "max_completion_tokens": max_tokens,
         "temperature": temperature,
     }
 

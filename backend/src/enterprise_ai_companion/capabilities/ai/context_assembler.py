@@ -17,6 +17,10 @@ import aiosqlite
 from qdrant_client import QdrantClient
 
 from enterprise_ai_companion.capabilities.ai.reranker import ChunkReranker, HeuristicReranker, RankedChunk
+from enterprise_ai_companion.capabilities.graph.graph_query_service import GraphQueryService
+from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvider
+from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
+from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
 from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
 from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import (
     HybridSearchOrchestrator,
@@ -60,6 +64,7 @@ class ContextPayload:
     chunks: list[ContextChunk] = field(default_factory=list)
     active_workspace: str | None = None
     total_chars: int = 0
+    graph_entities: list[str] = field(default_factory=list)
 
     def format_for_prompt(self) -> str:
         """Return a formatted string suitable for the system message context block."""
@@ -90,6 +95,8 @@ class ContextAssembler:
         qdrant_client: QdrantClient,
         embedding_service: EmbeddingService,
         reranker: ChunkReranker | None = None,
+        graph_provider: GraphProvider | None = None,
+        chunk_repo: ChunkRepository | None = None,
     ) -> None:
         self._orchestrator = HybridSearchOrchestrator(
             conn=conn,
@@ -97,17 +104,29 @@ class ContextAssembler:
             embedding_service=embedding_service,
         )
         self._reranker: ChunkReranker = reranker or HeuristicReranker()
+        self._graph_svc = GraphQueryService(graph_provider or NullGraphProvider())
+        self._chunk_repo = chunk_repo
 
     async def assemble(
         self,
         query: str,
         workspace_path: str | None = None,
+        use_graph: bool = True,
     ) -> ContextPayload:
         """Retrieve and assemble context chunks for the given query.
+
+        Pipeline:
+          1. Hybrid vector+keyword search (RRF).
+          2. Heuristic reranking.
+          3. Quality filter + token budget.
+          4. Graph expansion (optional, best-effort): expand retrieval via
+             entity neighbourhoods when the graph provider is online.
 
         Args:
             query: Raw user query (will be preprocessed internally).
             workspace_path: Optional folder path to restrict retrieval to.
+            use_graph: When True, graph-augmented expansion is attempted.
+                       Falls back to vector-only when the graph is offline.
 
         Returns:
             A ContextPayload with deduplicated, budget-capped chunks.
@@ -137,23 +156,110 @@ class ContextAssembler:
 
         chunks = self._filter_and_budget(reranked)
 
+        # Graph expansion — add graph-referenced chunks not yet in the set.
+        graph_entities: list[str] = []
+        if use_graph:
+            chunks, graph_entities = await self._expand_via_graph(
+                query=pq.search_text,
+                chunks=chunks,
+                workspace_path=workspace_path,
+            )
+
         logger.debug(
-            "ContextAssembler: query=%r candidates=%d reranked=%d retained=%d",
+            "ContextAssembler: query=%r candidates=%d reranked=%d retained=%d graph_entities=%d",
             query,
             len(candidates),
             len(reranked),
             len(chunks),
+            len(graph_entities),
         )
 
         return ContextPayload(
             chunks=chunks,
             active_workspace=workspace_path,
-            total_chars=sum(c.chunk_index for c in chunks),
+            total_chars=sum(len(c.content) for c in chunks),
+            graph_entities=graph_entities,
         )
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    async def _expand_via_graph(
+        self,
+        query: str,
+        chunks: list[ContextChunk],
+        workspace_path: str | None,
+    ) -> tuple[list[ContextChunk], list[str]]:
+        """Supplement vector-retrieved chunks with graph-neighbour chunks.
+
+        For each token in the query that matches an entity in the graph, the
+        connected document IDs are fetched. Chunks from those documents that
+        are not already in the retrieved set are fetched from the chunk
+        repository and appended (subject to the overall budget cap).
+
+        Returns:
+            Tuple of (updated chunks list, entity names that contributed).
+        """
+        if self._chunk_repo is None:
+            return chunks, []
+
+        already_seen: set[tuple[str, int]] = {
+            (c.document_id, c.chunk_index) for c in chunks
+        }
+        graph_entities: list[str] = []
+        extra_chunks: list[ContextChunk] = []
+        total_chars = sum(len(c.content) for c in chunks)
+
+        # Use individual query tokens as entity lookup keys — coarse but cheap.
+        tokens = [t.strip() for t in query.split() if len(t.strip()) > 3]
+
+        for token in tokens:
+            if len(chunks) + len(extra_chunks) >= _MAX_CONTEXT_CHUNKS:
+                break
+            if total_chars >= _MAX_CONTEXT_CHARS:
+                break
+
+            try:
+                doc_ids = await self._graph_svc.get_connected_documents(token)
+            except Exception:
+                continue
+
+            if not doc_ids:
+                continue
+
+            graph_entities.append(token)
+
+            for doc_id in doc_ids:
+                if len(chunks) + len(extra_chunks) >= _MAX_CONTEXT_CHUNKS:
+                    break
+
+                try:
+                    doc_chunks = await self._chunk_repo.get_by_document(doc_id)
+                except Exception:
+                    continue
+
+                for dc in doc_chunks:
+                    if (dc.document_id, dc.chunk_index) in already_seen:
+                        continue
+                    if total_chars + len(dc.content) > _MAX_CONTEXT_CHARS:
+                        continue
+                    already_seen.add((dc.document_id, dc.chunk_index))
+                    total_chars += len(dc.content)
+                    extra_chunks.append(
+                        ContextChunk(
+                            chunk_id=dc.id,
+                            document_id=dc.document_id,
+                            document_path=getattr(dc, "document_path", ""),
+                            chunk_index=dc.chunk_index,
+                            content=dc.content,
+                            rrf_score=0.0,
+                            semantic_rank=None,
+                            keyword_rank=None,
+                        )
+                    )
+
+        return chunks + extra_chunks, graph_entities
 
     def _filter_and_budget(
         self, candidates: list[RankedChunk]

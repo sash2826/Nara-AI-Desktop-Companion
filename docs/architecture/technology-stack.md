@@ -41,7 +41,7 @@ Technology decisions should support the architecture rather than define it.
 | Frontend Language  | TypeScript        | Frontend application logic                   |
 | Backend Language   | Python            | Business logic and AI orchestration          |
 | Local Database     | SQLite            | Structured application data                  |
-| Graph Database     | Neo4j             | Knowledge graph and relationships            |
+| Graph Database     | SQLite (embedded) | Knowledge graph and relationships (default)  |
 | Vector Database    | Qdrant            | Semantic search and embeddings               |
 | OCR Engine         | PaddleOCR         | Text extraction from images and documents    |
 | AI Provider        | OpenAI GPT Models | Natural language understanding and reasoning |
@@ -157,7 +157,7 @@ Examples include:
 * Index information.
 * Application state.
 
-SQLite should not be responsible for semantic search or graph relationships.
+SQLite stores structured data and, by default, the knowledge graph (via the `SQLiteGraphProvider`). It should not be responsible for semantic (vector) search — that remains Qdrant's responsibility.
 
 ---
 
@@ -165,11 +165,11 @@ SQLite should not be responsible for semantic search or graph relationships.
 
 ## Technology
 
-Neo4j
+SQLite (default) · Neo4j (optional, future scale-out)
 
 ## Responsibility
 
-Stores relationships between entities.
+Stores relationships between entities extracted from indexed documents.
 
 Examples include:
 
@@ -180,6 +180,14 @@ Examples include:
 * Knowledge navigation.
 
 Graph storage should remain focused on relationship data.
+
+## Default: SQLite
+
+The knowledge graph runs on SQLite by default using recursive CTEs for multi-hop traversal. No additional infrastructure is required. The `EAC_GRAPH_PROVIDER` environment variable controls provider selection at startup (`sqlite`, `neo4j`, or `null`).
+
+## Future Scope: Neo4j
+
+Neo4j is supported as an optional opt-in backend for large-scale deployments, advanced graph analytics (PageRank, community detection, graph ML), and multi-instance scenarios. Business logic is identical across both providers — only the storage implementation changes. See `docs/implementation/Phase-05-Knowledge-Graph.md` for migration guidance.
 
 ---
 
@@ -267,7 +275,8 @@ The technologies collaborate according to the following architecture.
                │
       ┌────────┼────────────┐
       ▼        ▼            ▼
-   SQLite    Neo4j      Qdrant
+   SQLite  SQLite/Neo4j  Qdrant
+  (data)   (graph)      (vectors)
       │                     │
       └────────┬────────────┘
                ▼

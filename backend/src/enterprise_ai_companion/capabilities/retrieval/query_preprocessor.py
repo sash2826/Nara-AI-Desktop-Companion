@@ -19,10 +19,13 @@ the raw form is better (e.g., exact phrase matching in FTS5).
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +163,30 @@ class QueryPreprocessor:
 
     def __init__(self, config: QueryPreprocessorConfig | None = None) -> None:
         self._cfg = config or QueryPreprocessorConfig()
+        self._dynamic_expansions: dict[str, list[str]] = {}
+
+    def merge_expansions(self, dynamic: dict[str, list[str]]) -> None:
+        """Replace the dynamic expansion set with entries from discovered abbreviations.
+
+        Static ``_EXPANSIONS`` always takes precedence — any key in *dynamic*
+        that already exists in ``_EXPANSIONS`` is silently ignored so
+        document-derived entries can never shadow the curated baseline.
+
+        This method is called after each indexing job completes and at
+        application startup (to prime from abbreviations persisted in
+        previous sessions).
+
+        Args:
+            dynamic: Mapping of ``{lowercase_abbreviation: [definition, ...]}``
+                as returned by ``AbbreviationRepository.load_all()``.
+        """
+        self._dynamic_expansions = {
+            k: v for k, v in dynamic.items() if k not in _EXPANSIONS
+        }
+        logger.debug(
+            "Dynamic abbreviation expansions reloaded: %d entries",
+            len(self._dynamic_expansions),
+        )
 
     def process(self, raw_query: str) -> ProcessedQuery:
         """Run the full preprocessing pipeline on raw_query.
@@ -174,7 +201,11 @@ class QueryPreprocessor:
         tokens = _tokenise(normalised)
 
         filtered = _remove_stop_words(tokens) if self._cfg.remove_stop_words else tokens
-        expanded = _expand(filtered) if self._cfg.expand_query else []
+        expanded = (
+            _expand(filtered, self._dynamic_expansions)
+            if self._cfg.expand_query
+            else []
+        )
         intent = _detect_intent(tokens) if self._cfg.detect_intent else SearchIntent.EXPLORATORY
         fuzzy = _has_fuzzy_candidates(filtered) if self._cfg.flag_fuzzy_candidates else False
 
@@ -226,19 +257,42 @@ def _remove_stop_words(tokens: list[str]) -> list[str]:
     return [t for t in tokens if t not in _STOP_WORDS]
 
 
-def _expand(tokens: list[str]) -> list[str]:
-    """Return additional terms for tokens that match the expansion dictionary.
+def _expand(
+    tokens: list[str],
+    dynamic: dict[str, list[str]] | None = None,
+) -> list[str]:
+    """Return additional terms for tokens that match the expansion dictionaries.
 
-    Only the *new* terms are returned — the original tokens remain in filtered_tokens.
+    Consults the static ``_EXPANSIONS`` first, then the dynamic entries
+    (document-derived abbreviations).  Static entries always win — a token
+    handled by ``_EXPANSIONS`` is not looked up in *dynamic*.
+
+    Only the *new* terms are returned — the original tokens remain in
+    ``filtered_tokens``.
+
+    Args:
+        tokens: Filtered token list from the current query.
+        dynamic: Optional dynamic expansion mapping merged from
+            ``AbbreviationRepository.load_all()``.  Pass ``None`` (or omit)
+            when no dynamic expansions are available.
+
+    Returns:
+        List of additional expansion strings (may be multi-word phrases).
     """
     additions: list[str] = []
     seen: set[str] = set(tokens)
     for token in tokens:
-        for expansion in _EXPANSIONS.get(token, []):
-            # Expansions can be multi-word phrases; add them as-is.
+        static_expansions = _EXPANSIONS.get(token, [])
+        for expansion in static_expansions:
             if expansion not in seen:
                 additions.append(expansion)
                 seen.add(expansion)
+        # Only consult dynamic expansions for tokens not covered by static dict.
+        if not static_expansions and dynamic:
+            for expansion in dynamic.get(token, []):
+                if expansion not in seen:
+                    additions.append(expansion)
+                    seen.add(expansion)
     return additions
 
 

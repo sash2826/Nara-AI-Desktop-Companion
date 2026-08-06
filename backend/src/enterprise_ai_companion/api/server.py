@@ -3,10 +3,35 @@
 import os
 import socket
 import ssl
+from pathlib import Path
 import uvicorn
+
+
+def _load_env_file() -> None:
+    """Load key=value pairs from backend/.env into os.environ (if the file exists).
+
+    Only sets variables that are not already present in the environment so that
+    shell exports and Tauri-injected env vars always take precedence.
+    Skips blank lines and lines starting with #.
+    """
+    env_path = Path(__file__).parents[3] / ".env"
+    if not env_path.exists():
+        return
+    with env_path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
 
 # Disable HuggingFace Xet CDN — uses byte-range HTTP requests that are blocked
 # by corporate proxies. Standard HTTP chunked download is used instead.
+_load_env_file()
+
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 # Inject the Windows system certificate store (including corporate proxy CAs)

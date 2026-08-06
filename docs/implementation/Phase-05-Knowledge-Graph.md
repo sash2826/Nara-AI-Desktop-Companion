@@ -2,9 +2,9 @@
 
 **Phase:** 05
 
-**Status:** Planned
+**Status:** Complete (implemented 2026-08-05)
 
-**Estimated Duration:** 3-5 Days
+**Estimated Duration:** 3-5 Days (actual: ~5 days across two parallel sessions)
 
 ---
 
@@ -44,9 +44,10 @@ Before beginning this phase:
 * Phase 00 through Phase 04 must be completed.
 * AI services should be operational.
 * Search engine should be available.
-* Neo4j provider should be initialized.
 * `ContextAssembler` from Phase 04 should be stable.
 * Background task processing should be functioning.
+
+> **Note:** Neo4j is no longer required as a prerequisite. The knowledge graph now runs on SQLite by default — no additional infrastructure setup is needed.
 
 ---
 
@@ -168,7 +169,7 @@ Provide a unified interface for:
 * Graph analytics.
 * AI-assisted graph exploration.
 
-Consumers should not require knowledge of Neo4j query syntax.
+Consumers should not require knowledge of graph query syntax (Cypher or SQL).
 
 ---
 
@@ -212,6 +213,51 @@ Provide graph structures suitable for visualization including:
 * Layout metadata.
 
 Rendering remains the responsibility of the frontend.
+
+---
+
+# Implementation Summary
+
+Phase 05 was implemented across two parallel sessions (Session A: core graph pipeline; Session B: graph UI and visualization).
+
+## Graph Backend: SQLiteGraphProvider (default)
+
+The knowledge graph runs on SQLite by default, requiring **zero additional infrastructure**. The backend uses recursive CTEs (`WITH RECURSIVE`) for multi-hop traversal, BFS-based path-finding, and connected document discovery — all capabilities previously associated only with Neo4j.
+
+Key implementation decisions:
+
+* **`SQLiteGraphProvider`** (`capabilities/graph/sqlite_graph_provider.py`) — full `GraphProvider` implementation with upsert-on-conflict, FK cascade deletes, depth-limited recursive traversal, substring entity search, and focal-entity visualization subgraphs.
+* **`EAC_GRAPH_PROVIDER` environment variable** controls provider selection at startup: `sqlite` (default), `neo4j` (opt-in), or `null` (graph features disabled).
+* **Migration `008_sqlite_graph.sql`** adds `graph_entities` and `graph_relationships` tables to the existing SQLite database — the same database already used for documents, chunks, and application state.
+* **`GraphProvider` abstract interface** extended with `search_entities()` and `get_connected_documents()` as required methods on all providers, eliminating `AttributeError` fallbacks.
+* **`EnrichmentService`** and **`TraversalEngine`** detect provider capability via `hasattr` rather than `isinstance`, keeping them decoupled from concrete provider classes.
+* **Graph-augmented retrieval** (`ContextAssembler._expand_via_graph()`) supplements vector search by looking up graph-connected documents for query tokens, appending extra chunks to the context payload without exceeding budget limits.
+* **Incremental updates** (`GraphStateRepository` + file hash comparison) prevent re-running LLM extraction on unchanged files.
+
+## Graph UI
+
+A force-directed SVG graph visualization was implemented without external graph libraries. The `KnowledgeGraphPage` renders an interactive canvas with drag support, entity type colour coding, confidence arc overlays, and a click-to-open `EntityCard` side panel.
+
+---
+
+# Neo4j: Future Scope
+
+Neo4j remains fully supported as an optional backend and is the recommended choice for large-scale or enterprise deployments that require:
+
+* **Very large graphs** — tens of millions of nodes and relationships where SQLite write performance or query planning becomes a bottleneck.
+* **Advanced graph analytics** — algorithms such as PageRank, betweenness centrality, Louvain community detection, and native graph ML (via Neo4j GDS).
+* **Multi-instance deployments** — scenarios where multiple backend instances must share a single graph store (Neo4j supports clustering; SQLite is single-file per host).
+* **Cypher tooling** — teams already familiar with Neo4j Browser, Bloom, or other Cypher-based inspection tools.
+
+To enable Neo4j, set the environment variable:
+
+```
+EAC_GRAPH_PROVIDER=neo4j
+```
+
+The backend will connect to a Neo4j instance using the credentials in `EAC_NEO4J_URI`, `EAC_NEO4J_USER`, and `EAC_NEO4J_PASSWORD`. All business logic is identical — only the storage layer changes.
+
+An Architecture Decision Record should be filed before migrating a production instance from SQLite to Neo4j.
 
 ---
 

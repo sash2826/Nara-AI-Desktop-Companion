@@ -10,11 +10,8 @@ from enterprise_ai_companion.capabilities.indexing.embedding_service import Embe
 from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import HybridSearchOrchestrator
 from enterprise_ai_companion.capabilities.retrieval.keyword_search import KeywordSearchProvider
 from enterprise_ai_companion.capabilities.retrieval.qdrant_search import QdrantSearchProvider
-from enterprise_ai_companion.capabilities.retrieval.query_preprocessor import QueryPreprocessor
 
 router = APIRouter(prefix="/search", tags=["search"])
-
-_preprocessor = QueryPreprocessor()
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +108,7 @@ async def semantic_search(
     body: SemanticSearchRequest, request: Request
 ) -> SemanticSearchResponse:
     """Return the top-k document chunks most semantically similar to the query."""
-    pq = _preprocessor.process(body.query)
+    pq = request.app.state.preprocessor.process(body.query)
     provider = QdrantSearchProvider(
         conn=_get_db(request),
         qdrant_client=request.app.state.qdrant.get_client(),
@@ -142,7 +139,7 @@ async def keyword_search(
     body: KeywordSearchRequest, request: Request
 ) -> KeywordSearchResponse:
     """Return up to top_k document chunks matching the query via FTS5 keyword search."""
-    pq = _preprocessor.process(body.query)
+    pq = request.app.state.preprocessor.process(body.query)
     provider = KeywordSearchProvider(conn=_get_db(request))
     results = await provider.search(
         query=pq.search_text,
@@ -175,7 +172,7 @@ async def hybrid_search(
 
     Use ``semantic_weight`` and ``keyword_weight`` to bias the blend (both default 1.0).
     """
-    pq = _preprocessor.process(body.query)
+    pq = request.app.state.preprocessor.process(body.query)
     orchestrator = HybridSearchOrchestrator(
         conn=_get_db(request),
         qdrant_client=request.app.state.qdrant.get_client(),

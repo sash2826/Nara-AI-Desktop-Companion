@@ -209,6 +209,25 @@ export interface SuggestionsResponse {
   suggestions: string[];
 }
 
+export interface GraphVisNode {
+  id: string;
+  label: string;
+  entity_type: string;
+  confidence: number;
+}
+
+export interface GraphVisEdge {
+  source: string;
+  target: string;
+  relation_type: string;
+  confidence: number;
+}
+
+export interface GraphVisualization {
+  nodes: GraphVisNode[];
+  edges: GraphVisEdge[];
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -506,6 +525,23 @@ async function getStats(): Promise<DashboardStats> {
 }
 
 /**
+ * Returns nodes and edges for the knowledge graph visualization.
+ *
+ * When `entityName` is provided the subgraph is centred on that entity.
+ * When omitted the provider returns an overview of the most-connected nodes.
+ * Always returns `{ nodes: [], edges: [] }` when Neo4j is offline.
+ */
+async function getGraphVisualization(
+  entityName?: string,
+  depth: number = 2
+): Promise<GraphVisualization> {
+  return invoke<GraphVisualization>("get_graph_visualization", {
+    entity: entityName ?? null,
+    depth,
+  });
+}
+
+/**
  * Returns AI-generated search query suggestions based on recently indexed file paths.
  * The client is responsible for caching the result (1-hour TTL recommended).
  */
@@ -549,4 +585,5 @@ export const IPCClient = {
   openFile,
   getStats,
   getSuggestedQueries,
+  getGraphVisualization,
 } as const;

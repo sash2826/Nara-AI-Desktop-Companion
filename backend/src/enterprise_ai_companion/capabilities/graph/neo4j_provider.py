@@ -106,6 +106,7 @@ class Neo4jProvider(GraphProvider):
             "name": entity.name,
             "entity_type": entity.entity_type.value,
             "source_document_id": entity.source_document_id,
+            "confidence": entity.confidence,
             **entity.properties,
         }
         cypher = (
@@ -127,6 +128,10 @@ class Neo4jProvider(GraphProvider):
         type is embedded as a Neo4j relationship type label.
         """
         rel_type = relationship.relationship_type.value
+        props: dict[str, Any] = {
+            "confidence": relationship.confidence,
+            **relationship.properties,
+        }
         cypher = (
             f"MATCH (src:Entity {{id: $src_id}}), (tgt:Entity {{id: $tgt_id}}) "
             f"MERGE (src)-[r:{rel_type}]->(tgt) "
@@ -137,7 +142,7 @@ class Neo4jProvider(GraphProvider):
                 cypher,
                 src_id=relationship.source_id,
                 tgt_id=relationship.target_id,
-                props=dict(relationship.properties),
+                props=props,
             )
 
     # ------------------------------------------------------------------
@@ -191,6 +196,154 @@ class Neo4jProvider(GraphProvider):
             related_entities=related_entities,
             relationships=relationships,
         )
+
+    async def get_visualization(
+        self,
+        entity_name: str | None = None,
+        depth: int = 2,
+    ) -> dict:
+        """Return ``{"nodes": [...], "edges": [...]}`` for the graph UI.
+
+        When *entity_name* is given the subgraph is centred on that entity.
+        When *None* the most-connected 50 entities are returned as an overview.
+        Session A (Epic 5.1+) will enrich this with confidence scores once the
+        ExtractedEntity schema is in place. Until then confidence defaults to 1.0.
+        """
+        depth = min(max(depth, 1), 3)
+
+        if entity_name:
+            cypher = (
+                "MATCH (root:Entity {name: $name}) "
+                f"OPTIONAL MATCH path = (root)-[r*1..{depth}]-(n:Entity) "
+                "RETURN collect(DISTINCT root) + collect(DISTINCT n) AS nodes, "
+                "       collect(DISTINCT r) AS rel_lists"
+            )
+            params: dict = {"name": entity_name}
+        else:
+            cypher = (
+                "MATCH (e:Entity) "
+                "OPTIONAL MATCH (e)-[r]->(:Entity) "
+                "WITH e, count(r) AS deg "
+                "ORDER BY deg DESC LIMIT 50 "
+                "MATCH (e)-[rel]->(tgt:Entity) "
+                "RETURN collect(DISTINCT e) + collect(DISTINCT tgt) AS nodes, "
+                "       collect(DISTINCT rel) AS rel_lists"
+            )
+            params = {}
+
+        async with self._driver.session() as session:  # type: ignore[union-attr]
+            result = await session.run(cypher, **params)
+            record = await result.single()
+
+        if record is None:
+            return {"nodes": [], "edges": []}
+
+        seen_node_ids: set[str] = set()
+        nodes: list[dict] = []
+        for node in record["nodes"]:
+            if node is None:
+                continue
+            props = dict(node.items())
+            nid = props.get("id", str(node.element_id))
+            if nid in seen_node_ids:
+                continue
+            seen_node_ids.add(nid)
+            nodes.append({
+                "id": nid,
+                "label": props.get("name", nid),
+                "entity_type": props.get("entity_type", "unknown"),
+                "confidence": float(props.get("confidence", 1.0)),
+            })
+
+        seen_edge_keys: set[tuple[str, str, str]] = set()
+        edges: list[dict] = []
+        for path_rels in record["rel_lists"]:
+            if path_rels is None:
+                continue
+            rels = path_rels if isinstance(path_rels, list) else [path_rels]
+            for rel in rels:
+                props = dict(rel.items())
+                src = str(rel.start_node.element_id)
+                tgt = str(rel.end_node.element_id)
+                rtype = rel.type
+                key = (src, tgt, rtype)
+                if key in seen_edge_keys:
+                    continue
+                seen_edge_keys.add(key)
+                edges.append({
+                    "source": src,
+                    "target": tgt,
+                    "relation_type": rtype,
+                    "confidence": float(props.get("confidence", 1.0)),
+                })
+
+        return {"nodes": nodes, "edges": edges}
+
+    async def search_entities(
+        self,
+        query: str,
+        entity_type: str | None = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        """Return entities whose names contain *query* (case-insensitive substring).
+
+        Args:
+            query: Substring to search for.
+            entity_type: Optional entity type filter.
+            limit: Maximum results (1–50).
+
+        Returns:
+            List of dicts with id, name, entity_type, confidence, source_document_id.
+        """
+        if entity_type:
+            cypher = (
+                "MATCH (e:Entity) "
+                "WHERE toLower(e.name) CONTAINS toLower($query) "
+                "  AND e.entity_type = $entity_type "
+                "RETURN e.id AS id, e.name AS name, e.entity_type AS entity_type, "
+                "       e.confidence AS confidence, e.source_document_id AS source_document_id "
+                "ORDER BY e.confidence DESC LIMIT $limit"
+            )
+            params: dict = {"query": query, "entity_type": entity_type, "limit": limit}
+        else:
+            cypher = (
+                "MATCH (e:Entity) "
+                "WHERE toLower(e.name) CONTAINS toLower($query) "
+                "RETURN e.id AS id, e.name AS name, e.entity_type AS entity_type, "
+                "       e.confidence AS confidence, e.source_document_id AS source_document_id "
+                "ORDER BY e.confidence DESC LIMIT $limit"
+            )
+            params = {"query": query, "limit": limit}
+
+        async with self._driver.session() as session:  # type: ignore[union-attr]
+            result = await session.run(cypher, **params)
+            records = await result.data()
+
+        return [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "entity_type": r["entity_type"] or "Concept",
+                "confidence": float(r["confidence"] or 1.0),
+                "source_document_id": r["source_document_id"] or "",
+            }
+            for r in records
+        ]
+
+    async def get_connected_documents(self, entity_name: str) -> list[str]:
+        """Return document IDs of all entities reachable (up to 2 hops) from entity_name."""
+        cypher = (
+            "MATCH (root:Entity {name: $name})-[*0..2]-(neighbour:Entity) "
+            "WHERE neighbour.source_document_id IS NOT NULL "
+            "RETURN collect(DISTINCT neighbour.source_document_id) AS doc_ids"
+        )
+        async with self._driver.session() as session:  # type: ignore[union-attr]
+            result = await session.run(cypher, name=entity_name)
+            record = await result.single()
+
+        if record is None:
+            return []
+        return [str(d) for d in (record["doc_ids"] or []) if d]
 
     # ------------------------------------------------------------------
     # Delete operations

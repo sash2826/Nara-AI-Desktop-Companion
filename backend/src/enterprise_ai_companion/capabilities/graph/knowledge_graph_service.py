@@ -1,45 +1,31 @@
-"""Extracts entities and relationships from text and writes them to the graph.
+"""Orchestrates entity/relationship extraction and graph persistence for indexed documents.
 
-Entity extraction uses a single LLM call per chunk (structured JSON output).
-On failure the service logs a warning and skips the chunk — graph building is
-best-effort and must never block document indexing.
+The extraction pipeline per chunk:
+  1. EntityExtractor  — LLM call → list[ExtractedEntity]
+  2. RelationshipExtractor — LLM call → list[ExtractedRelationship]
+  3. Persist entities → Neo4j (or NullGraphProvider)
+  4. Persist relationships → Neo4j
+
+All steps are best-effort: a failure on one chunk never aborts the others and
+never propagates up to the caller (FileIndexer wraps the call in its own guard).
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
-from typing import Any
 
-from enterprise_ai_companion.capabilities.ai.llm_client import chat_complete
+from enterprise_ai_companion.capabilities.graph.enrichment_service import EnrichmentService
+from enterprise_ai_companion.capabilities.graph.entity_extractor import EntityExtractor
 from enterprise_ai_companion.capabilities.graph.graph_models import (
     Entity,
-    EntityType,
+    ExtractedEntity,
     Relationship,
-    RelationshipType,
 )
 from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvider
+from enterprise_ai_companion.capabilities.graph.relationship_extractor import RelationshipExtractor
 
 logger = logging.getLogger(__name__)
-
-_ENTITY_TYPES = ", ".join(e.value for e in EntityType)
-_REL_TYPES = ", ".join(r.value for r in RelationshipType)
-
-_EXTRACTION_SYSTEM = (
-    "You are a knowledge extraction engine. "
-    "Given a text passage, extract named entities and relationships as JSON. "
-    "Return ONLY valid JSON — no markdown, no commentary.\n\n"
-    "Schema:\n"
-    "{\n"
-    '  "entities": [\n'
-    '    {"name": "string", "type": "one of: ' + _ENTITY_TYPES + '"}\n'
-    "  ],\n"
-    '  "relationships": [\n'
-    '    {"source": "entity name", "target": "entity name", "type": "one of: ' + _REL_TYPES + '"}\n'
-    "  ]\n"
-    "}"
-)
 
 
 class KnowledgeGraphService:
@@ -49,8 +35,17 @@ class KnowledgeGraphService:
     after a document's chunks are saved to SQLite/Qdrant.
     """
 
-    def __init__(self, graph_provider: GraphProvider) -> None:
+    def __init__(
+        self,
+        graph_provider: GraphProvider,
+        entity_extractor: EntityExtractor | None = None,
+        relationship_extractor: RelationshipExtractor | None = None,
+        enrichment_service: EnrichmentService | None = None,
+    ) -> None:
         self._graph = graph_provider
+        self._entity_extractor = entity_extractor or EntityExtractor()
+        self._relationship_extractor = relationship_extractor or RelationshipExtractor()
+        self._enrichment = enrichment_service or EnrichmentService(graph_provider)
 
     async def build_from_chunks(
         self,
@@ -59,7 +54,8 @@ class KnowledgeGraphService:
     ) -> None:
         """Extract entities/relationships from each chunk and persist to the graph.
 
-        Processing is best-effort: a failure on one chunk does not abort others.
+        After all chunks are processed, runs the enrichment pass (duplicate
+        merge, confidence update). Processing is best-effort throughout.
         """
         for i, chunk_text in enumerate(chunks):
             try:
@@ -72,8 +68,14 @@ class KnowledgeGraphService:
                     exc,
                 )
 
+        # Enrichment is best-effort — failure must not propagate to FileIndexer.
+        try:
+            await self._enrichment.enrich()
+        except Exception as exc:
+            logger.warning("Graph enrichment failed for document %s: %s", document_id, exc)
+
     async def delete_document(self, document_id: str) -> None:
-        """Remove all graph nodes sourced from this document."""
+        """Remove all graph nodes and relationships sourced from this document."""
         await self._graph.delete_by_document(document_id)
 
     # ------------------------------------------------------------------
@@ -81,87 +83,53 @@ class KnowledgeGraphService:
     # ------------------------------------------------------------------
 
     async def _process_chunk(self, document_id: str, text: str) -> None:
-        extracted = await self._extract(text)
-        if not extracted:
+        # Step 1 — entity extraction.
+        extracted_entities = await self._entity_extractor.extract(text)
+        if not extracted_entities:
             return
 
-        raw_entities: list[dict[str, Any]] = extracted.get("entities", [])
-        raw_rels: list[dict[str, Any]] = extracted.get("relationships", [])
-
-        # Build a name→id map so we can construct relationships by name.
+        # Step 2 — build name→id map and persist entities.
         name_to_id: dict[str, str] = {}
-        for raw in raw_entities:
-            name = str(raw.get("name", "")).strip()
-            if not name:
-                continue
-            entity_type = _coerce_entity_type(raw.get("type", ""))
-            entity_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"{document_id}:{name}"))
+        for extracted in extracted_entities:
+            entity_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"{document_id}:{extracted.name}"))
             entity = Entity(
                 id=entity_id,
-                name=name,
-                entity_type=entity_type,
+                name=extracted.name,
+                entity_type=extracted.entity_type,
                 source_document_id=document_id,
+                confidence=extracted.confidence,
             )
             await self._graph.upsert_entity(entity)
-            name_to_id[name] = entity_id
+            name_to_id[extracted.name] = entity_id
+            # Map by lowercase for relationship lookup resilience.
+            name_to_id[extracted.name.lower()] = entity_id
 
-        for raw in raw_rels:
-            source_name = str(raw.get("source", "")).strip()
-            target_name = str(raw.get("target", "")).strip()
-            rel_type = _coerce_rel_type(raw.get("type", ""))
+        # Step 3 — relationship extraction (best-effort; failure does not lose entities).
+        try:
+            extracted_rels = await self._relationship_extractor.extract(
+                text, extracted_entities
+            )
+        except Exception as exc:
+            logger.warning(
+                "Relationship extraction failed for document %s: %s", document_id, exc
+            )
+            extracted_rels = []
 
-            source_id = name_to_id.get(source_name)
-            target_id = name_to_id.get(target_name)
+        # Step 4 — persist relationships.
+        for extracted_rel in extracted_rels:
+            source_id = name_to_id.get(extracted_rel.source_name) or name_to_id.get(
+                extracted_rel.source_name.lower()
+            )
+            target_id = name_to_id.get(extracted_rel.target_name) or name_to_id.get(
+                extracted_rel.target_name.lower()
+            )
             if not source_id or not target_id:
                 continue
 
             relationship = Relationship(
                 source_id=source_id,
                 target_id=target_id,
-                relationship_type=rel_type,
+                relationship_type=extracted_rel.relationship_type,
+                confidence=extracted_rel.confidence,
             )
             await self._graph.upsert_relationship(relationship)
-
-    async def _extract(self, text: str) -> dict[str, Any] | None:
-        """Call the LLM and parse JSON output."""
-        messages = [
-            {"role": "system", "content": _EXTRACTION_SYSTEM},
-            {"role": "user", "content": text[:3000]},  # cap to avoid token overrun
-        ]
-        try:
-            raw = await chat_complete(messages, max_tokens=512, temperature=0.0)
-        except Exception as exc:
-            logger.debug("LLM call failed during entity extraction: %s", exc)
-            return None
-
-        try:
-            return json.loads(raw)  # type: ignore[return-value]
-        except json.JSONDecodeError:
-            # Attempt to extract JSON from within a markdown code fence.
-            start = raw.find("{")
-            end = raw.rfind("}") + 1
-            if start != -1 and end > start:
-                try:
-                    return json.loads(raw[start:end])  # type: ignore[return-value]
-                except json.JSONDecodeError:
-                    pass
-            logger.debug("Failed to parse entity extraction response: %s", raw[:200])
-            return None
-
-
-# ------------------------------------------------------------------
-# Coercion helpers
-# ------------------------------------------------------------------
-
-def _coerce_entity_type(value: Any) -> EntityType:
-    try:
-        return EntityType(str(value))
-    except ValueError:
-        return EntityType.CONCEPT
-
-
-def _coerce_rel_type(value: Any) -> RelationshipType:
-    try:
-        return RelationshipType(str(value))
-    except ValueError:
-        return RelationshipType.RELATED_TO

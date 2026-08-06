@@ -1,4 +1,6 @@
-import { Loader2, FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { Loader2, FolderOpen, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FolderRow } from "./FolderRow";
 import { AddFolderInput } from "./AddFolderInput";
 import { WatcherStatusBadge } from "./WatcherStatusBadge";
@@ -14,6 +16,17 @@ export function FolderList() {
     removeFolder,
     indexFolder,
   } = useWorkspace();
+  const [reindexingAll, setReindexingAll] = useState(false);
+
+  const handleReindexAll = async () => {
+    if (folders.length === 0 || reindexingAll) return;
+    setReindexingAll(true);
+    try {
+      await Promise.all(folders.map((f) => indexFolder(f.path)));
+    } finally {
+      setReindexingAll(false);
+    }
+  };
 
   if (watcherLoading) {
     return (
@@ -33,7 +46,27 @@ export function FolderList() {
             Files in these folders are indexed automatically.
           </p>
         </div>
-        <WatcherStatusBadge status={watcherStatus} />
+        <div className="flex items-center gap-2">
+          {folders.length > 0 && (
+            <button
+              onClick={handleReindexAll}
+              disabled={reindexingAll}
+              title="Re-index all folders"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                reindexingAll && "cursor-not-allowed opacity-60"
+              )}
+            >
+              <RefreshCw
+                size={12}
+                strokeWidth={1.5}
+                className={reindexingAll ? "animate-spin" : ""}
+              />
+              Re-index All
+            </button>
+          )}
+          <WatcherStatusBadge status={watcherStatus} />
+        </div>
       </div>
 
       <AddFolderInput onAdd={addFolder} />

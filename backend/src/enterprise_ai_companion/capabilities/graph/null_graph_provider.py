@@ -38,5 +38,23 @@ class NullGraphProvider(GraphProvider):
     async def health(self) -> bool:
         return True
 
+    async def get_visualization(
+        self,
+        entity_name: str | None = None,
+        depth: int = 2,
+    ) -> dict:
+        return {"nodes": [], "edges": []}
+
+    async def search_entities(
+        self,
+        query: str,
+        entity_type: str | None = None,
+        limit: int = 10,
+    ) -> list[dict]:
+        return []  # type: ignore[return-value]
+
+    async def get_connected_documents(self, entity_name: str) -> list[str]:
+        return []
+
     async def close(self) -> None:
         pass

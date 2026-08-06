@@ -2,7 +2,7 @@
 
 **Phase:** 02
 
-**Status:** Complete
+**Status:** Complete (includes Epic 2.7a — Automatic Abbreviation Discovery)
 
 **Estimated Duration:** 3-5 Days
 
@@ -484,6 +484,61 @@ Analytics should support future optimization without affecting retrieval behavio
 - ✅ Wired into `POST /search/semantic` and `POST /search/keyword` — raw query replaced with `pq.search_text`
 - ✅ 50 unit tests covering every stage and the full pipeline (all passing)
 
+### Epic 2.7a — Automatic Abbreviation Discovery ✅
+
+Extends Stage 5 so the query expansion dictionary grows automatically from the user's own indexed documents. When a file is indexed, the system scans its full text for abbreviation–definition pairs, persists them to SQLite, and reloads the preprocessor's dynamic expansion set. On the next query, any discovered abbreviation is expanded the same way static entries are.
+
+**Architecture:**
+
+```
+FileIndexer._index_file(text)
+    │  after doc_repo.upsert() — doc.id available as FK
+    ▼
+AbbreviationExtractor.extract(full_text)
+    │  two regex patterns + acronym-initial validation
+    ▼
+AbbreviationRepository.save_batch(doc_id, matches)
+    │  persisted in abbreviations table (CASCADE on doc delete)
+    ▼
+[indexing job completes — non-cancelled]
+    ▼
+AbbreviationRepository.load_all() → dict[str, list[str]]
+    ▼
+QueryPreprocessor.merge_expansions(dynamic)
+    │  static _EXPANSIONS always takes precedence
+    ▼
+next query uses combined static + dynamic expansions
+```
+
+**Deliverables:**
+
+- ✅ Migration `006_abbreviations.sql` — `abbreviations` table with composite PK `(abbreviation, document_id)`, `ON DELETE CASCADE` FK to `documents`, and indexes on `document_id` and `abbreviation` for fast lookup and cascade cleanup
+- ✅ `AbbreviationExtractor` (`capabilities/retrieval/abbreviation_extractor.py`) — two regex patterns:
+  - Pattern 1 — abbreviation-first: `RRF (Reciprocal Rank Fusion)` → `[A-Z]{2,8}\s*\([a-zA-Z][^()]{2,79}\)`
+  - Pattern 2 — definition-first: `Reciprocal Rank Fusion (RRF)` → `((?:[A-Z][a-zA-Z-]*\s+){1,7}[A-Z][a-zA-Z-]*)\s*\([A-Z]{2,8}\)`
+  - Acronym-initial validation — compares abbreviation letters against content-word initials of the definition, skipping stop-words; rejects matches where letters do not align
+  - `static_exclusions` constructor parameter so entries that are already in `_EXPANSIONS` are never persisted
+  - Deduplication per document — first occurrence of each abbreviation wins; subsequent ignored
+- ✅ `AbbreviationRepository` (`capabilities/indexing/abbreviation_repository.py`) — `save_batch(doc_id, matches)` (INSERT OR REPLACE on composite PK), `delete_by_document(doc_id)` (clears stale entries before re-indexing), `load_all() → dict[str, list[str]]` (loads full cross-document set, deduplicating definitions)
+- ✅ `QueryPreprocessor._dynamic_expansions` instance attribute — holds the current document-derived expansion set
+- ✅ `QueryPreprocessor.merge_expansions(dynamic)` — replaces the dynamic expansion set; any key already present in static `_EXPANSIONS` is silently filtered so document-derived entries can never shadow the curated baseline
+- ✅ `_expand()` updated — consults static `_EXPANSIONS` first; dynamic entries are only consulted for tokens not already handled by the static dict
+- ✅ `FileIndexer._extract_and_save_abbreviations(doc_id, text, file_name)` — best-effort method called after `doc_repo.upsert()`; clears previous abbreviations for the document then saves newly extracted matches; exceptions are logged at WARNING and swallowed so abbreviation extraction never aborts indexing
+- ✅ `app.state.preprocessor` singleton — `QueryPreprocessor` moved from a module-level variable in `search.py` to `app.state` in `lifespan()` so the indexing router can call `merge_expansions()` without creating a circular import
+- ✅ Post-indexing reload in `indexing.py` — `_run_indexing()` receives `app_state`; after each non-cancelled job it calls `abbreviation_repo.load_all()` → `preprocessor.merge_expansions()`; logged at INFO level with the count of loaded entries
+- ✅ Startup priming — `lifespan()` in `app.py` calls `abbreviation_repo.load_all()` → `preprocessor.merge_expansions()` immediately after the preprocessor is created, restoring expansions discovered in previous sessions without requiring a re-index
+
+**Design decisions:**
+
+| Decision | Rationale |
+|---|---|
+| Static expansions always win | Prevents user documents from accidentally overriding curated expansions (e.g. a document redefining "AI" as something else) |
+| Composite PK `(abbreviation, document_id)` | One abbreviation can appear across many documents with the same or different definitions; all are stored and contributed to `load_all()` |
+| `ON DELETE CASCADE` | When a document is deleted from the `documents` table, its abbreviation rows are removed automatically without a separate cleanup step |
+| `delete_by_document` before re-index | Prevents stale definitions accumulating when a document's content changes |
+| Best-effort extraction | Abbreviation extraction failure must never block indexing of a file's content — matches the same pattern as graph build failures |
+| Reload after every job, not per-file | Batches the SQLite read and preprocessor update to once per indexing run rather than once per file |
+
 ## Epic 2.8 — Hybrid Search Orchestrator ✅
 
 - ✅ `HybridSearchOrchestrator` — runs keyword (FTS5) and semantic (Qdrant) search concurrently via `asyncio.gather`
@@ -527,28 +582,26 @@ Analytics should support future optimization without affecting retrieval behavio
 
 ## Phase 02 Summary
 
-| Epic | Title | Status | Commit |
-|------|-------|--------|--------|
-| 2.1 | Infrastructure & Providers | ✅ Done | c9954af |
-| 2.2 | Repository Abstraction | ✅ Done | c9954af |
-| 2.3 | SQLite Schema Expansion | ✅ Done | c9954af |
-| 2.4 | File Indexing Pipeline | ✅ Done | c9954af |
-| 2.5 | Semantic Search | ✅ Done | c9954af |
-| 2.6 | Keyword Search | ✅ Done | c9954af |
-| 2.7 | Query Preprocessing | ✅ Done | (this commit) |
-| 2.8 | Hybrid Search Orchestrator | ❌ Pending | — |
-| 2.9 | Neo4j Knowledge Graph | ✅ Done | 21b64c4 |
-| 2.10 | Backup Foundation | ✅ Done | (parallel) |
+| Epic | Title | Status |
+|------|-------|--------|
+| 2.1 | Infrastructure & Providers | ✅ Done |
+| 2.2 | Repository Abstraction | ✅ Done |
+| 2.3 | SQLite Schema Expansion | ✅ Done |
+| 2.4 | File Indexing Pipeline | ✅ Done |
+| 2.5 | Semantic Search | ✅ Done |
+| 2.6 | Keyword Search | ✅ Done |
+| 2.7 | Query Preprocessing | ✅ Done |
+| 2.7a | Automatic Abbreviation Discovery | ✅ Done |
+| 2.8 | Hybrid Search Orchestrator | ✅ Done |
+| 2.9 | Neo4j Knowledge Graph | ✅ Done |
+| 2.10 | Backup Foundation | ✅ Done |
 
-**Implemented:** 9 / 10 epics  
-**Pending:** 2.8 (Hybrid Search Orchestrator)
+**All epics complete.**
 
 ---
 
 # Next Phase
 
-After completing the remaining epic (2.8), proceed to:
-
 **Phase 03 – Workspace Features**
 
-The next phase introduces workspace-specific frontend capabilities, including document management views, search UI, file browsing, and workspace organization features.
+Phase 02 is complete. The next phase introduces workspace-specific frontend capabilities, including document management views, search UI, file browsing, and workspace organization features.

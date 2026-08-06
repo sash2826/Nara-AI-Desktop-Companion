@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvider
+from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import KnowledgeGraphService
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
 from enterprise_ai_companion.capabilities.indexing.chunk_repository import (
@@ -23,10 +24,16 @@ from enterprise_ai_companion.capabilities.indexing.document_repository import (
     IndexedDocument,
 )
 from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
+from enterprise_ai_companion.capabilities.indexing.abbreviation_repository import (
+    AbbreviationRepository,
+)
 from enterprise_ai_companion.capabilities.indexing.indexing_error_repository import (
     IndexingErrorRepository,
 )
 from enterprise_ai_companion.capabilities.indexing.text_chunker import TextChunker
+from enterprise_ai_companion.capabilities.retrieval.abbreviation_extractor import (
+    AbbreviationExtractor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +129,9 @@ class FileIndexer:
         chunker: TextChunker | None = None,
         graph_provider: GraphProvider | None = None,
         error_repo: IndexingErrorRepository | None = None,
+        abbreviation_extractor: AbbreviationExtractor | None = None,
+        abbreviation_repo: AbbreviationRepository | None = None,
+        graph_state_repo: GraphStateRepository | None = None,
     ) -> None:
         self._doc_repo = doc_repo
         self._chunk_repo = chunk_repo
@@ -129,6 +139,9 @@ class FileIndexer:
         self._chunker = chunker or TextChunker()
         self._graph_service = KnowledgeGraphService(graph_provider or NullGraphProvider())
         self._error_repo = error_repo
+        self._abbreviation_extractor = abbreviation_extractor
+        self._abbreviation_repo = abbreviation_repo
+        self._graph_state_repo = graph_state_repo
 
     async def index_workspace(
         self,
@@ -206,12 +219,23 @@ class FileIndexer:
 
         existing = await self._doc_repo.get_by_path(str(file_path))
         if existing and existing.file_hash == file_hash:
-            return False  # unchanged
+            # File content is unchanged. If the graph was never built for this document
+            # (e.g. a previous run had broken env vars), rebuild it now using the chunks
+            # already stored in the database — no need to re-embed or re-chunk.
+            if self._graph_state_repo is not None:
+                state = await self._graph_state_repo.get_by_document(existing.id)
+                if state is None:
+                    await self._rebuild_graph_from_db(
+                        existing.id, file_hash, file_path.name
+                    )
+            return False  # content unchanged
 
-        # Remove stale chunks and graph nodes before re-indexing.
+        # Remove stale chunks, graph nodes, and graph state before re-indexing.
         if existing:
             await self._chunk_repo.delete_by_document(existing.id)
             await self._graph_service.delete_document(existing.id)
+            if self._graph_state_repo is not None:
+                await self._graph_state_repo.delete_by_document(existing.id)
 
         raw_chunks = self._chunker.chunk(text)
         if not raw_chunks:
@@ -246,14 +270,114 @@ class FileIndexer:
 
         await self._chunk_repo.save_batch(chunks, embeddings)
 
-        # Graph building is best-effort — failure here must not abort indexing.
+        # Abbreviation extraction is best-effort — failure must not abort indexing.
+        await self._extract_and_save_abbreviations(doc_id, text, file_path.name)
+
+        # Graph build — skip if the content hash matches the last successful build.
+        await self._build_graph_incremental(doc_id, file_hash, chunks, file_path.name)
+
+        logger.debug("Indexed %s (%d chunks)", file_path.name, len(chunks))
+        return True
+
+    async def _extract_and_save_abbreviations(
+        self,
+        doc_id: str,
+        text: str,
+        file_name: str,
+    ) -> None:
+        """Extract abbreviations from *text* and persist them for *doc_id*.
+
+        Clears any previously stored abbreviations for the document first so
+        re-indexing does not accumulate stale entries.  Failures are logged
+        and swallowed — abbreviation extraction is never a reason to fail
+        indexing.
+        """
+        if self._abbreviation_extractor is None or self._abbreviation_repo is None:
+            return
         try:
+            await self._abbreviation_repo.delete_by_document(doc_id)
+            matches = self._abbreviation_extractor.extract(text)
+            if matches:
+                await self._abbreviation_repo.save_batch(doc_id, matches)
+                logger.debug(
+                    "Extracted %d abbreviation(s) from %s", len(matches), file_name
+                )
+        except Exception as exc:
+            logger.warning(
+                "Abbreviation extraction failed for %s: %s", file_name, exc
+            )
+
+    async def _build_graph_incremental(
+        self,
+        doc_id: str,
+        file_hash: str,
+        chunks: list,
+        file_name: str,
+    ) -> None:
+        """Build the knowledge graph for doc_id, skipping when the hash is unchanged.
+
+        Checks GraphStateRepository first — if the stored hash matches the current
+        file hash the graph is already up to date and the (expensive) LLM extraction
+        calls are skipped.  On success the new hash is persisted so future runs
+        benefit from the same shortcut.
+
+        Failures are logged and swallowed — graph build must never abort indexing.
+        """
+        try:
+            if self._graph_state_repo is not None:
+                state = await self._graph_state_repo.get_by_document(doc_id)
+                if state is not None and state.file_hash == file_hash:
+                    logger.debug(
+                        "Graph build skipped for %s — content unchanged", file_name
+                    )
+                    return
+
             await self._graph_service.build_from_chunks(
                 doc_id,
                 [c.content for c in chunks],
             )
-        except Exception as exc:
-            logger.warning("Graph build failed for %s: %s", file_path.name, exc)
 
-        logger.debug("Indexed %s (%d chunks)", file_path.name, len(chunks))
-        return True
+            if self._graph_state_repo is not None:
+                await self._graph_state_repo.save(doc_id, file_hash)
+
+        except Exception as exc:
+            logger.warning("Graph build failed for %s: %s", file_name, exc)
+
+    async def _rebuild_graph_from_db(
+        self,
+        doc_id: str,
+        file_hash: str,
+        file_name: str,
+    ) -> None:
+        """Rebuild the knowledge graph for doc_id using chunks already in the database.
+
+        Called when a file's content is unchanged but graph_state is missing — this
+        happens when a previous indexing run completed successfully for chunks/embeddings
+        but failed during graph extraction (e.g. LLM env vars not set).
+
+        Loads chunk text from the chunks table and delegates to _build_graph_incremental.
+        Failures are logged and swallowed.
+        """
+        try:
+            async with self._chunk_repo._conn.execute(
+                "SELECT content FROM chunks WHERE document_id = ? ORDER BY chunk_index",
+                (doc_id,),
+            ) as cur:
+                rows = await cur.fetchall()
+
+            if not rows:
+                logger.debug("No chunks found in DB for %s — skipping graph rebuild", file_name)
+                return
+
+            chunk_texts = [row[0] for row in rows]
+            logger.info(
+                "Rebuilding graph for %s from %d stored chunks", file_name, len(chunk_texts)
+            )
+
+            await self._graph_service.build_from_chunks(doc_id, chunk_texts)
+
+            if self._graph_state_repo is not None:
+                await self._graph_state_repo.save(doc_id, file_hash)
+
+        except Exception as exc:
+            logger.warning("Graph rebuild from DB failed for %s: %s", file_name, exc)

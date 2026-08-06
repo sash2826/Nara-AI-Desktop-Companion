@@ -293,6 +293,28 @@ pub struct SuggestionsResponse {
     pub suggestions: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphVisNodeResponse {
+    pub id: String,
+    pub label: String,
+    pub entity_type: String,
+    pub confidence: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphVisEdgeResponse {
+    pub source: String,
+    pub target: String,
+    pub relation_type: String,
+    pub confidence: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphVisualizationResponse {
+    pub nodes: Vec<GraphVisNodeResponse>,
+    pub edges: Vec<GraphVisEdgeResponse>,
+}
+
 // ─── Helper: base URL ─────────────────────────────────────────────────────────
 
 fn sidecar_base(state: &AppState) -> Result<String, String> {
@@ -1109,6 +1131,47 @@ async fn get_suggested_queries(
         .map_err(|e| format!("Failed to parse get_suggested_queries response: {}", e))
 }
 
+/// Returns nodes and edges for the knowledge graph visualization page.
+///
+/// Proxies to `GET /graph/visualize` on the Python sidecar.
+/// Returns empty nodes/edges arrays when Neo4j is offline or the graph is empty.
+#[tauri::command]
+async fn get_graph_visualization(
+    entity: Option<String>,
+    depth: Option<u32>,
+    state: State<'_, Arc<AppState>>,
+) -> Result<GraphVisualizationResponse, String> {
+    let base = sidecar_base(&state)?;
+    let mut url = format!("{}/graph/visualize", base);
+
+    let mut params: Vec<String> = Vec::new();
+    if let Some(e) = entity {
+        params.push(format!("entity={}", urlencoding::encode(&e)));
+    }
+    if let Some(d) = depth {
+        params.push(format!("depth={}", d));
+    }
+    if !params.is_empty() {
+        url = format!("{}?{}", url, params.join("&"));
+    }
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("get_graph_visualization request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "get_graph_visualization returned HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+
+    response
+        .json::<GraphVisualizationResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse graph visualization response: {}", e))
+}
+
 // ─── Global shortcut ──────────────────────────────────────────────────────────
 
 /// Registers Ctrl+K as a system-wide shortcut.
@@ -1265,7 +1328,8 @@ pub fn run() {
             clear_indexing_errors,
             open_file,
             get_stats,
-            get_suggested_queries
+            get_suggested_queries,
+            get_graph_visualization
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

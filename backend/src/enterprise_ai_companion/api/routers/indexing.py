@@ -63,6 +63,7 @@ async def _run_indexing(
     workspace_path: str,
     tasks: dict[str, Any],
     indexer: FileIndexer,
+    app_state: Any,
 ) -> None:
     tasks[task_id]["status"] = "running"
 
@@ -87,6 +88,19 @@ async def _run_indexing(
                     "errors": result.errors,
                 }
             )
+            # Reload dynamic abbreviation expansions from the newly indexed documents.
+            abbrev_repo = getattr(app_state, "abbreviation_repo", None)
+            preprocessor = getattr(app_state, "preprocessor", None)
+            if abbrev_repo is not None and preprocessor is not None:
+                try:
+                    dynamic = await abbrev_repo.load_all()
+                    preprocessor.merge_expansions(dynamic)
+                    logger.info(
+                        "Abbreviation expansions reloaded after indexing: %d entries",
+                        len(dynamic),
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to reload abbreviation expansions: %s", exc)
     except asyncio.CancelledError:
         tasks[task_id]["status"] = "cancelled"
         logger.info("Indexing task %s was cancelled", task_id)
@@ -137,6 +151,7 @@ async def start_indexing(body: StartIndexingRequest, request: Request) -> StartI
             workspace_path=body.workspace_path,
             tasks=tasks,
             indexer=request.app.state.file_indexer,
+            app_state=request.app.state,
         )
     )
     tasks[task_id]["_task"] = bg_task

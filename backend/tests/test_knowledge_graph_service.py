@@ -5,13 +5,32 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from enterprise_ai_companion.capabilities.graph.entity_extractor import _coerce_entity_type
 from enterprise_ai_companion.capabilities.graph.graph_models import EntityType, RelationshipType
-from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import (
-    KnowledgeGraphService,
-    _coerce_entity_type,
-    _coerce_rel_type,
-)
+from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import KnowledgeGraphService
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
+from enterprise_ai_companion.capabilities.graph.relationship_extractor import _coerce_rel_type
+
+# Patch targets: extraction now happens inside EntityExtractor and RelationshipExtractor.
+_ENTITY_LLM = "enterprise_ai_companion.capabilities.graph.entity_extractor.chat_complete"
+_REL_LLM = "enterprise_ai_companion.capabilities.graph.relationship_extractor.chat_complete"
+
+_ENTITY_PAYLOAD = json.dumps(
+    {
+        "entities": [
+            {"name": "Volvo", "type": "Organization", "confidence": 0.9},
+            {"name": "Sweden", "type": "Location", "confidence": 0.88},
+        ]
+    }
+)
+
+_REL_PAYLOAD = json.dumps(
+    {
+        "relationships": [
+            {"source": "Volvo", "target": "Sweden", "type": "BELONGS_TO", "confidence": 0.85}
+        ]
+    }
+)
 
 
 @pytest.fixture
@@ -21,33 +40,20 @@ async def service() -> KnowledgeGraphService:
     return KnowledgeGraphService(provider)
 
 
-_VALID_EXTRACTION = {
-    "entities": [
-        {"name": "Volvo", "type": "Organization"},
-        {"name": "Sweden", "type": "Location"},
-    ],
-    "relationships": [
-        {"source": "Volvo", "target": "Sweden", "type": "BELONGS_TO"},
-    ],
-}
-
-
 class TestBuildFromChunks:
     async def test_does_not_raise_with_valid_llm_response(
         self, service: KnowledgeGraphService
     ) -> None:
-        with patch(
-            "enterprise_ai_companion.capabilities.graph.knowledge_graph_service.chat_complete",
-            new_callable=AsyncMock,
-            return_value=json.dumps(_VALID_EXTRACTION),
+        with (
+            patch(_ENTITY_LLM, new_callable=AsyncMock, return_value=_ENTITY_PAYLOAD),
+            patch(_REL_LLM, new_callable=AsyncMock, return_value=_REL_PAYLOAD),
         ):
             await service.build_from_chunks("doc1", ["Volvo is a company from Sweden."])
 
     async def test_tolerates_llm_failure(self, service: KnowledgeGraphService) -> None:
-        with patch(
-            "enterprise_ai_companion.capabilities.graph.knowledge_graph_service.chat_complete",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("network error"),
+        with (
+            patch(_ENTITY_LLM, new_callable=AsyncMock, side_effect=RuntimeError("network error")),
+            patch(_REL_LLM, new_callable=AsyncMock, side_effect=RuntimeError("network error")),
         ):
             # Should not raise — graph building is best-effort
             await service.build_from_chunks("doc1", ["Some text."])
@@ -55,10 +61,9 @@ class TestBuildFromChunks:
     async def test_tolerates_invalid_json_from_llm(
         self, service: KnowledgeGraphService
     ) -> None:
-        with patch(
-            "enterprise_ai_companion.capabilities.graph.knowledge_graph_service.chat_complete",
-            new_callable=AsyncMock,
-            return_value="this is not json",
+        with (
+            patch(_ENTITY_LLM, new_callable=AsyncMock, return_value="this is not json"),
+            patch(_REL_LLM, new_callable=AsyncMock, return_value="also not json"),
         ):
             await service.build_from_chunks("doc1", ["Some text."])
 
@@ -68,27 +73,31 @@ class TestBuildFromChunks:
     async def test_skips_relationships_with_missing_entities(
         self, service: KnowledgeGraphService
     ) -> None:
-        extraction = {
-            "entities": [{"name": "Volvo", "type": "Organization"}],
-            "relationships": [
-                {"source": "Volvo", "target": "Unknown", "type": "MENTIONS"},
-            ],
-        }
-        with patch(
-            "enterprise_ai_companion.capabilities.graph.knowledge_graph_service.chat_complete",
-            new_callable=AsyncMock,
-            return_value=json.dumps(extraction),
+        entity_payload = json.dumps(
+            {"entities": [{"name": "Volvo", "type": "Organization", "confidence": 0.9}]}
+        )
+        rel_payload = json.dumps(
+            {
+                "relationships": [
+                    {"source": "Volvo", "target": "Unknown", "type": "MENTIONS", "confidence": 0.7}
+                ]
+            }
+        )
+        with (
+            patch(_ENTITY_LLM, new_callable=AsyncMock, return_value=entity_payload),
+            patch(_REL_LLM, new_callable=AsyncMock, return_value=rel_payload),
         ):
+            # "Unknown" is not in the entity list — relationship should be silently dropped.
             await service.build_from_chunks("doc1", ["text"])
 
     async def test_extracts_json_from_markdown_fence(
         self, service: KnowledgeGraphService
     ) -> None:
-        fenced = f"```json\n{json.dumps(_VALID_EXTRACTION)}\n```"
-        with patch(
-            "enterprise_ai_companion.capabilities.graph.knowledge_graph_service.chat_complete",
-            new_callable=AsyncMock,
-            return_value=fenced,
+        fenced_entities = f"```json\n{_ENTITY_PAYLOAD}\n```"
+        fenced_rels = f"```json\n{_REL_PAYLOAD}\n```"
+        with (
+            patch(_ENTITY_LLM, new_callable=AsyncMock, return_value=fenced_entities),
+            patch(_REL_LLM, new_callable=AsyncMock, return_value=fenced_rels),
         ):
             await service.build_from_chunks("doc1", ["Volvo is from Sweden."])
 
