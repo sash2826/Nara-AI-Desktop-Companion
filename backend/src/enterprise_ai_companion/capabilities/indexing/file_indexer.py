@@ -35,6 +35,12 @@ from enterprise_ai_companion.capabilities.retrieval.abbreviation_extractor impor
     AbbreviationExtractor,
 )
 
+# TYPE_CHECKING guard avoids a circular import at runtime; PluginManager
+# is only needed as a type annotation here.
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from enterprise_ai_companion.capabilities.plugins.plugin_manager import PluginManager
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
@@ -150,6 +156,7 @@ class FileIndexer:
         abbreviation_extractor: AbbreviationExtractor | None = None,
         abbreviation_repo: AbbreviationRepository | None = None,
         graph_state_repo: GraphStateRepository | None = None,
+        plugin_manager: "PluginManager | None" = None,
     ) -> None:
         self._doc_repo = doc_repo
         self._chunk_repo = chunk_repo
@@ -160,6 +167,7 @@ class FileIndexer:
         self._abbreviation_extractor = abbreviation_extractor
         self._abbreviation_repo = abbreviation_repo
         self._graph_state_repo = graph_state_repo
+        self._plugin_manager = plugin_manager
 
     def _is_safe_path(self, resolved: Path) -> bool:
         """Return False if resolved is inside a blocked OS-critical directory."""
@@ -229,8 +237,18 @@ class FileIndexer:
         return result
 
     def _extract_text(self, file_path: Path) -> str:
-        """Extract plain text from a file based on its extension."""
+        """Extract plain text from a file based on its extension.
+
+        Enabled FileProcessorPlugins are consulted first so they can handle
+        custom extensions or override built-in extraction for known types.
+        """
         ext = file_path.suffix.lower()
+
+        if self._plugin_manager:
+            for fp_plugin in self._plugin_manager.get_file_processors():
+                if ext in fp_plugin.supported_extensions:
+                    return fp_plugin.extract_text(file_path)
+
         if ext in {".txt", ".md"}:
             return file_path.read_text(encoding="utf-8", errors="replace")
         if ext == ".pdf":
@@ -247,6 +265,20 @@ class FileIndexer:
     async def _index_file(self, file_path: Path, workspace_path: str) -> bool:
         """Index a single file. Returns True if indexed, False if unchanged."""
         text = self._extract_text(file_path)
+
+        # Run text through enabled TextProcessorPlugins before hashing/chunking.
+        if self._plugin_manager:
+            for tp_plugin in self._plugin_manager.get_text_processors():
+                try:
+                    text = tp_plugin.process_text(text, str(file_path))
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "TextProcessorPlugin '%s' failed on %s: %s",
+                        type(tp_plugin).__name__,
+                        file_path.name,
+                        exc,
+                    )
+
         file_hash = hashlib.sha256(text.encode()).hexdigest()
 
         existing = await self._doc_repo.get_by_path(str(file_path))

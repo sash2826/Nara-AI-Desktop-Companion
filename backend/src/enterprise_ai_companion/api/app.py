@@ -11,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request as StarletteRequest
 
-from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, search, stats
+from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, plugins as plugins_router_module, search, stats
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
@@ -26,6 +26,7 @@ from enterprise_ai_companion.capabilities.indexing.file_watcher import WatcherSe
 from enterprise_ai_companion.capabilities.indexing.indexing_error_repository import IndexingErrorRepository
 from enterprise_ai_companion.capabilities.retrieval.abbreviation_extractor import AbbreviationExtractor
 from enterprise_ai_companion.capabilities.retrieval.query_preprocessor import QueryPreprocessor, _EXPANSIONS
+from enterprise_ai_companion.capabilities.plugins.plugin_manager import PluginManager
 from enterprise_ai_companion.infrastructure.audit_logger import AuditLogger
 from enterprise_ai_companion.infrastructure.config import get_config
 from enterprise_ai_companion.infrastructure.database import close_db, open_db
@@ -59,6 +60,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Open all stores on startup; close them on shutdown."""
     app.state.db = await open_db()
     app.state.audit_logger = AuditLogger(app.state.db)
+
+    plugin_manager = PluginManager(app.state.db)
+    counts = await plugin_manager.initialize()
+    logger.info("Plugin manager ready: %d plugin(s) loaded", counts["loaded"])
+    app.state.plugin_manager = plugin_manager
 
     qdrant = QdrantProvider()
     qdrant.initialize()
@@ -108,6 +114,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         abbreviation_extractor=abbreviation_extractor,
         abbreviation_repo=abbreviation_repo,
         graph_state_repo=graph_state_repo,
+        plugin_manager=plugin_manager,
     )
 
     # Prime the preprocessor with abbreviations discovered in previous sessions.
@@ -197,6 +204,7 @@ app.include_router(search.router)
 app.include_router(graph.router)
 app.include_router(backup.router)
 app.include_router(documents.router)
+app.include_router(plugins_router_module.router)
 app.include_router(watcher_router_module.router, prefix="/watcher", tags=["watcher"])
 app.include_router(stats.router)
 

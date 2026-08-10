@@ -1200,6 +1200,80 @@ async fn get_graph_visualization(
         .map_err(|e| format!("Failed to parse graph visualization response: {}", e))
 }
 
+// ─── Plugin commands ──────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PluginRecord {
+    pub id: String,
+    pub display_name: String,
+    pub version: String,
+    pub description: String,
+    pub author: String,
+    pub permissions: Vec<String>,
+    pub enabled: bool,
+    pub installed_at: String,
+}
+
+/// Returns all registered plugins with their current enabled state.
+#[tauri::command]
+async fn list_plugins(state: State<'_, Arc<AppState>>) -> Result<Vec<PluginRecord>, String> {
+    let port = {
+        let guard = state.sidecar_port.lock().map_err(|e| e.to_string())?;
+        guard.ok_or_else(|| "Sidecar not ready".to_string())?
+    };
+    let url = format!("http://127.0.0.1:{}/plugins", port);
+    ipc_client(&state)
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<Vec<PluginRecord>>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Enables a plugin by ID. Returns the updated plugin record.
+#[tauri::command]
+async fn enable_plugin(
+    plugin_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<PluginRecord, String> {
+    let port = {
+        let guard = state.sidecar_port.lock().map_err(|e| e.to_string())?;
+        guard.ok_or_else(|| "Sidecar not ready".to_string())?
+    };
+    let url = format!("http://127.0.0.1:{}/plugins/{}/enable", port, plugin_id);
+    ipc_client(&state)
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<PluginRecord>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Disables a plugin by ID. Returns the updated plugin record.
+#[tauri::command]
+async fn disable_plugin(
+    plugin_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<PluginRecord, String> {
+    let port = {
+        let guard = state.sidecar_port.lock().map_err(|e| e.to_string())?;
+        guard.ok_or_else(|| "Sidecar not ready".to_string())?
+    };
+    let url = format!("http://127.0.0.1:{}/plugins/{}/disable", port, plugin_id);
+    ipc_client(&state)
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<PluginRecord>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ─── OS Keychain commands ─────────────────────────────────────────────────────
 
 /// Stores a credential in the OS keychain (Windows Credential Manager on Windows).
@@ -1411,6 +1485,9 @@ pub fn run() {
             get_stats,
             get_suggested_queries,
             get_graph_visualization,
+            list_plugins,
+            enable_plugin,
+            disable_plugin,
             store_credential,
             load_credential,
             delete_credential

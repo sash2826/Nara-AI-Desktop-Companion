@@ -4,6 +4,7 @@ import {
   Brain,
   FolderSearch,
   HardDrive,
+  Puzzle,
   ShieldCheck,
   Save,
   RotateCcw,
@@ -15,9 +16,10 @@ import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { AIProviderSettings } from "@/components/settings/AIProviderSettings";
 import { IndexingSettings } from "@/components/settings/IndexingSettings";
 import { BackupSettings } from "@/components/settings/BackupSettings";
+import { PluginSettings } from "@/components/settings/PluginSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
 
-type SettingsTab = "general" | "ai" | "indexing" | "backup" | "security";
+type SettingsTab = "general" | "ai" | "indexing" | "backup" | "security" | "plugins";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
   { id: "general", label: "General", icon: Monitor },
@@ -25,6 +27,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
   { id: "indexing", label: "Indexing", icon: FolderSearch },
   { id: "backup", label: "Backup", icon: HardDrive },
   { id: "security", label: "Security", icon: ShieldCheck },
+  { id: "plugins", label: "Plugins", icon: Puzzle },
 ];
 
 export function SettingsPage() {
@@ -91,6 +94,7 @@ export function SettingsPage() {
         )}
         {activeTab === "backup" && <BackupSettings />}
         {activeTab === "security" && <SecuritySettings />}
+        {activeTab === "plugins" && <PluginSettings />}
       </main>
     </div>
   );

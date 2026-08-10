@@ -231,6 +231,17 @@ export interface GraphVisualization {
   edges: GraphVisEdge[];
 }
 
+export interface PluginRecord {
+  id: string;
+  display_name: string;
+  version: string;
+  description: string;
+  author: string;
+  permissions: string[];
+  enabled: boolean;
+  installed_at: string;
+}
+
 // ─── Sidecar readiness ────────────────────────────────────────────────────────
 
 /**
@@ -567,6 +578,27 @@ async function deleteCredential(service: string, key: string): Promise<void> {
 }
 
 /**
+ * Returns all registered plugins with their current enabled state.
+ */
+async function listPlugins(): Promise<PluginRecord[]> {
+  return invoke<PluginRecord[]>("list_plugins");
+}
+
+/**
+ * Enables a plugin by ID. Returns the updated plugin record.
+ */
+async function enablePlugin(pluginId: string): Promise<PluginRecord> {
+  return invoke<PluginRecord>("enable_plugin", { pluginId });
+}
+
+/**
+ * Disables a plugin by ID. Returns the updated plugin record.
+ */
+async function disablePlugin(pluginId: string): Promise<PluginRecord> {
+  return invoke<PluginRecord>("disable_plugin", { pluginId });
+}
+
+/**
  * Returns AI-generated search query suggestions based on recently indexed file paths.
  * The client is responsible for caching the result (1-hour TTL recommended).
  */
@@ -611,6 +643,9 @@ export const IPCClient = {
   getStats,
   getSuggestedQueries,
   getGraphVisualization,
+  listPlugins,
+  enablePlugin,
+  disablePlugin,
   storeCredential,
   loadCredential,
   deleteCredential,

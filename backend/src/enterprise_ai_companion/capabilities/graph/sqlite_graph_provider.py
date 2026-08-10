@@ -147,10 +147,10 @@ class SQLiteGraphProvider(GraphProvider):
         """
         depth = min(max(depth, 1), 3)
 
-        # Fetch root entity by exact name.
+        # Fetch root entity — case-insensitive exact match.
         async with self._conn.execute(
             "SELECT id, name, entity_type, source_document_id, confidence "
-            "FROM graph_entities WHERE name = ? LIMIT 1",
+            "FROM graph_entities WHERE lower(name) = lower(?) LIMIT 1",
             (entity_name,),
         ) as cur:
             row = await cur.fetchone()
@@ -217,18 +217,20 @@ class SQLiteGraphProvider(GraphProvider):
         entity_name (case-insensitive) to handle partial matches.
         """
         sql = """
-        WITH RECURSIVE reachable(id) AS (
-            -- seed: all entities whose name matches
-            SELECT id FROM graph_entities
+        WITH RECURSIVE reachable(id, depth) AS (
+            -- seed: all entities whose name matches (depth 0)
+            SELECT id, 0 FROM graph_entities
             WHERE lower(name) LIKE lower(?)
             UNION
-            -- 1-hop neighbours (outgoing)
-            SELECT r.target_id FROM graph_relationships r
+            -- outgoing neighbours, bounded to 2 hops
+            SELECT r.target_id, src.depth + 1 FROM graph_relationships r
             JOIN reachable src ON src.id = r.source_id
+            WHERE src.depth < 2
             UNION
-            -- 1-hop neighbours (incoming)
-            SELECT r.source_id FROM graph_relationships r
+            -- incoming neighbours, bounded to 2 hops
+            SELECT r.source_id, tgt.depth + 1 FROM graph_relationships r
             JOIN reachable tgt ON tgt.id = r.target_id
+            WHERE tgt.depth < 2
         )
         SELECT DISTINCT e.source_document_id
         FROM reachable
