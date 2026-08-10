@@ -18,7 +18,7 @@ export function useGraph() {
     isLoading: true,
     error: null,
     focalEntity: null,
-    depth: 2,
+    depth: 1,
     selectedNode: null,
   });
 
@@ -47,7 +47,7 @@ export function useGraph() {
 
   // Initial load on mount
   useEffect(() => {
-    load(null, 2);
+    load(null, 1);
   }, [load]);
 
   const setFocalEntity = useCallback(

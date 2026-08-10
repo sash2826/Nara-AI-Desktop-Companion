@@ -259,33 +259,45 @@ class SQLiteGraphProvider(GraphProvider):
         """
         depth = min(max(depth, 1), 3)
 
+        # Node query: LEFT JOIN documents to get the source file path for "open document".
+        # Edges query: join entity names so the frontend shows labels not UUIDs.
+        node_select = (
+            "SELECT e.id, e.name, e.entity_type, e.confidence, d.file_path "
+            "FROM graph_entities e "
+            "LEFT JOIN documents d ON d.id = e.source_document_id"
+        )
+        edge_select = (
+            "SELECT gr.source_id, src.name, gr.target_id, tgt.name, "
+            "gr.relationship_type, gr.confidence "
+            "FROM graph_relationships gr "
+            "JOIN graph_entities src ON src.id = gr.source_id "
+            "JOIN graph_entities tgt ON tgt.id = gr.target_id"
+        )
+
         if entity_name:
             node_ids = await self._reachable_ids(entity_name, depth)
             if not node_ids:
                 return {"nodes": [], "edges": []}
             # Fetch all candidate nodes sorted by confidence and apply cap.
             placeholders = ",".join("?" * len(node_ids))
-            node_sql = (
-                f"SELECT id, name, entity_type, confidence "
-                f"FROM graph_entities WHERE id IN ({placeholders}) "
-                f"ORDER BY confidence DESC LIMIT {self._VIS_NODE_LIMIT}"
-            )
-            async with self._conn.execute(node_sql, node_ids) as cur:
+            async with self._conn.execute(
+                f"{node_select} WHERE e.id IN ({placeholders}) "
+                f"ORDER BY e.confidence DESC LIMIT {self._VIS_NODE_LIMIT}",
+                node_ids,
+            ) as cur:
                 node_rows = await cur.fetchall()
             # Rebuild node_ids from the capped set so edges are consistent.
             node_ids = [r[0] for r in node_rows]
             placeholders = ",".join("?" * len(node_ids))
-            edge_sql = (
-                f"SELECT id, source_id, target_id, relationship_type, confidence "
-                f"FROM graph_relationships "
-                f"WHERE source_id IN ({placeholders}) AND target_id IN ({placeholders})"
-            )
-            async with self._conn.execute(edge_sql, node_ids + node_ids) as cur:
+            async with self._conn.execute(
+                f"{edge_select} "
+                f"WHERE gr.source_id IN ({placeholders}) AND gr.target_id IN ({placeholders})",
+                node_ids + node_ids,
+            ) as cur:
                 edge_rows = await cur.fetchall()
         else:
             async with self._conn.execute(
-                "SELECT id, name, entity_type, confidence "
-                "FROM graph_entities ORDER BY confidence DESC LIMIT 50"
+                f"{node_select} ORDER BY e.confidence DESC LIMIT 50"
             ) as cur:
                 node_rows = await cur.fetchall()
 
@@ -295,28 +307,32 @@ class SQLiteGraphProvider(GraphProvider):
 
             placeholders = ",".join("?" * len(node_ids))
             async with self._conn.execute(
-                f"SELECT id, source_id, target_id, relationship_type, confidence "
-                f"FROM graph_relationships "
-                f"WHERE source_id IN ({placeholders}) AND target_id IN ({placeholders})",
+                f"{edge_select} "
+                f"WHERE gr.source_id IN ({placeholders}) AND gr.target_id IN ({placeholders})",
                 node_ids + node_ids,
             ) as cur:
                 edge_rows = await cur.fetchall()
 
+        # node_rows: (id, name, entity_type, confidence, file_path)
         nodes = [
             {
                 "id": r[0],
                 "label": r[1],
                 "entity_type": r[2],
                 "confidence": float(r[3]),
+                "source_document_path": r[4],  # may be None for merged/synthetic entities
             }
             for r in node_rows
         ]
+        # edge_rows: (source_id, source_name, target_id, target_name, relation_type, confidence)
         edges = [
             {
-                "source": r[1],
-                "target": r[2],
-                "relation_type": r[3],
-                "confidence": float(r[4]),
+                "source": r[0],        # entity UUID (used for graph layout)
+                "source_name": r[1],   # human-readable label
+                "target": r[2],        # entity UUID
+                "target_name": r[3],   # human-readable label
+                "relation_type": r[4],
+                "confidence": float(r[5]),
             }
             for r in edge_rows
         ]

@@ -79,11 +79,14 @@ class GraphVisNode(BaseModel):
     label: str
     entity_type: str
     confidence: float
+    source_document_path: str | None = None
 
 
 class GraphVisEdge(BaseModel):
-    source: str
-    target: str
+    source: str        # entity UUID — used by the force layout
+    source_name: str   # human-readable name for display
+    target: str        # entity UUID
+    target_name: str   # human-readable name for display
     relation_type: str
     confidence: float
 
@@ -263,13 +266,16 @@ async def get_graph_visualization(
                 label=n["label"],
                 entity_type=n.get("entity_type", "unknown"),
                 confidence=float(n.get("confidence", 1.0)),
+                source_document_path=n.get("source_document_path"),
             )
             for n in raw.get("nodes", [])
         ]
         edges = [
             GraphVisEdge(
                 source=e["source"],
+                source_name=e.get("source_name", e["source"]),
                 target=e["target"],
+                target_name=e.get("target_name", e["target"]),
                 relation_type=e.get("relation_type", "RELATED_TO"),
                 confidence=float(e.get("confidence", 1.0)),
             )

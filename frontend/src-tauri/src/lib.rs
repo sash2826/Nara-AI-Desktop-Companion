@@ -299,12 +299,15 @@ pub struct GraphVisNodeResponse {
     pub label: String,
     pub entity_type: String,
     pub confidence: f64,
+    pub source_document_path: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GraphVisEdgeResponse {
     pub source: String,
+    pub source_name: String,
     pub target: String,
+    pub target_name: String,
     pub relation_type: String,
     pub confidence: f64,
 }

@@ -28,9 +28,9 @@ export function EntityCard({ node, edges, onClose, onFocus, className }: EntityC
   const outgoing = edges.filter((e) => e.source === node.id);
   const incoming = edges.filter((e) => e.target === node.id);
 
-  const handleOpenDocument = async (docId: string) => {
+  const handleOpenDocument = async (filePath: string) => {
     try {
-      await IPCClient.openFile(docId);
+      await IPCClient.openFile(filePath);
     } catch {
       // No-op — file open is best-effort
     }
@@ -85,10 +85,10 @@ export function EntityCard({ node, edges, onClose, onFocus, className }: EntityC
                 </span>
                 <button
                   type="button"
-                  onClick={() => onFocus(e.target)}
+                  onClick={() => onFocus(e.target_name)}
                   className="truncate text-foreground hover:underline"
                 >
-                  {e.target}
+                  {e.target_name}
                 </button>
               </div>
             ))}
@@ -103,10 +103,10 @@ export function EntityCard({ node, edges, onClose, onFocus, className }: EntityC
                 </span>
                 <button
                   type="button"
-                  onClick={() => onFocus(e.source)}
+                  onClick={() => onFocus(e.source_name)}
                   className="truncate text-foreground hover:underline"
                 >
-                  {e.source}
+                  {e.source_name}
                 </button>
               </div>
             ))}
@@ -116,15 +116,17 @@ export function EntityCard({ node, edges, onClose, onFocus, className }: EntityC
 
       {/* Actions */}
       <div className="flex flex-col gap-1.5">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="h-7 justify-start gap-1.5 text-xs"
-          onClick={() => void handleOpenDocument(node.id)}
-        >
-          <FileText size={11} />
-          Open source document
-        </Button>
+        {node.source_document_path && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 justify-start gap-1.5 text-xs"
+            onClick={() => void handleOpenDocument(node.source_document_path!)}
+          >
+            <FileText size={11} />
+            Open source document
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

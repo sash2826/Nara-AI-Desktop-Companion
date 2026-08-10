@@ -214,11 +214,14 @@ export interface GraphVisNode {
   label: string;
   entity_type: string;
   confidence: number;
+  source_document_path: string | null;
 }
 
 export interface GraphVisEdge {
-  source: string;
-  target: string;
+  source: string; // entity UUID — used for layout
+  source_name: string; // human-readable label
+  target: string; // entity UUID
+  target_name: string; // human-readable label
   relation_type: string;
   confidence: number;
 }
