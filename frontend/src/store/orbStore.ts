@@ -36,6 +36,15 @@ export const useOrbStore = create<OrbStore>()(
     }),
     {
       name: "eac-orb-position",
+      // Re-clamp on rehydration so a position persisted at a larger window size
+      // doesn't leave the orb off-screen after resize or display change.
+      merge: (persisted, current) => {
+        const p = (persisted as Partial<OrbStore>).position;
+        if (p) {
+          return { ...current, position: clampToViewport(p.x, p.y) };
+        }
+        return { ...current, ...(persisted as Partial<OrbStore>) };
+      },
     }
   )
 );

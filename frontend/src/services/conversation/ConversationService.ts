@@ -218,13 +218,16 @@ export class ConversationService {
           `Retrieved excerpts:\n${context.retrievedContext}`
       );
     } else {
-      // No retrieved context — tell the model to be honest rather than answering from general knowledge.
+      // No retrieved context — allow the LLM to respond naturally.
+      // For conversational messages ("hello", "hi", general questions) the model
+      // should answer helpfully. For document-specific queries it can note that
+      // nothing has been indexed yet without being forced into a single template.
       parts.push(
-        `You are an AI assistant connected to the user's indexed knowledge base.\n` +
-          `A search was performed but no relevant documents were found for this query.\n` +
-          `Respond with a brief, honest message telling the user that no matching documents were found in their knowledge base.\n` +
-          `Do NOT answer from general knowledge. Do NOT invent or reference any file names or paths.\n` +
-          `Keep the response to one or two sentences.`
+        `You are a helpful AI assistant. You also have access to the user's indexed knowledge base, ` +
+          `but no relevant documents were found for this query.\n` +
+          `If the user is asking a conversational or general question, answer it helpfully.\n` +
+          `If the user is asking about specific documents or files, let them know nothing has been indexed yet.\n` +
+          `Do NOT invent or reference any file names or paths.`
       );
     }
 

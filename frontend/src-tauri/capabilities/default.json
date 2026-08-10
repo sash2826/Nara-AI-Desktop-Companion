@@ -6,7 +6,10 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "http:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://api.volvogenaihubqa.volvogroup.net/*" }]
+    },
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister"
   ]

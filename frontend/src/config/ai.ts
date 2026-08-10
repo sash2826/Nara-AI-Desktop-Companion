@@ -85,9 +85,11 @@ function resolveAPIMConfig(): APIMConfig | undefined {
   return {
     endpoint: apimEndpoint,
     model: "gpt-5.4-mini_gb_2026-03-17",
-    // Subscription key starts empty; ConversationServiceProvider injects the
-    // keychain value via APIMProvider.setSubscriptionKey() after mount.
-    subscriptionKey: "",
+    // In dev, seed from VITE_APIM_SUBSCRIPTION_KEY in .env.local so the app
+    // works without going through the keychain on every hot-reload.
+    // In production (Tauri), ConversationServiceProvider overwrites this with
+    // the keychain value via APIMProvider.setSubscriptionKey() after mount.
+    subscriptionKey: (import.meta.env.VITE_APIM_SUBSCRIPTION_KEY as string | undefined) ?? "",
     timeoutMs: 30_000,
     maxRetries: 3,
   };

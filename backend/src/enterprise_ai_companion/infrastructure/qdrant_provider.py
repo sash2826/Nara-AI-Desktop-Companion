@@ -78,8 +78,8 @@ def _remove_stale_lock(data_dir: Path) -> None:
 
     try:
         lock_path.unlink()
-        logger.warning(
-            "Removed stale Qdrant lock file at %s (left by a crashed process).",
+        logger.debug(
+            "Removed Qdrant lock file at %s (previous sidecar process did not shut down cleanly).",
             lock_path,
         )
     except PermissionError:

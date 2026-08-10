@@ -34,9 +34,5 @@
       "icons/icon.ico"
     ]
   },
-  "plugins": {
-    "http": {
-      "scope": ["https://api.volvogenaihubqa.volvogroup.net/*"]
-    }
-  }
+  "plugins": {}
 }
