@@ -1,5 +1,4 @@
-import { Eye, EyeOff, Info } from "lucide-react";
-import { useState } from "react";
+import { Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AIProviderSettings as AIProviderSettingsType } from "@/store/settingsStore";
@@ -21,8 +20,6 @@ function FieldLabel({ htmlFor, label, hint }: { htmlFor: string; label: string; 
 }
 
 export function AIProviderSettings({ settings, onChange }: AIProviderSettingsProps) {
-  const [showKey, setShowKey] = useState(false);
-
   return (
     <div className="space-y-6">
       <div>
@@ -48,33 +45,6 @@ export function AIProviderSettings({ settings, onChange }: AIProviderSettingsPro
           placeholder="https://your-apim.azure-api.net/..."
           className="font-mono text-xs"
         />
-      </div>
-
-      {/* Subscription key */}
-      <div>
-        <FieldLabel
-          htmlFor="apim-key"
-          label="Subscription Key"
-          hint="Your APIM subscription key (api-key header). Stored locally only."
-        />
-        <div className="relative">
-          <Input
-            id="apim-key"
-            type={showKey ? "text" : "password"}
-            value={settings.subscriptionKey}
-            onChange={(e) => onChange({ subscriptionKey: e.target.value })}
-            placeholder="••••••••••••••••"
-            className="pr-9 font-mono text-xs"
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey((v) => !v)}
-            aria-label={showKey ? "Hide subscription key" : "Show subscription key"}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
-        </div>
       </div>
 
       {/* Model */}
@@ -121,7 +91,7 @@ export function AIProviderSettings({ settings, onChange }: AIProviderSettingsPro
         </div>
       </div>
 
-      {/* Note about env vars */}
+      {/* Note about key storage */}
       <div
         className={cn(
           "flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground"
@@ -129,9 +99,8 @@ export function AIProviderSettings({ settings, onChange }: AIProviderSettingsPro
       >
         <Info size={13} className="mt-0.5 flex-shrink-0" />
         <span>
-          These settings override <code className="font-mono">VITE_APIM_ENDPOINT</code> and{" "}
-          <code className="font-mono">VITE_APIM_SUBSCRIPTION_KEY</code> environment variables at
-          runtime. Credentials are persisted to localStorage — never sent to any server.
+          The APIM subscription key is stored in the OS keychain — not in localStorage or the app
+          bundle. Manage it in the <strong>Security</strong> settings tab.
         </span>
       </div>
     </div>

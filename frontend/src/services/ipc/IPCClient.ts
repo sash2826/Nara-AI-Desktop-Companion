@@ -545,6 +545,28 @@ async function getGraphVisualization(
 }
 
 /**
+ * Stores a credential in the OS keychain (Windows Credential Manager).
+ * The value is never written to localStorage or the JS bundle.
+ */
+async function storeCredential(service: string, key: string, value: string): Promise<void> {
+  return invoke<void>("store_credential", { service, key, value });
+}
+
+/**
+ * Loads a credential from the OS keychain. Returns null when no entry exists.
+ */
+async function loadCredential(service: string, key: string): Promise<string | null> {
+  return invoke<string | null>("load_credential", { service, key });
+}
+
+/**
+ * Deletes a credential from the OS keychain. Silently succeeds when not found.
+ */
+async function deleteCredential(service: string, key: string): Promise<void> {
+  return invoke<void>("delete_credential", { service, key });
+}
+
+/**
  * Returns AI-generated search query suggestions based on recently indexed file paths.
  * The client is responsible for caching the result (1-hour TTL recommended).
  */
@@ -589,4 +611,7 @@ export const IPCClient = {
   getStats,
   getSuggestedQueries,
   getGraphVisualization,
+  storeCredential,
+  loadCredential,
+  deleteCredential,
 } as const;

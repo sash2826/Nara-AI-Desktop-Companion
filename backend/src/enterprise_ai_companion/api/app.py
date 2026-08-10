@@ -2,11 +2,14 @@
 
 import asyncio
 import logging
-import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.requests import Request as StarletteRequest
 
 from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, search, stats
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
@@ -23,6 +26,8 @@ from enterprise_ai_companion.capabilities.indexing.file_watcher import WatcherSe
 from enterprise_ai_companion.capabilities.indexing.indexing_error_repository import IndexingErrorRepository
 from enterprise_ai_companion.capabilities.retrieval.abbreviation_extractor import AbbreviationExtractor
 from enterprise_ai_companion.capabilities.retrieval.query_preprocessor import QueryPreprocessor, _EXPANSIONS
+from enterprise_ai_companion.infrastructure.audit_logger import AuditLogger
+from enterprise_ai_companion.infrastructure.config import get_config
 from enterprise_ai_companion.infrastructure.database import close_db, open_db
 from enterprise_ai_companion.infrastructure.qdrant_provider import QdrantProvider
 
@@ -38,7 +43,7 @@ def _build_graph_provider(
     EAC_GRAPH_PROVIDER=neo4j: Neo4jProvider — requires running Neo4j.
     EAC_GRAPH_PROVIDER=null: NullGraphProvider — graph features disabled.
     """
-    mode = os.environ.get("EAC_GRAPH_PROVIDER", "sqlite").lower()
+    mode = get_config().graph_provider.lower()
     if mode == "neo4j":
         return Neo4jProvider()
     if mode == "null":
@@ -53,6 +58,7 @@ def _build_graph_provider(
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Open all stores on startup; close them on shutdown."""
     app.state.db = await open_db()
+    app.state.audit_logger = AuditLogger(app.state.db)
 
     qdrant = QdrantProvider()
     qdrant.initialize()
@@ -142,12 +148,47 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.graph = None
 
 
+class TokenVerificationMiddleware(BaseHTTPMiddleware):
+    """Reject requests that lack the per-session IPC shared secret.
+
+    The token is generated at startup (server.py), injected via EAC_IPC_SECRET,
+    and transmitted by the Tauri host as the X-EAC-Token header. When no secret
+    is configured (e.g. in development without Tauri), all requests are allowed.
+    """
+
+    async def dispatch(
+        self, request: StarletteRequest, call_next  # type: ignore[override]
+    ):
+        expected = get_config().ipc_secret
+        if expected:
+            provided = request.headers.get("X-EAC-Token")
+            if provided != expected:
+                return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await call_next(request)
+
+
 app = FastAPI(
     title="Enterprise AI Companion",
     version="0.1.0",
     description="Local backend service for the Enterprise AI Companion desktop app.",
     lifespan=lifespan,
 )
+
+app.add_middleware(TokenVerificationMiddleware)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+
+_MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024  # 10 MiB
+
+
+@app.middleware("http")
+async def limit_request_body(request: StarletteRequest, call_next):  # type: ignore[return]
+    """Reject requests with a Content-Length header exceeding 10 MiB."""
+    cl = request.headers.get("content-length")
+    if cl and int(cl) > _MAX_REQUEST_BODY_BYTES:
+        return JSONResponse({"detail": "Request body too large"}, status_code=413)
+    return await call_next(request)
+
 
 app.include_router(embeddings.router)
 app.include_router(conversations.router)

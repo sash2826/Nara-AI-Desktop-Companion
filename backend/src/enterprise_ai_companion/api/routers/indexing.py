@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re as _re
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -21,15 +23,29 @@ router = APIRouter(prefix="/indexing", tags=["indexing"])
 # Request / response models
 # ---------------------------------------------------------------------------
 
+def _safe_error(exc: Exception) -> str:
+    """Strip filesystem paths from exception messages before returning to the client."""
+    msg = str(exc)
+    msg = _re.sub(r"[A-Za-z]:\\[^\s,;\"']+", "<path>", msg)
+    msg = _re.sub(r"/[^\s,;\"']{4,}", "<path>", msg)
+    return msg[:300]
+
+
 class StartIndexingRequest(BaseModel):
     workspace_path: str
 
     @field_validator("workspace_path")
     @classmethod
-    def must_not_be_empty(cls, v: str) -> str:
-        if not v.strip():
+    def must_be_valid_directory(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
             raise ValueError("workspace_path must not be empty")
-        return v.strip()
+        resolved = Path(v).resolve()
+        if not resolved.exists():
+            raise ValueError("workspace_path does not exist")
+        if not resolved.is_dir():
+            raise ValueError("workspace_path must be a directory")
+        return str(resolved)
 
 
 class StartIndexingResponse(BaseModel):
@@ -66,6 +82,10 @@ async def _run_indexing(
     app_state: Any,
 ) -> None:
     tasks[task_id]["status"] = "running"
+    audit = getattr(app_state, "audit_logger", None)
+
+    if audit is not None:
+        await audit.log("indexing.started", {"task_id": task_id, "workspace_path": workspace_path})
 
     def _progress(result: IndexingResult) -> None:
         if tasks[task_id]["status"] == "cancelled":
@@ -88,6 +108,17 @@ async def _run_indexing(
                     "errors": result.errors,
                 }
             )
+            if audit is not None:
+                await audit.log(
+                    "indexing.completed",
+                    {
+                        "task_id": task_id,
+                        "files_found": result.files_found,
+                        "files_indexed": result.files_indexed,
+                        "files_skipped": result.files_skipped,
+                        "error_count": len(result.errors),
+                    },
+                )
             # Reload dynamic abbreviation expansions from the newly indexed documents.
             abbrev_repo = getattr(app_state, "abbreviation_repo", None)
             preprocessor = getattr(app_state, "preprocessor", None)
@@ -106,7 +137,9 @@ async def _run_indexing(
         logger.info("Indexing task %s was cancelled", task_id)
     except Exception as exc:
         logger.exception("Indexing task %s failed", task_id)
-        tasks[task_id].update({"status": "failed", "errors": [str(exc)]})
+        tasks[task_id].update({"status": "failed", "errors": [_safe_error(exc)]})
+        if audit is not None:
+            await audit.log("indexing.failed", {"task_id": task_id, "error": _safe_error(exc)})
 
 
 # ---------------------------------------------------------------------------

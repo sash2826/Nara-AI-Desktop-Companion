@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Monitor, Brain, FolderSearch, HardDrive, Save, RotateCcw } from "lucide-react";
+import {
+  Monitor,
+  Brain,
+  FolderSearch,
+  HardDrive,
+  ShieldCheck,
+  Save,
+  RotateCcw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/hooks/useSettings";
@@ -7,14 +15,16 @@ import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { AIProviderSettings } from "@/components/settings/AIProviderSettings";
 import { IndexingSettings } from "@/components/settings/IndexingSettings";
 import { BackupSettings } from "@/components/settings/BackupSettings";
+import { SecuritySettings } from "@/components/settings/SecuritySettings";
 
-type SettingsTab = "general" | "ai" | "indexing" | "backup";
+type SettingsTab = "general" | "ai" | "indexing" | "backup" | "security";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
   { id: "general", label: "General", icon: Monitor },
   { id: "ai", label: "AI Provider", icon: Brain },
   { id: "indexing", label: "Indexing", icon: FolderSearch },
   { id: "backup", label: "Backup", icon: HardDrive },
+  { id: "security", label: "Security", icon: ShieldCheck },
 ];
 
 export function SettingsPage() {
@@ -80,6 +90,7 @@ export function SettingsPage() {
           <IndexingSettings settings={settings.indexing} onChange={updateIndexing} />
         )}
         {activeTab === "backup" && <BackupSettings />}
+        {activeTab === "security" && <SecuritySettings />}
       </main>
     </div>
   );

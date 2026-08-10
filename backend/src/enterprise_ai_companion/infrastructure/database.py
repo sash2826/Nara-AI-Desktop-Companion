@@ -11,13 +11,14 @@ so subsequent restarts skip already-applied migrations.
 
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import AsyncGenerator
 
 import aiosqlite
+
+from enterprise_ai_companion.infrastructure.config import get_config
 
 
 # ---------------------------------------------------------------------------
@@ -39,14 +40,14 @@ def _find_migrations_dir() -> Path:
 
 
 def _migrations_dir() -> Path:
-    env = os.environ.get("EAC_MIGRATIONS_DIR")
-    return Path(env) if env else _find_migrations_dir()
+    cfg_val = get_config().migrations_dir
+    return Path(cfg_val) if cfg_val else _find_migrations_dir()
 
 
 def _db_path() -> Path:
-    env = os.environ.get("EAC_DB_PATH")
-    if env:
-        return Path(env)
+    cfg_val = get_config().db_path
+    if cfg_val:
+        return Path(cfg_val)
     return Path(__file__).parents[4] / "enterprise_ai_companion.db"
 
 

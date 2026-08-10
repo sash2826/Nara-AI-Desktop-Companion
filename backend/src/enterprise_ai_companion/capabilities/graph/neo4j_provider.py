@@ -13,10 +13,11 @@ Environment variables:
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from neo4j import AsyncDriver, AsyncGraphDatabase
+
+from enterprise_ai_companion.infrastructure.config import get_config
 
 from enterprise_ai_companion.capabilities.graph.graph_models import (
     Entity,
@@ -29,19 +30,14 @@ from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvi
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_URI = "bolt://localhost:7687"
-_DEFAULT_USER = "neo4j"
-_DEFAULT_PASSWORD = "eac-dev-password"
-
 
 def _uri() -> str:
-    return os.environ.get("EAC_NEO4J_URI", _DEFAULT_URI)
+    return get_config().neo4j_uri
 
 
 def _auth() -> tuple[str, str]:
-    user = os.environ.get("EAC_NEO4J_USER", _DEFAULT_USER)
-    password = os.environ.get("EAC_NEO4J_PASSWORD", _DEFAULT_PASSWORD)
-    return user, password
+    cfg = get_config()
+    return cfg.neo4j_user, cfg.neo4j_password.get_secret_value()
 
 
 class Neo4jProvider(GraphProvider):

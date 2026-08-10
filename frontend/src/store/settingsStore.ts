@@ -5,7 +5,6 @@ import type { ThemeMode } from "@/types/theme";
 
 export interface AIProviderSettings {
   endpoint: string;
-  subscriptionKey: string;
   model: string;
   timeoutMs: number;
   maxRetries: number;
@@ -29,7 +28,6 @@ export interface AppSettings {
 
 const DEFAULT_AI_PROVIDER: AIProviderSettings = {
   endpoint: import.meta.env.VITE_APIM_ENDPOINT ?? "",
-  subscriptionKey: import.meta.env.VITE_APIM_SUBSCRIPTION_KEY ?? "",
   model: "gpt-5.4-mini_gb_2026-03-17",
   timeoutMs: 30_000,
   maxRetries: 3,

@@ -3,11 +3,12 @@
  *
  * Provider selection is automatic:
  *
- *   "apim"  — Selected when VITE_APIM_ENDPOINT and VITE_APIM_SUBSCRIPTION_KEY
- *             are both present in the environment. Routes all requests through
- *             Azure API Management. Used in production and staging.
+ *   "apim"  — Selected when VITE_APIM_ENDPOINT is present in the environment.
+ *             Routes all requests through Azure API Management.
+ *             The subscription key is loaded at runtime from the OS keychain —
+ *             it is never baked into the JS bundle.
  *
- *   "mock"  — Selected when either APIM env var is absent. Returns local
+ *   "mock"  — Selected when VITE_APIM_ENDPOINT is absent. Returns local
  *             keyword-matched responses with no network calls. Used during
  *             development when APIM credentials are not available.
  *
@@ -37,7 +38,9 @@ export interface APIMConfig {
 
   /**
    * APIM subscription key (api-key header).
-   * Will be replaced by an Azure AD bearer token in Phase 02.
+   * Loaded at runtime from the OS keychain via IPCClient.loadCredential().
+   * Empty string until the keychain resolves — requests made before that point
+   * will fail with a 401 from APIM, which is the correct safe default.
    */
   subscriptionKey: string;
 
@@ -67,22 +70,24 @@ export interface LLMConfig {
 // ── Environment variable resolution ───────────────────────────────────────────
 
 const apimEndpoint = import.meta.env.VITE_APIM_ENDPOINT as string | undefined;
-const apimKey = import.meta.env.VITE_APIM_SUBSCRIPTION_KEY as string | undefined;
 const providerOverride = import.meta.env.VITE_LLM_PROVIDER as string | undefined;
 
 function resolveProvider(): LLMProviderKey {
   if (providerOverride === "mock") return "mock";
   if (providerOverride === "apim") return "apim";
-  // Auto-detect: use APIM when both credentials are present and non-empty.
-  return apimEndpoint && apimKey ? "apim" : "mock";
+  // Auto-detect: use APIM when an endpoint is configured.
+  // The subscription key is loaded at runtime from the OS keychain, not the bundle.
+  return apimEndpoint ? "apim" : "mock";
 }
 
 function resolveAPIMConfig(): APIMConfig | undefined {
-  if (!apimEndpoint || !apimKey) return undefined;
+  if (!apimEndpoint) return undefined;
   return {
     endpoint: apimEndpoint,
-    model: "gpt-41-mini_gb_2025-04-14",
-    subscriptionKey: apimKey,
+    model: "gpt-5.4-mini_gb_2026-03-17",
+    // Subscription key starts empty; ConversationServiceProvider injects the
+    // keychain value via APIMProvider.setSubscriptionKey() after mount.
+    subscriptionKey: "",
     timeoutMs: 30_000,
     maxRetries: 3,
   };

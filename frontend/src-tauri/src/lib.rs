@@ -10,8 +10,11 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 /// Shared application state injected into every Tauri command.
 pub struct AppState {
     /// Port on which the Python sidecar is listening.
-    /// Set once after the sidecar prints `READY:{port}` to stdout.
+    /// Set once after the sidecar prints `READY:{port}:{token}` to stdout.
     pub sidecar_port: Mutex<Option<u16>>,
+    /// IPC shared secret transmitted in the `X-EAC-Token` header.
+    /// Set once from the `READY:{port}:{token}` stdout line.
+    pub ipc_token: Mutex<Option<String>>,
     /// Handle to the Python child process for lifecycle management.
     pub sidecar_process: Mutex<Option<Child>>,
 }
@@ -20,6 +23,7 @@ impl AppState {
     fn new() -> Self {
         Self {
             sidecar_port: Mutex::new(None),
+            ipc_token: Mutex::new(None),
             sidecar_process: Mutex::new(None),
         }
     }
@@ -329,6 +333,27 @@ fn sidecar_base(state: &AppState) -> Result<String, String> {
     Ok(format!("http://127.0.0.1:{}", port))
 }
 
+fn ipc_token(state: &AppState) -> Option<String> {
+    state.ipc_token.lock().ok()?.clone()
+}
+
+/// Build a reqwest Client pre-configured with the IPC shared secret header.
+///
+/// When no token is set (dev mode or legacy sidecar), the client still works
+/// but unauthenticated — the middleware on the Python side only enforces the
+/// token when `EAC_IPC_SECRET` is set.
+fn ipc_client(state: &AppState) -> reqwest::Client {
+    let mut builder = reqwest::Client::builder();
+    if let Some(token) = ipc_token(state) {
+        let mut headers = reqwest::header::HeaderMap::new();
+        if let Ok(val) = reqwest::header::HeaderValue::from_str(&token) {
+            headers.insert("X-EAC-Token", val);
+        }
+        builder = builder.default_headers(headers);
+    }
+    builder.build().unwrap_or_default()
+}
+
 // ─── Tauri commands ───────────────────────────────────────────────────────────
 
 /// Returns `{ "status": "ok" }` when the Python sidecar is reachable.
@@ -337,7 +362,7 @@ async fn health_check(state: State<'_, Arc<AppState>>) -> Result<HealthResponse,
     let base = sidecar_base(&state)?;
     let url = format!("{}/health", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("Health check request failed: {}", e))?;
 
@@ -366,7 +391,7 @@ async fn generate_embedding(
     let base = sidecar_base(&state)?;
     let url = format!("{}/embeddings", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&EmbedRequest { text })
@@ -402,7 +427,7 @@ async fn save_message(
     let base = sidecar_base(&state)?;
     let url = format!("{}/conversations/{}/messages", base, conversation_id);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&SaveMessageRequest {
@@ -437,7 +462,7 @@ async fn list_conversations(
     let base = sidecar_base(&state)?;
     let url = format!("{}/conversations", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("list_conversations request failed: {}", e))?;
 
@@ -463,7 +488,7 @@ async fn load_conversation(
     let base = sidecar_base(&state)?;
     let url = format!("{}/conversations/{}", base, conversation_id);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("load_conversation request failed: {}", e))?;
 
@@ -491,7 +516,7 @@ async fn index_workspace(
     let base = sidecar_base(&state)?;
     let url = format!("{}/indexing/start", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&IndexWorkspaceRequest { workspace_path })
@@ -521,7 +546,7 @@ async fn get_indexing_status(
     let base = sidecar_base(&state)?;
     let url = format!("{}/indexing/status/{}", base, task_id);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("get_indexing_status request failed: {}", e))?;
 
@@ -549,7 +574,7 @@ async fn search_semantic(
     let base = sidecar_base(&state)?;
     let url = format!("{}/search/semantic", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&SemanticSearchRequest {
@@ -585,7 +610,7 @@ async fn search_keyword(
     let base = sidecar_base(&state)?;
     let url = format!("{}/search/keyword", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&KeywordSearchRequest {
@@ -625,7 +650,7 @@ async fn get_graph_entity(
         depth
     );
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("get_graph_entity request failed: {}", e))?;
 
@@ -648,7 +673,7 @@ async fn graph_health(state: State<'_, Arc<AppState>>) -> Result<GraphHealthResp
     let base = sidecar_base(&state)?;
     let url = format!("{}/graph/health", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("graph_health request failed: {}", e))?;
 
@@ -678,7 +703,7 @@ async fn search_hybrid(
     let base = sidecar_base(&state)?;
     let url = format!("{}/search/hybrid", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&HybridSearchRequest {
@@ -714,7 +739,7 @@ async fn create_backup(
     let base = sidecar_base(&state)?;
     let url = format!("{}/backup/create", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&CreateBackupRequest { notes })
@@ -743,7 +768,7 @@ async fn list_backups(
     let base = sidecar_base(&state)?;
     let url = format!("{}/backup/list", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("list_backups request failed: {}", e))?;
 
@@ -769,7 +794,7 @@ async fn add_watched_folder(
     let base = sidecar_base(&state)?;
     let url = format!("{}/watcher/folders", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&AddFolderRequest { path })
@@ -799,7 +824,7 @@ async fn remove_watched_folder(
     let base = sidecar_base(&state)?;
     let url = format!("{}/watcher/folders/{}", base, folder_id);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .delete(&url)
         .send()
@@ -824,7 +849,7 @@ async fn list_watched_folders(
     let base = sidecar_base(&state)?;
     let url = format!("{}/watcher/folders", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("list_watched_folders request failed: {}", e))?;
 
@@ -849,7 +874,7 @@ async fn get_watcher_status(
     let base = sidecar_base(&state)?;
     let url = format!("{}/watcher/status", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("get_watcher_status request failed: {}", e))?;
 
@@ -891,7 +916,7 @@ async fn list_documents(
         url = format!("{}?{}", url, params.join("&"));
     }
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("list_documents request failed: {}", e))?;
 
@@ -917,7 +942,7 @@ async fn delete_document(
     let base = sidecar_base(&state)?;
     let url = format!("{}/documents/{}", base, document_id);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .delete(&url)
         .send()
@@ -944,7 +969,7 @@ async fn bulk_delete_documents(
     let url = format!("{}/documents/bulk", base);
 
     let body = serde_json::json!({ "document_ids": document_ids });
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .delete(&url)
         .json(&body)
@@ -971,7 +996,7 @@ async fn cancel_indexing(
     let base = sidecar_base(&state)?;
     let url = format!("{}/indexing/cancel/{}", base, task_id);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .delete(&url)
         .send()
@@ -996,7 +1021,7 @@ async fn list_indexing_errors(
     let base = sidecar_base(&state)?;
     let url = format!("{}/indexing/errors", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("list_indexing_errors request failed: {}", e))?;
 
@@ -1021,7 +1046,7 @@ async fn clear_indexing_errors(
     let base = sidecar_base(&state)?;
     let url = format!("{}/indexing/errors", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .delete(&url)
         .send()
@@ -1050,7 +1075,7 @@ async fn get_conversation_memory(
     let base = sidecar_base(&state)?;
     let url = format!("{}/conversations/{}/memory", base, conversation_id);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("get_conversation_memory request failed: {}", e))?;
 
@@ -1083,7 +1108,7 @@ async fn get_stats(state: State<'_, Arc<AppState>>) -> Result<DashboardStatsResp
     let base = sidecar_base(&state)?;
     let url = format!("{}/stats", base);
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("get_stats request failed: {}", e))?;
 
@@ -1110,7 +1135,7 @@ async fn get_suggested_queries(
     let base = sidecar_base(&state)?;
     let url = format!("{}/stats/suggestions", base);
 
-    let client = reqwest::Client::new();
+    let client = ipc_client(&state);
     let response = client
         .post(&url)
         .json(&SuggestionsRequest {
@@ -1158,7 +1183,7 @@ async fn get_graph_visualization(
         url = format!("{}?{}", url, params.join("&"));
     }
 
-    let response = reqwest::get(&url)
+    let response = ipc_client(&state).get(&url).send()
         .await
         .map_err(|e| format!("get_graph_visualization request failed: {}", e))?;
 
@@ -1173,6 +1198,46 @@ async fn get_graph_visualization(
         .json::<GraphVisualizationResponse>()
         .await
         .map_err(|e| format!("Failed to parse graph visualization response: {}", e))
+}
+
+// ─── OS Keychain commands ─────────────────────────────────────────────────────
+
+/// Stores a credential in the OS keychain (Windows Credential Manager on Windows).
+///
+/// `service` is the top-level name (e.g. "eac") and `key` is the credential name
+/// within that service (e.g. "apim-key"). The value is the secret to store.
+#[tauri::command]
+async fn store_credential(service: String, key: String, value: String) -> Result<(), String> {
+    keyring::Entry::new(&service, &key)
+        .map_err(|e| e.to_string())?
+        .set_password(&value)
+        .map_err(|e| e.to_string())
+}
+
+/// Loads a credential from the OS keychain. Returns `None` when the entry does not exist.
+#[tauri::command]
+async fn load_credential(service: String, key: String) -> Result<Option<String>, String> {
+    match keyring::Entry::new(&service, &key)
+        .map_err(|e| e.to_string())?
+        .get_password()
+    {
+        Ok(val) => Ok(Some(val)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Deletes a credential from the OS keychain. Silently succeeds if the entry does not exist.
+#[tauri::command]
+async fn delete_credential(service: String, key: String) -> Result<(), String> {
+    match keyring::Entry::new(&service, &key)
+        .map_err(|e| e.to_string())?
+        .delete_credential()
+    {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 // ─── Global shortcut ──────────────────────────────────────────────────────────
@@ -1262,12 +1327,25 @@ fn start_sidecar(app_handle: AppHandle, state: Arc<AppState>) {
                     Err(_) => break,
                 };
 
-                if let Some(port_str) = line.trim().strip_prefix("READY:") {
+                if let Some(rest) = line.trim().strip_prefix("READY:") {
+                    // Protocol: READY:{port} (legacy) or READY:{port}:{token}
+                    let mut parts = rest.splitn(2, ':');
+                    let port_str = parts.next().unwrap_or("");
+                    let token_str = parts.next();
+
                     if let Ok(port) = port_str.parse::<u16>() {
                         println!("[sidecar] ready on port {}", port);
 
                         if let Ok(mut guard) = state.sidecar_port.lock() {
                             *guard = Some(port);
+                        }
+                        if let Some(token) = token_str {
+                            let token = token.trim().to_string();
+                            if !token.is_empty() {
+                                if let Ok(mut guard) = state.ipc_token.lock() {
+                                    *guard = Some(token);
+                                }
+                            }
                         }
 
                         // Notify the frontend that the sidecar is ready.
@@ -1332,7 +1410,10 @@ pub fn run() {
             open_file,
             get_stats,
             get_suggested_queries,
-            get_graph_visualization
+            get_graph_visualization,
+            store_credential,
+            load_credential,
+            delete_credential
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

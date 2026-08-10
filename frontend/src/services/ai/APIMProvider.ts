@@ -86,6 +86,14 @@ export class APIMProvider implements LLMProvider {
     this.config = config;
   }
 
+  /**
+   * Injects the APIM subscription key loaded at runtime from the OS keychain.
+   * Called by ConversationServiceProvider after the keychain resolves.
+   */
+  setSubscriptionKey(key: string): void {
+    (this.config as { subscriptionKey: string }).subscriptionKey = key;
+  }
+
   // ─── generateResponse ──────────────────────────────────────────────────────
 
   async generateResponse(

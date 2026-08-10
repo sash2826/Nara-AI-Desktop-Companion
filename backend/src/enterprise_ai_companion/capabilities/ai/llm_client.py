@@ -10,30 +10,24 @@ The model deployment ID is also configurable:
 
 from __future__ import annotations
 
-import os
-
 import httpx
 
-_DEFAULT_MODEL = "gpt-5.4-mini_gb_2026-03-17"
+from enterprise_ai_companion.infrastructure.config import get_config
+
 _API_VERSION = "preview"
 
 
 def _base_url() -> str:
-    endpoint = os.environ.get("EAC_APIM_ENDPOINT", "")
-    if not endpoint:
-        raise EnvironmentError("EAC_APIM_ENDPOINT environment variable is not set.")
+    endpoint = get_config().apim_endpoint
     return f"{endpoint.rstrip('/')}/azure-openai/v1"
 
 
 def _api_key() -> str:
-    key = os.environ.get("EAC_APIM_SUBSCRIPTION_KEY", "")
-    if not key:
-        raise EnvironmentError("EAC_APIM_SUBSCRIPTION_KEY environment variable is not set.")
-    return key
+    return get_config().apim_subscription_key.get_secret_value()
 
 
 def _model_id() -> str:
-    return os.environ.get("EAC_LLM_MODEL_ID", _DEFAULT_MODEL)
+    return get_config().llm_model_id
 
 
 async def chat_complete(

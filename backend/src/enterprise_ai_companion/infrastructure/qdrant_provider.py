@@ -13,6 +13,8 @@ import sys
 import time
 from pathlib import Path
 
+from enterprise_ai_companion.infrastructure.config import get_config
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
@@ -90,10 +92,9 @@ def _remove_stale_lock(data_dir: Path) -> None:
 
 
 def _qdrant_data_dir() -> Path:
-    env = os.environ.get("EAC_QDRANT_PATH")
-    if env:
-        return Path(env)
-    # Default: repo root / qdrant_data
+    cfg_val = get_config().qdrant_path
+    if cfg_val:
+        return Path(cfg_val)
     return Path(__file__).parents[4] / "qdrant_data"
 
 

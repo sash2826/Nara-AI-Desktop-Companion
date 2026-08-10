@@ -62,6 +62,19 @@ async def create_backup(
     """Create a timestamped backup of SQLite and Qdrant collection metadata."""
     service = _get_service(request)
     result = await service.create_backup(notes=body.notes)
+
+    audit = getattr(request.app.state, "audit_logger", None)
+    if audit is not None:
+        await audit.log(
+            "backup.created",
+            {
+                "backup_id": result.backup_id,
+                "sqlite_size_bytes": result.sqlite_size_bytes,
+                "qdrant_collections": result.qdrant_collections,
+                "status": result.status,
+            },
+        )
+
     return BackupResultResponse(
         backup_id=result.backup_id,
         backup_path=result.backup_path,

@@ -64,6 +64,24 @@ EXCLUDED_DIRS: frozenset[str] = frozenset({
 # OneDrive Files On-Demand stubs that are not yet downloaded locally.
 _ONEDRIVE_STUB_ATTR = 0x400000
 
+# OS-critical roots that must never be indexed, regardless of what path the
+# caller supplies. Prevents a confused-deputy attack where a malicious document
+# or UI action triggers indexing of system directories.
+_BLOCKED_ROOTS: frozenset[Path] = frozenset({
+    # Windows system directories
+    Path("C:/Windows"),
+    Path("C:/Program Files"),
+    Path("C:/Program Files (x86)"),
+    Path("C:/ProgramData"),
+    Path("C:/System Volume Information"),
+    # POSIX system directories
+    Path("/etc"),
+    Path("/sys"),
+    Path("/proc"),
+    Path("/dev"),
+    Path("/boot"),
+})
+
 
 def _collect_files(root: Path) -> list[Path]:
     """Walk root recursively, skipping any directory in EXCLUDED_DIRS.
@@ -143,6 +161,16 @@ class FileIndexer:
         self._abbreviation_repo = abbreviation_repo
         self._graph_state_repo = graph_state_repo
 
+    def _is_safe_path(self, resolved: Path) -> bool:
+        """Return False if resolved is inside a blocked OS-critical directory."""
+        for root in _BLOCKED_ROOTS:
+            try:
+                resolved.relative_to(root.resolve())
+                return False
+            except ValueError:
+                pass
+        return True
+
     async def index_workspace(
         self,
         workspace_path: str,
@@ -154,6 +182,10 @@ class FileIndexer:
         live progress rather than waiting for the full run to finish.
         """
         root = Path(workspace_path).resolve()
+
+        if not self._is_safe_path(root):
+            raise ValueError(f"Unsafe workspace path rejected: {root}")
+
         result = IndexingResult()
 
         if not root.exists() or not root.is_dir():

@@ -5,6 +5,7 @@ import { ContextEngineContext } from "./ContextEngineContext";
 import { ConversationService } from "@/services/conversation/ConversationService";
 import { WorkspaceContextEngine } from "@/services/context/WorkspaceContextEngine";
 import { createLLMProvider } from "@/services/providers/ProviderFactory";
+import { APIMProvider } from "@/services/ai/APIMProvider";
 import { LLM_CONFIG } from "@/config/ai";
 import { useConversationStore } from "@/store/conversationStore";
 import { IPCClient } from "@/services/ipc/IPCClient";
@@ -37,10 +38,8 @@ function makeConversationId(): string {
  * is a no-op since there is no persistence layer.
  */
 export function ConversationServiceProvider({ children }: ConversationServiceProviderProps) {
-  const [service] = useState<ConversationService>(() => {
-    const provider = createLLMProvider(LLM_CONFIG);
-    return new ConversationService(provider);
-  });
+  const [llmProvider] = useState(() => createLLMProvider(LLM_CONFIG));
+  const [service] = useState<ConversationService>(() => new ConversationService(llmProvider));
 
   const [contextEngine] = useState(() => new WorkspaceContextEngine());
 
@@ -57,6 +56,21 @@ export function ConversationServiceProvider({ children }: ConversationServicePro
     conversationId,
     renew,
   };
+
+  // Load the APIM subscription key from the OS keychain and inject it into the
+  // provider. Must run before the first LLM call — fire-and-forget failures are
+  // safe because requests will 401 without a key rather than using a stale one.
+  useEffect(() => {
+    if (!IS_TAURI || !(llmProvider instanceof APIMProvider)) return;
+
+    IPCClient.loadCredential("eac", "apim-key")
+      .then((key) => {
+        if (key) (llmProvider as APIMProvider).setSubscriptionKey(key);
+      })
+      .catch((err: unknown) => {
+        console.warn("[ConversationService] failed to load APIM key from keychain:", err);
+      });
+  }, [llmProvider]);
 
   // Clear any stuck conversation state left over from HMR or a previous session.
   useEffect(() => {
