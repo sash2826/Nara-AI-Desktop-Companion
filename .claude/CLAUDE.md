@@ -1616,3 +1616,6 @@ Version: 1.0.0
 Status: Active
 
 This document serves as the permanent engineering specification for the Enterprise AI Companion repository.
+# graphify
+- **graphify** (`.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.

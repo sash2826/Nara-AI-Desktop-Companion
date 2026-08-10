@@ -43,4 +43,13 @@ htmlcov/
 # Runtime data (generated at runtime, never committed)
 qdrant_data/
 *.sqlite
+*.db
 !database/migrations/*.sql
+
+# graphify intermediate files (large extraction caches, not useful to commit)
+graphify-out/.graphify_ast.json
+graphify-out/.graphify_extract.json
+graphify-out/.graphify_semantic.json
+graphify-out/.graphify_cached.json
+graphify-out/.graphify_uncached.txt
+graphify-out/cache/
