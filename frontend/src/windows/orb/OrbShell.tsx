@@ -62,8 +62,16 @@ export function OrbShell() {
         /* sidecar not yet ready — ignore */
       });
 
+    // Poll every 30s so the amber badge appears without needing a Tauri event push.
+    const pollInterval = setInterval(() => {
+      invoke<number>("get_pending_recommendation_count")
+        .then((count) => setPendingCount(count))
+        .catch(() => {});
+    }, 30_000);
+
     return () => {
       unlistenFn?.();
+      clearInterval(pollInterval);
     };
   }, [setPendingCount]);
 

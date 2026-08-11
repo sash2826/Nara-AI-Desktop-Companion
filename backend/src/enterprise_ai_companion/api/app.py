@@ -13,6 +13,11 @@ from starlette.requests import Request as StarletteRequest
 
 from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, orb as orb_router_module, plugins as plugins_router_module, search, stats
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
+from enterprise_ai_companion.api.routers import organisation as organisation_router_module
+from enterprise_ai_companion.capabilities.organisation.file_mover import FileMover
+from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
+from enterprise_ai_companion.capabilities.organisation.recommendation_repository import RecommendationRepository
+from enterprise_ai_companion.capabilities.organisation.recommendation_service import RecommendationService
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
@@ -137,6 +142,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await watcher._async_start()
     app.state.watcher = watcher
 
+    # Organisation capability — placement recommendations for new Downloads files.
+    recommendation_repo = RecommendationRepository(app.state.db)
+    app.state.recommendation_repo = recommendation_repo
+
+    app.state.file_mover = FileMover(app.state.db)
+
+    placement_scorer = PlacementScorer(
+        conn=app.state.db,
+        graph_provider=graph_provider,
+        embedding_service=embedding_service,
+        qdrant_client=qdrant.get_client(),
+    )
+
+    recommendation_service = RecommendationService(
+        recommendation_repo=recommendation_repo,
+        placement_scorer=placement_scorer,
+        watcher_service=watcher,
+    )
+    app.state.recommendation_service = recommendation_service
+
+    # Wire the Downloads hook and auto-register the Downloads folder.
+    watcher.recommendation_service = recommendation_service
+    await watcher._ensure_downloads_registered()
+
     app.state.indexing_tasks: dict = {}
 
     try:
@@ -208,6 +237,7 @@ app.include_router(plugins_router_module.router)
 app.include_router(watcher_router_module.router, prefix="/watcher", tags=["watcher"])
 app.include_router(stats.router)
 app.include_router(orb_router_module.router)
+app.include_router(organisation_router_module.router)
 
 
 @app.get("/health")

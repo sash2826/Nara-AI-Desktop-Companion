@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 _DEBOUNCE_SECONDS = 2.0
 
+# The OS Downloads folder is auto-registered on first launch.
+DOWNLOADS_PATH = str(Path.home() / "Downloads")
+
 
 @dataclass
 class WatchedFolder:
@@ -52,6 +55,11 @@ class DebounceHandler(FileSystemEventHandler):
     Consecutive events for the same source path within _DEBOUNCE_SECONDS are
     collapsed into a single index call — prevents double-indexing on editor
     save (temp file + rename pattern).
+
+    When post_index_hook is provided (Downloads folder use-case), new files
+    detected via on_created are indexed individually rather than triggering a
+    full workspace re-index, and the hook is called with (file_path, document_id)
+    after indexing succeeds.
     """
 
     def __init__(
@@ -59,23 +67,29 @@ class DebounceHandler(FileSystemEventHandler):
         folder_path: str,
         indexer: FileIndexer,
         loop: asyncio.AbstractEventLoop,
+        post_index_hook: "asyncio.Coroutine | None" = None,
     ) -> None:
         super().__init__()
         self._folder_path = folder_path
         self._indexer = indexer
         self._loop = loop
+        self._post_index_hook = post_index_hook
         self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
+        # Tracks paths that arrived via on_created (truly new files).
+        self._created_paths: set[str] = set()
 
     def on_modified(self, event: FileSystemEvent) -> None:
         if not event.is_directory:
-            self._schedule(event.src_path)
+            self._schedule(event.src_path, is_new=False)
 
     def on_created(self, event: FileSystemEvent) -> None:
         if not event.is_directory:
-            self._schedule(event.src_path)
+            with self._lock:
+                self._created_paths.add(event.src_path)
+            self._schedule(event.src_path, is_new=True)
 
-    def _schedule(self, src_path: str) -> None:
+    def _schedule(self, src_path: str, is_new: bool = False) -> None:
         if _is_excluded(src_path):
             return
         ext = Path(src_path).suffix.lower()
@@ -86,17 +100,41 @@ class DebounceHandler(FileSystemEventHandler):
             existing = self._timers.get(src_path)
             if existing is not None:
                 existing.cancel()
-            timer = threading.Timer(_DEBOUNCE_SECONDS, self._fire, args=[src_path])
+            timer = threading.Timer(
+                _DEBOUNCE_SECONDS, self._fire, args=[src_path]
+            )
             self._timers[src_path] = timer
             timer.start()
 
     def _fire(self, src_path: str) -> None:
         with self._lock:
             self._timers.pop(src_path, None)
-        logger.debug("File change detected, re-indexing folder: %s (triggered by %s)",
-                     self._folder_path, Path(src_path).name)
-        coro = self._indexer.index_workspace(self._folder_path)
+            is_new = src_path in self._created_paths
+            self._created_paths.discard(src_path)
+
+        if is_new and self._post_index_hook is not None:
+            logger.debug(
+                "New file detected in %s: %s — indexing single file",
+                self._folder_path, Path(src_path).name,
+            )
+            coro = self._fire_new_file(src_path)
+        else:
+            logger.debug(
+                "File change detected, re-indexing folder: %s (triggered by %s)",
+                self._folder_path, Path(src_path).name,
+            )
+            coro = self._indexer.index_workspace(self._folder_path)
+
         asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    async def _fire_new_file(self, src_path: str) -> None:
+        """Index a single new file and invoke post_index_hook on success."""
+        document_id = await self._indexer.index_file(src_path, self._folder_path)
+        if document_id and self._post_index_hook is not None:
+            try:
+                await self._post_index_hook(src_path, document_id)
+            except Exception:
+                logger.exception("post_index_hook failed for %s", src_path)
 
     def cancel_all(self) -> None:
         """Cancel pending debounce timers — called when a watch is removed."""
@@ -104,6 +142,7 @@ class DebounceHandler(FileSystemEventHandler):
             for timer in self._timers.values():
                 timer.cancel()
             self._timers.clear()
+            self._created_paths.clear()
 
 
 class WatcherService:
@@ -127,6 +166,8 @@ class WatcherService:
         # Maps folder path → (watchdog WatchHandle, DebounceHandler)
         self._watches: dict[str, tuple[Any, DebounceHandler]] = {}
         self._running = False
+        # Set by app.py after construction — wires the Downloads → recommendation pipeline.
+        self.recommendation_service: object | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -275,13 +316,55 @@ class WatcherService:
             for row in rows
         ]
 
+    async def _ensure_downloads_registered(self) -> None:
+        """Register the OS Downloads folder as a watched path if not already present.
+
+        Called by app.py after recommendation_service is assigned. Creates the
+        folder if it does not exist (edge case: fresh Windows installs where the
+        user has never opened Downloads).
+        """
+        downloads = Path(DOWNLOADS_PATH)
+        downloads.mkdir(parents=True, exist_ok=True)
+
+        async with self._db.execute(
+            "SELECT id FROM watched_folders WHERE path = ?", (str(downloads),)
+        ) as cur:
+            row = await cur.fetchone()
+
+        if row is None:
+            folder = WatchedFolder(
+                id=str(uuid.uuid4()),
+                path=str(downloads),
+                auto_index=True,
+                added_at=datetime.now(UTC).isoformat(),
+            )
+            await self._db.execute(
+                "INSERT OR IGNORE INTO watched_folders (id, path, auto_index, added_at) "
+                "VALUES (?, ?, ?, ?)",
+                (folder.id, folder.path, int(folder.auto_index), folder.added_at),
+            )
+            await self._db.commit()
+            logger.info("Downloads folder auto-registered: %s", folder.path)
+
+        if self._running and str(downloads) not in self._watches:
+            self._schedule_watch(str(downloads))
+
     def _schedule_watch(self, path: str) -> None:
         if path in self._watches:
             return
-        handler = DebounceHandler(path, self._indexer, self._loop)
+
+        hook = None
+        if (
+            path == DOWNLOADS_PATH
+            and self.recommendation_service is not None
+            and hasattr(self.recommendation_service, "process_new_file")
+        ):
+            hook = self.recommendation_service.process_new_file
+
+        handler = DebounceHandler(path, self._indexer, self._loop, post_index_hook=hook)
         watch = self._observer.schedule(handler, path, recursive=True)
         self._watches[path] = (watch, handler)
-        logger.debug("Scheduled watchdog watch on: %s", path)
+        logger.debug("Scheduled watchdog watch on: %s (hook=%s)", path, hook is not None)
 
     def _unschedule_watch(self, path: str) -> None:
         entry = self._watches.pop(path, None)
