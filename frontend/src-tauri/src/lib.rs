@@ -1516,20 +1516,28 @@ fn register_windows_startup() {
 ///   - label: "orb"
 ///   - always_on_top, decorations: false, transparent, skip_taskbar
 ///   - 80 wide × 340 tall (orb 56px + overlay expansion headroom 284px)
-///   - Positioned bottom-right of the primary monitor on first launch
+///   - Positioned bottom-right of the primary monitor, scale-factor corrected
 fn create_orb_window(app: &tauri::App) {
     let primary_monitor = app
         .primary_monitor()
         .ok()
         .flatten();
 
+    // `monitor.size()` is in physical pixels; `monitor.position()` is in physical pixels.
+    // `WebviewWindowBuilder::position()` takes logical pixels (physical / scale_factor).
+    // Without this correction the orb ends up off-screen on HiDPI displays.
     let (start_x, start_y) = if let Some(monitor) = primary_monitor {
         let size = monitor.size();
         let pos = monitor.position();
-        // Bottom-right, 24px inset from edge
+        let scale = monitor.scale_factor();
+        // Orb window is 80×340 logical pixels; inset 24px from right, 56px from bottom.
+        let logical_w = (size.width as f64 / scale) as i32;
+        let logical_h = (size.height as f64 / scale) as i32;
+        let logical_x = (pos.x as f64 / scale) as i32;
+        let logical_y = (pos.y as f64 / scale) as i32;
         (
-            pos.x + size.width as i32 - 80 - 24,
-            pos.y + size.height as i32 - 340 - 48,
+            logical_x + logical_w - 80 - 24,
+            logical_y + logical_h - 340 - 56,
         )
     } else {
         (1160, 640)
@@ -1755,22 +1763,31 @@ pub fn run() {
             orb_query
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Only kill the sidecar when the MAIN window closes (label "main").
-                // Closing the main window should NOT terminate the orb — the orb
-                // persists as a background desktop widget until the user explicitly
-                // quits the application.
-                if window.label() == "main" {
-                    let state: State<Arc<AppState>> = window.state();
-                    let child_opt = state
-                        .sidecar_process
-                        .lock()
-                        .ok()
-                        .and_then(|mut g| g.take());
-                    if let Some(mut child) = child_opt {
-                        let _ = child.kill();
-                        println!("[sidecar] process killed on main window close");
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                match window.label() {
+                    "main" => {
+                        // Closing the main window hides it — the orb stays alive
+                        // and the sidecar keeps running. The user can re-open the
+                        // main window by double-clicking the orb.
+                        api.prevent_close();
+                        let _ = window.hide();
                     }
+                    "orb" => {
+                        // Closing the orb is a full application quit.
+                        // Kill the sidecar then exit.
+                        let state: State<Arc<AppState>> = window.state();
+                        let child_opt = state
+                            .sidecar_process
+                            .lock()
+                            .ok()
+                            .and_then(|mut g| g.take());
+                        if let Some(mut child) = child_opt {
+                            let _ = child.kill();
+                            println!("[sidecar] process killed on orb close (full quit)");
+                        }
+                        window.app_handle().exit(0);
+                    }
+                    _ => {}
                 }
             }
         })
