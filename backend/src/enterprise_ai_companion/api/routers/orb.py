@@ -4,6 +4,10 @@ Orb window API endpoints.
 Provides a lightweight single-turn query endpoint used by the orb inline
 query overlay. Unlike the full conversation endpoint, this is stateless —
 no message history is persisted, no conversation ID is required.
+
+RAG context is retrieved via HybridSearchOrchestrator, the same pipeline
+used by the main search router, so the orb and the main app share the same
+knowledge base.
 """
 
 import logging
@@ -13,6 +17,8 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from enterprise_ai_companion.capabilities.ai.llm_client import chat_complete
+from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
+from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import HybridSearchOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +38,9 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
     """
     Single-turn LLM query for the orb inline overlay.
 
-    Optionally enriches the response with RAG context if the search service
-    is available on app.state. Returns a plain text answer suitable for the
-    compact overlay (no citations, no markdown headers).
+    Runs the query through the same hybrid search pipeline (HybridSearchOrchestrator)
+    as the main app so the orb has access to the same indexed knowledge base.
+    Returns a concise plain-text answer suitable for the compact overlay.
     """
     query = body.query.strip()
     if not query:
@@ -42,20 +48,26 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
 
     context_text = ""
 
-    # Best-effort RAG: search for relevant context without blocking on errors.
+    # RAG: use the same hybrid search pipeline as the main search router.
     try:
-        search_service = getattr(request.app.state, "search_service", None)
-        if search_service is not None:
-            results = await search_service.hybrid_search(
-                query=query,
-                top_k=3,
-                workspace_path=None,
-                semantic_weight=0.7,
-                keyword_weight=0.3,
-            )
-            if results:
-                snippets = [r.content[:300] for r in results[:3]]
-                context_text = "\n\n".join(snippets)
+        preprocessor = getattr(request.app.state, "preprocessor", None)
+        search_text = preprocessor.process(query).search_text if preprocessor else query
+
+        orchestrator = HybridSearchOrchestrator(
+            conn=request.app.state.db,
+            qdrant_client=request.app.state.qdrant.get_client(),
+            embedding_service=EmbeddingService(),
+        )
+        results = await orchestrator.search(
+            query=search_text,
+            top_k=3,
+            workspace_path=None,
+            semantic_weight=0.7,
+            keyword_weight=0.3,
+        )
+        if results:
+            snippets = [r.content[:400] for r in results[:3]]
+            context_text = "\n\n".join(snippets)
     except Exception:
         logger.debug("Orb RAG context fetch failed — proceeding without context")
 
