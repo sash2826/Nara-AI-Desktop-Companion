@@ -2,8 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Listener, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+#[cfg(target_os = "windows")]
+use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
 // ─── App state ────────────────────────────────────────────────────────────────
 
@@ -1200,6 +1203,155 @@ async fn get_graph_visualization(
         .map_err(|e| format!("Failed to parse graph visualization response: {}", e))
 }
 
+// ─── Orb window commands ──────────────────────────────────────────────────────
+
+/// Returns the current screen-space position of the orb window.
+/// Used by OrbShell to compute drag offsets correctly.
+#[tauri::command]
+async fn get_orb_position(app: AppHandle) -> Result<serde_json::Value, String> {
+    let window = app
+        .get_webview_window("orb")
+        .ok_or_else(|| "Orb window not found".to_string())?;
+    let pos = window
+        .outer_position()
+        .map_err(|e| format!("Failed to get orb position: {}", e))?;
+    Ok(serde_json::json!({ "x": pos.x, "y": pos.y }))
+}
+
+/// Moves the orb window to the given screen-space coordinates.
+#[tauri::command]
+async fn set_orb_position(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
+    let window = app
+        .get_webview_window("orb")
+        .ok_or_else(|| "Orb window not found".to_string())?;
+    window
+        .set_position(tauri::PhysicalPosition::new(x, y))
+        .map_err(|e| format!("Failed to set orb position: {}", e))
+}
+
+/// Shows the main EAC window and brings it to the foreground.
+#[tauri::command]
+async fn focus_main_window(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window not found".to_string())?;
+    window.show().map_err(|e| format!("Failed to show main window: {}", e))?;
+    window
+        .set_focus()
+        .map_err(|e| format!("Failed to focus main window: {}", e))
+}
+
+/// Returns the number of pending file placement recommendations.
+/// Returns 0 when the sidecar is not yet ready.
+#[tauri::command]
+async fn get_pending_recommendation_count(
+    state: State<'_, Arc<AppState>>,
+) -> Result<u32, String> {
+    let base = match sidecar_base(&state) {
+        Ok(b) => b,
+        Err(_) => return Ok(0),
+    };
+    let url = format!("{}/organisation/recommendations/pending/count", base);
+    match ipc_client(&state).get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body: serde_json::Value =
+                resp.json().await.map_err(|e| e.to_string())?;
+            Ok(body["count"].as_u64().unwrap_or(0) as u32)
+        }
+        _ => Ok(0),
+    }
+}
+
+/// Accepts a file placement recommendation and triggers the physical move.
+#[tauri::command]
+async fn accept_recommendation(
+    recommendation_id: String,
+    folder: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/organisation/recommendations/{}/accept", base, recommendation_id);
+    let body = serde_json::json!({ "folder": folder });
+    let resp = ipc_client(&state)
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("accept_recommendation returned HTTP {}", resp.status().as_u16()));
+    }
+    Ok(())
+}
+
+/// Dismisses a file placement recommendation without moving the file.
+#[tauri::command]
+async fn dismiss_recommendation(
+    recommendation_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!(
+        "{}/organisation/recommendations/{}/dismiss",
+        base, recommendation_id
+    );
+    let resp = ipc_client(&state)
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "dismiss_recommendation returned HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    Ok(())
+}
+
+/// Returns all pending file placement recommendations.
+#[tauri::command]
+async fn list_pending_recommendations(
+    state: State<'_, Arc<AppState>>,
+) -> Result<serde_json::Value, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/organisation/recommendations/pending", base);
+    let resp = ipc_client(&state)
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "list_pending_recommendations returned HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    resp.json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Sends a single-turn query to the LLM through the backend and returns the
+/// response text. Used by the orb inline query overlay.
+#[tauri::command]
+async fn orb_query(query: String, state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/orb/query", base);
+    let body = serde_json::json!({ "query": query });
+    let resp = ipc_client(&state)
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("orb_query returned HTTP {}", resp.status().as_u16()));
+    }
+    let parsed: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed["response"].as_str().unwrap_or("").to_string())
+}
+
 // ─── Plugin commands ──────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1311,6 +1463,91 @@ async fn delete_credential(service: String, key: String) -> Result<(), String> {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
+    }
+}
+
+// ─── Windows startup registration ────────────────────────────────────────────
+
+/// Registers the EAC orb in the Windows startup registry so it launches on login.
+/// Safe to call on every start — the key is always overwritten with the current exe path.
+/// No-op on non-Windows platforms.
+#[cfg(target_os = "windows")]
+fn register_windows_startup() {
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[startup] could not determine exe path: {}", e);
+            return;
+        }
+    };
+    let exe_str = match exe.to_str() {
+        Some(s) => s.to_string(),
+        None => {
+            eprintln!("[startup] exe path is not valid UTF-8");
+            return;
+        }
+    };
+
+    match RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey_with_flags(
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            winreg::enums::KEY_WRITE,
+        ) {
+        Ok(key) => {
+            match key.set_value("EnterpriseAICompanion", &exe_str) {
+                Ok(()) => println!("[startup] registered in HKCU\\...\\Run"),
+                Err(e) => eprintln!("[startup] failed to set registry value: {}", e),
+            }
+        }
+        Err(e) => eprintln!("[startup] failed to open registry key: {}", e),
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn register_windows_startup() {
+    // No-op on macOS/Linux — startup handled via platform-specific mechanisms
+}
+
+// ─── Orb window creation ──────────────────────────────────────────────────────
+
+/// Creates the standalone always-on-top orb WebviewWindow.
+///
+/// Window properties:
+///   - label: "orb"
+///   - always_on_top, decorations: false, transparent, skip_taskbar
+///   - 80 wide × 340 tall (orb 56px + overlay expansion headroom 284px)
+///   - Positioned bottom-right of the primary monitor on first launch
+fn create_orb_window(app: &tauri::App) {
+    let primary_monitor = app
+        .primary_monitor()
+        .ok()
+        .flatten();
+
+    let (start_x, start_y) = if let Some(monitor) = primary_monitor {
+        let size = monitor.size();
+        let pos = monitor.position();
+        // Bottom-right, 24px inset from edge
+        (
+            pos.x + size.width as i32 - 80 - 24,
+            pos.y + size.height as i32 - 340 - 48,
+        )
+    } else {
+        (1160, 640)
+    };
+
+    match WebviewWindowBuilder::new(app, "orb", WebviewUrl::App("index.html".into()))
+        .title("EAC Orb")
+        .inner_size(80.0, 340.0)
+        .resizable(false)
+        .always_on_top(true)
+        .decorations(false)
+        .transparent(true)
+        .skip_taskbar(true)
+        .position(start_x as f64, start_y as f64)
+        .build()
+    {
+        Ok(_) => println!("[orb] window created at ({}, {})", start_x, start_y),
+        Err(e) => eprintln!("[orb] failed to create window: {}", e),
     }
 }
 
@@ -1451,8 +1688,25 @@ pub fn run() {
         .manage(app_state)
         .setup(move |app| {
             register_global_shortcut(app);
+            register_windows_startup();
+            create_orb_window(app);
+
             let handle = app.handle().clone();
-            start_sidecar(handle, state_for_setup);
+            start_sidecar(handle.clone(), state_for_setup);
+
+            // When the sidecar becomes ready, emit initial pending count to the orb window.
+            let handle_for_ready = handle.clone();
+            handle.listen("sidecar-ready", move |_event| {
+                let h = handle_for_ready.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Brief delay to let the sidecar finish startup
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    if let Some(orb) = h.get_webview_window("orb") {
+                        let _ = orb.emit("orb-pending-count", 0u32);
+                    }
+                });
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1490,19 +1744,33 @@ pub fn run() {
             disable_plugin,
             store_credential,
             load_credential,
-            delete_credential
+            delete_credential,
+            get_orb_position,
+            set_orb_position,
+            focus_main_window,
+            get_pending_recommendation_count,
+            accept_recommendation,
+            dismiss_recommendation,
+            list_pending_recommendations,
+            orb_query
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                let state: State<Arc<AppState>> = window.state();
-                let child_opt = state
-                    .sidecar_process
-                    .lock()
-                    .ok()
-                    .and_then(|mut g| g.take());
-                if let Some(mut child) = child_opt {
-                    let _ = child.kill();
-                    println!("[sidecar] process killed on window close");
+                // Only kill the sidecar when the MAIN window closes (label "main").
+                // Closing the main window should NOT terminate the orb — the orb
+                // persists as a background desktop widget until the user explicitly
+                // quits the application.
+                if window.label() == "main" {
+                    let state: State<Arc<AppState>> = window.state();
+                    let child_opt = state
+                        .sidecar_process
+                        .lock()
+                        .ok()
+                        .and_then(|mut g| g.take());
+                    if let Some(mut child) = child_opt {
+                        let _ = child.kill();
+                        println!("[sidecar] process killed on main window close");
+                    }
                 }
             }
         })

@@ -598,6 +598,60 @@ async function disablePlugin(pluginId: string): Promise<PluginRecord> {
   return invoke<PluginRecord>("disable_plugin", { pluginId });
 }
 
+// ── Orb window IPC ────────────────────────────────────────────────────────────
+
+export interface PlacementCandidate {
+  folder: string;
+  score: number;
+  label: "Strong" | "Good" | "Possible";
+}
+
+export interface PendingRecommendation {
+  id: string;
+  source_path: string;
+  candidates: PlacementCandidate[];
+}
+
+/** Returns the current screen-space position of the orb window. */
+async function getOrbPosition(): Promise<{ x: number; y: number }> {
+  return invoke<{ x: number; y: number }>("get_orb_position");
+}
+
+/** Moves the orb window to the given absolute screen coordinates. */
+async function setOrbPosition(x: number, y: number): Promise<void> {
+  return invoke<void>("set_orb_position", { x, y });
+}
+
+/** Shows and focuses the main EAC window. */
+async function focusMainWindow(): Promise<void> {
+  return invoke<void>("focus_main_window");
+}
+
+/** Returns the number of pending file placement recommendations. */
+async function getPendingRecommendationCount(): Promise<number> {
+  return invoke<number>("get_pending_recommendation_count");
+}
+
+/** Returns all pending file placement recommendations. */
+async function listPendingRecommendations(): Promise<PendingRecommendation[]> {
+  return invoke<PendingRecommendation[]>("list_pending_recommendations");
+}
+
+/** Accepts a recommendation and moves the file to the chosen folder. */
+async function acceptRecommendation(recommendationId: string, folder: string): Promise<void> {
+  return invoke<void>("accept_recommendation", { recommendationId, folder });
+}
+
+/** Dismisses a recommendation without moving the file. */
+async function dismissRecommendation(recommendationId: string): Promise<void> {
+  return invoke<void>("dismiss_recommendation", { recommendationId });
+}
+
+/** Sends a single-turn query to the LLM via the backend. Returns the response text. */
+async function orbQuery(query: string): Promise<string> {
+  return invoke<string>("orb_query", { query });
+}
+
 /**
  * Returns AI-generated search query suggestions based on recently indexed file paths.
  * The client is responsible for caching the result (1-hour TTL recommended).
@@ -649,4 +703,12 @@ export const IPCClient = {
   storeCredential,
   loadCredential,
   deleteCredential,
+  getOrbPosition,
+  setOrbPosition,
+  focusMainWindow,
+  getPendingRecommendationCount,
+  listPendingRecommendations,
+  acceptRecommendation,
+  dismissRecommendation,
+  orbQuery,
 } as const;

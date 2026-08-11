@@ -11,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request as StarletteRequest
 
-from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, plugins as plugins_router_module, search, stats
+from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, orb as orb_router_module, plugins as plugins_router_module, search, stats
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
@@ -207,6 +207,7 @@ app.include_router(documents.router)
 app.include_router(plugins_router_module.router)
 app.include_router(watcher_router_module.router, prefix="/watcher", tags=["watcher"])
 app.include_router(stats.router)
+app.include_router(orb_router_module.router)
 
 
 @app.get("/health")
