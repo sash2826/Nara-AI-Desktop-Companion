@@ -3,9 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { useOrbWindowStore } from "./orbWindowStore";
 
+interface SourceItem {
+  path: string;
+  name: string;
+}
+
 interface QueryState {
   status: "idle" | "submitting" | "answered" | "error";
   response: string;
+  sources: SourceItem[];
   errorMessage: string;
 }
 
@@ -27,6 +33,7 @@ export function OrbQueryOverlay() {
     status: "idle",
     errorMessage: "",
     response: "",
+    sources: [],
   });
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,7 +44,7 @@ export function OrbQueryOverlay() {
   const handleDismiss = useCallback(() => {
     setOverlayMode("none");
     setQuery("");
-    setQueryState({ status: "idle", response: "", errorMessage: "" });
+    setQueryState({ status: "idle", response: "", sources: [], errorMessage: "" });
   }, [setOverlayMode]);
 
   useEffect(() => {
@@ -52,17 +59,23 @@ export function OrbQueryOverlay() {
     const trimmed = query.trim();
     if (!trimmed || queryState.status === "submitting") return;
 
-    setQueryState({ status: "submitting", response: "", errorMessage: "" });
+    setQueryState({ status: "submitting", response: "", sources: [], errorMessage: "" });
     setAnimationState("processing");
 
     try {
-      // Ask the Tauri backend to run the query via the Python sidecar
-      const response = await invoke<string>("orb_query", { query: trimmed });
-      setQueryState({ status: "answered", response, errorMessage: "" });
+      const result = await invoke<{ response: string; sources: SourceItem[] }>("orb_query", {
+        query: trimmed,
+      });
+      setQueryState({
+        status: "answered",
+        response: result.response,
+        sources: result.sources ?? [],
+        errorMessage: "",
+      });
       setAnimationState("idle");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setQueryState({ status: "error", response: "", errorMessage: msg });
+      setQueryState({ status: "error", response: "", sources: [], errorMessage: msg });
       setAnimationState("error");
     }
   }, [query, queryState.status, setAnimationState]);
@@ -171,6 +184,55 @@ export function OrbQueryOverlay() {
                 ? `Error: ${queryState.errorMessage}`
                 : queryState.response}
             </div>
+
+            {/* Source file chips */}
+            {queryState.sources.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 4,
+                  marginTop: 8,
+                  paddingTop: 6,
+                  borderTop: "1px solid hsl(0 0% 100% / 0.08)",
+                }}
+              >
+                {queryState.sources.map((src) => (
+                  <button
+                    key={src.path}
+                    onClick={() => invoke("open_file", { path: src.path }).catch(() => {})}
+                    title={src.path}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      border: "1px solid hsl(0 0% 100% / 0.15)",
+                      background: "hsl(0 0% 100% / 0.07)",
+                      color: "hsl(210 80% 70%)",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      maxWidth: 160,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <span style={{ opacity: 0.7 }}>📄</span>
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {src.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Action row */}
             <div

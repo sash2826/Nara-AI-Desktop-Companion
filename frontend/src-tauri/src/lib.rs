@@ -1332,10 +1332,10 @@ async fn list_pending_recommendations(
         .map_err(|e| e.to_string())
 }
 
-/// Sends a single-turn query to the LLM through the backend and returns the
-/// response text. Used by the orb inline query overlay.
+/// Sends a single-turn query to the LLM through the backend.
+/// Returns both the response text and a list of source file paths.
 #[tauri::command]
-async fn orb_query(query: String, state: State<'_, Arc<AppState>>) -> Result<String, String> {
+async fn orb_query(query: String, state: State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
     let base = sidecar_base(&state)?;
     let url = format!("{}/orb/query", base);
     let body = serde_json::json!({ "query": query });
@@ -1348,8 +1348,9 @@ async fn orb_query(query: String, state: State<'_, Arc<AppState>>) -> Result<Str
     if !resp.status().is_success() {
         return Err(format!("orb_query returned HTTP {}", resp.status().as_u16()));
     }
-    let parsed: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    Ok(parsed["response"].as_str().unwrap_or("").to_string())
+    resp.json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ─── Plugin commands ──────────────────────────────────────────────────────────
