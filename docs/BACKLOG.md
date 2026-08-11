@@ -78,4 +78,37 @@ Items deferred from completed phases. Each entry records what was deferred, why,
 
 ---
 
-*Last updated: 2026-08-10*
+---
+
+## Graph Correctness (Pre-08 blocker)
+
+### get_connected_documents — unbounded recursive CTE
+**Deferred from:** Phase 06 audit  
+**Why:** The recursive CTE in `SQLiteGraphProvider.get_connected_documents()` has no depth limit. For large graphs this causes excessive traversal and corrupts placement recommendation scores in Phase 09.  
+**Recommended:** Apply before Phase 08. Cap traversal at 2 hops, mirroring `_reachable_ids_from_id(depth=2)`. Also fix `get_context` case-sensitive name match (`WHERE name = ?` → `WHERE lower(name) = lower(?)`).
+
+---
+
+## File Organisation
+
+### Bulk accept for suggestions inbox
+**Deferred from:** Phase 09/10 design  
+**Why:** "Accept all Strong matches" was noted as a useful UX enhancement but scoped out to keep Phase 09 focused on the core recommendation and move flow.  
+**Recommended:** Add in a future UX polish pass after Phase 10.
+
+### SearchEnricherPlugin wiring
+**Deferred from:** Phase 06B  
+**Why:** The `SearchEnricherPlugin` ABC exists but the search pipeline does not call enrichers. The clean wiring point is the post-RRF merge step in `SearchService.hybrid_search()`. Reassess when Phase 07 (Automation) is scheduled — the refactor belongs there.
+
+---
+
+## Orb / UI
+
+### Volvo/Scandinavian main app design
+**Deferred from:** Phase 08 design session (2026-08-11)  
+**Why:** The user will decide the Volvo/Scandinavian visual direction separately. The main EAC window retains its current dark theme until that decision is made.  
+**Recommended:** Treat as a dedicated design + implementation phase once direction is confirmed.
+
+---
+
+*Last updated: 2026-08-11*

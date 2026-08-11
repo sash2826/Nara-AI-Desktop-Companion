@@ -11,6 +11,7 @@ knowledge base.
 """
 
 import logging
+import re
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -23,6 +24,18 @@ from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import H
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orb", tags=["orb"])
+
+# Minimum word count before we bother hitting the search pipeline.
+# Greetings and very short queries can't produce meaningful RRF scores.
+_MIN_QUERY_WORDS_FOR_RAG: int = 3
+
+# Conversational patterns that should never trigger RAG.
+_CONVERSATIONAL_RE = re.compile(
+    r"^\s*(hi+|hello+|hey+|howdy|greetings?|good\s+(morning|afternoon|evening|day)|"
+    r"thanks?|thank\s+you|thx|cheers|bye+|goodbye|ok+|okay|sure|yes|no|yep|nope|"
+    r"who\s+are\s+you|what\s+are\s+you|help)\s*[.!?]?\s*$",
+    re.IGNORECASE,
+)
 
 
 class OrbQueryRequest(BaseModel):
@@ -55,38 +68,41 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
     context_text = ""
     sources: list[OrbSourceItem] = []
 
-    # RAG: use the same hybrid search pipeline as the main search router.
-    try:
-        preprocessor = getattr(request.app.state, "preprocessor", None)
-        search_text = preprocessor.process(query).search_text if preprocessor else query
+    # RAG: skip for conversational queries and very short inputs that cannot
+    # meaningfully match indexed documents.
+    word_count = len(query.split())
+    is_conversational = bool(_CONVERSATIONAL_RE.match(query)) or word_count < _MIN_QUERY_WORDS_FOR_RAG
 
-        orchestrator = HybridSearchOrchestrator(
-            conn=request.app.state.db,
-            qdrant_client=request.app.state.qdrant.get_client(),
-            embedding_service=EmbeddingService(),
-        )
-        results = await orchestrator.search(
-            query=search_text,
-            top_k=5,
-            workspace_path=None,
-            semantic_weight=0.7,
-            keyword_weight=0.3,
-        )
-        if results:
-            # Build context with file attribution so the LLM knows which file each
-            # snippet came from and can reference it by name.
-            snippets = []
-            seen_paths: set[str] = set()
-            for r in results[:5]:
-                path = r.document_path
-                name = path.replace("\\", "/").split("/")[-1]
-                snippets.append(f"[{name}]\n{r.content[:400]}")
-                if path not in seen_paths:
-                    seen_paths.add(path)
-                    sources.append(OrbSourceItem(path=path, name=name))
-            context_text = "\n\n".join(snippets[:3])
-    except Exception:
-        logger.debug("Orb RAG context fetch failed — proceeding without context")
+    if not is_conversational:
+        try:
+            preprocessor = getattr(request.app.state, "preprocessor", None)
+            search_text = preprocessor.process(query).search_text if preprocessor else query
+
+            orchestrator = HybridSearchOrchestrator(
+                conn=request.app.state.db,
+                qdrant_client=request.app.state.qdrant.get_client(),
+                embedding_service=EmbeddingService(),
+            )
+            results = await orchestrator.search(
+                query=search_text,
+                top_k=20,
+                workspace_path=None,
+                semantic_weight=0.7,
+                keyword_weight=0.3,
+            )
+            if results:
+                snippets = []
+                seen_paths: set[str] = set()
+                for r in results[:5]:
+                    path = r.document_path
+                    name = path.replace("\\", "/").split("/")[-1]
+                    snippets.append(f"[{name}]\n{r.content[:400]}")
+                    if path not in seen_paths:
+                        seen_paths.add(path)
+                        sources.append(OrbSourceItem(path=path, name=name))
+                context_text = "\n\n".join(snippets[:3])
+        except Exception:
+            logger.debug("Orb RAG context fetch failed — proceeding without context")
 
     if context_text:
         system_content = (

@@ -64,6 +64,44 @@ The system should function as an intelligent layer above the user's existing fil
 
 The architecture must support future expansion without major redesign.
 
+## Core Experience Pillars (settled 2026-08-11)
+
+**Living Orb — Desktop Native Widget**
+
+The Living Orb is a standalone always-on-top Tauri window that floats on the desktop independently of the main application. It is the ambient interface surface for EAC:
+
+- Single click opens a compact inline query overlay (Liquid Glass visual, grows from the orb).
+- Double click opens the full EAC main window.
+- Orb glows amber when file placement recommendations are pending.
+- Five animation states signal system activity: Idle, Listening, Processing, Notification Pending, Error.
+- Orb auto-starts with Windows and persists when the main window is closed.
+- Liquid Glass aesthetic applies to the orb and all floating overlays only. The main app UI is Volvo/Scandinavian inspired (direction TBD by user).
+
+**File Intelligence — Placement Recommendations**
+
+EAC watches the OS Downloads folder automatically. When a new file arrives:
+
+1. The file is indexed (embeddings, entities, graph relationships).
+2. A placement scorer combines knowledge graph community overlap (70%) and hybrid search rerank similarity (30%) against all known folders.
+3. The top 3 candidate folders are presented via the orb overlay with confidence labels.
+4. If the user accepts, EAC physically moves the file and updates all records in place (no re-indexing).
+5. If the user ignores, the recommendation persists in a Suggestions inbox until acted upon.
+6. EAC never moves a file without explicit user consent.
+
+For existing indexed files, an on-demand "Organise" audit and a passive background suggester surface reorganisation opportunities over time using the same scoring formula.
+
+## Phase Roadmap (as of 2026-08-11)
+
+| Phase    | Name                               | Status    |
+| -------- | ---------------------------------- | --------- |
+| 00–06    | Foundation through Security        | Complete  |
+| Pre-08   | SQLite Graph Correctness Fixes     | Planned   |
+| 08       | Orb Native Shell                   | Planned   |
+| 09       | File Organisation — New Files      | Planned   |
+| 10       | File Organisation — Existing Files | Planned   |
+| 07       | Automation Engine                  | Deferred — under review |
+| 11       | Polish & Release                   | Planned   |
+
 ---
 
 # 4. Core Engineering Philosophy

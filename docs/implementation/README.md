@@ -58,17 +58,21 @@ Implementation guides should never contradict the architecture or accepted Archi
 
 Development is organized into the following phases.
 
-| Phase    | Name                   | Objective                                                         |
-| -------- | ---------------------- | ----------------------------------------------------------------- |
-| Phase 00 | Assistant Experience   | Desktop application, Character Widget, conversation architecture  |
-| Phase 01 | AI Integration         | APIM provider, RAG pipeline, embeddings, streaming responses      |
-| Phase 02 | Knowledge & Search     | Data layer (SQLite, Neo4j, Qdrant) and hybrid search engine       |
-| Phase 03 | Workspace Features     | Workspace management, document browser, search UI                 |
-| Phase 04 | AI Context & Intelligence | Context assembly, conversation memory, reranking, source citation |
-| Phase 05 | Knowledge Graph        | Graph-augmented retrieval, entity/relationship extraction          |
-| Phase 06 | Enterprise Features    | Plugin system, security, authentication, audit logging            |
-| Phase 07 | Automation             | Workflow engine, task scheduling, event-driven processing         |
-| Phase 08 | Polish & Release       | Testing, quality assurance, packaging, and production release     |
+| Phase       | Name                              | Status    | Objective                                                              |
+| ----------- | --------------------------------- | --------- | ---------------------------------------------------------------------- |
+| Phase 00    | Assistant Experience              | Complete  | Desktop application, Character Widget, conversation architecture       |
+| Phase 01    | AI Integration                    | Complete  | APIM provider, RAG pipeline, embeddings, streaming responses           |
+| Phase 02    | Knowledge & Search                | Complete  | Data layer (SQLite, Neo4j, Qdrant) and hybrid search engine            |
+| Phase 03    | Workspace Features                | Complete  | Workspace management, document browser, search UI                      |
+| Phase 04    | AI Context & Intelligence         | Complete  | Context assembly, conversation memory, reranking, source citation      |
+| Phase 05    | Knowledge Graph                   | Complete  | Graph-augmented retrieval, entity/relationship extraction               |
+| Phase 06    | Enterprise Features               | Complete  | Plugin system, security, authentication, audit logging                 |
+| Pre-08      | Graph Correctness Fixes           | Planned   | SQLite graph CTE depth cap and case-insensitive name lookup            |
+| Phase 08    | Orb Native Shell                  | Planned   | Always-on-top orb window, Liquid Glass UI, 5 animation states          |
+| Phase 09    | File Organisation — New Files     | Planned   | Downloads auto-watch, graph+rerank placement recommendations, move     |
+| Phase 10    | File Organisation — Existing Files| Planned   | On-demand audit + passive background reorganisation suggestions        |
+| Phase 07    | Automation Engine                 | Deferred  | Workflow engine, task scheduling, event-driven processing (under review)|
+| Phase 11    | Polish & Release                  | Planned   | Testing, quality assurance, packaging, and production release          |
 
 Each phase should be completed before progressing to the next unless dependencies explicitly allow parallel development.
 

@@ -1232,6 +1232,10 @@ async fn set_orb_position(app: AppHandle, x: i32, y: i32) -> Result<(), String> 
 /// Shows the main EAC window and brings it to the foreground.
 #[tauri::command]
 async fn focus_main_window(app: AppHandle) -> Result<(), String> {
+    // Hide the orb while the main window is open — they should not coexist.
+    if let Some(orb) = app.get_webview_window("orb") {
+        let _ = orb.hide();
+    }
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "Main window not found".to_string())?;
@@ -1239,6 +1243,21 @@ async fn focus_main_window(app: AppHandle) -> Result<(), String> {
     window
         .set_focus()
         .map_err(|e| format!("Failed to focus main window: {}", e))
+}
+
+/// Relays the orb Q&A handoff to the main window via Rust-side emit.
+///
+/// Frontend-to-frontend `emitTo` is unreliable across separate Tauri webview
+/// windows. Routing through Rust (`window.emit`) guarantees delivery to the
+/// correct webview's event listener.
+#[tauri::command]
+async fn relay_orb_handoff(app: AppHandle, query: String, response: String) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window not found".to_string())?;
+    window
+        .emit("orb-handoff", serde_json::json!({ "query": query, "response": response }))
+        .map_err(|e| format!("Failed to relay orb handoff: {}", e))
 }
 
 /// Returns the number of pending file placement recommendations.
@@ -1760,6 +1779,7 @@ pub fn run() {
             get_orb_position,
             set_orb_position,
             focus_main_window,
+            relay_orb_handoff,
             get_pending_recommendation_count,
             accept_recommendation,
             dismiss_recommendation,
@@ -1770,11 +1790,15 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 match window.label() {
                     "main" => {
-                        // Closing the main window hides it — the orb stays alive
-                        // and the sidecar keeps running. The user can re-open the
-                        // main window by double-clicking the orb.
+                        // Closing the main window hides it and brings the orb back.
+                        // The sidecar keeps running. The user can re-open the main
+                        // window by double-clicking the orb.
                         api.prevent_close();
                         let _ = window.hide();
+                        if let Some(orb) = window.app_handle().get_webview_window("orb") {
+                            let _ = orb.show();
+                            let _ = orb.set_focus();
+                        }
                     }
                     "orb" => {
                         // Closing the orb is a full application quit.

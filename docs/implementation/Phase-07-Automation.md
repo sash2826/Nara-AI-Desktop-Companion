@@ -2,11 +2,13 @@
 
 **Phase:** 07
 
-**Status:** Planned
+**Status:** Deferred — Under Review
 
-**Estimated Duration:** 3-5 Days
+**Estimated Duration:** 3-5 Days (estimate unchanged; scope under review)
 
 ---
+
+> **Note (2026-08-11):** This phase is deferred pending user review of scope and relevance. Phases 08, 09, and 10 (Orb Native Shell and File Organisation) have been inserted ahead of it. The event system defined here is not required by Phases 08–10 — those phases use the existing `progress_cb` callback pattern rather than a full event bus. Phase 07 will be reassessed and scheduled after Phase 10 is complete.
 
 # Purpose
 

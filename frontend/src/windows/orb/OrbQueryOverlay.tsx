@@ -10,10 +10,20 @@ interface SourceItem {
 
 interface QueryState {
   status: "idle" | "submitting" | "answered" | "error";
+  submittedQuery: string;
   response: string;
   sources: SourceItem[];
   errorMessage: string;
+  thinkingPhase: number;
 }
+
+const THINKING_PHRASES = [
+  "Thinking",
+  "Searching your knowledge base",
+  "Reading through files",
+  "Combining results",
+  "Almost there",
+];
 
 const OVERLAY_WIDTH = 340;
 
@@ -31,20 +41,50 @@ export function OrbQueryOverlay() {
   const [query, setQuery] = useState("");
   const [queryState, setQueryState] = useState<QueryState>({
     status: "idle",
+    submittedQuery: "",
     errorMessage: "",
     response: "",
     sources: [],
+    thinkingPhase: 0,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const thinkingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  // Advance thinking phrase every 1.8s while submitting
+  useEffect(() => {
+    if (queryState.status === "submitting") {
+      thinkingTimerRef.current = setInterval(() => {
+        setQueryState((prev) => ({
+          ...prev,
+          thinkingPhase: (prev.thinkingPhase + 1) % THINKING_PHRASES.length,
+        }));
+      }, 1800);
+    } else {
+      if (thinkingTimerRef.current) {
+        clearInterval(thinkingTimerRef.current);
+        thinkingTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
+    };
+  }, [queryState.status]);
+
   const handleDismiss = useCallback(() => {
     setOverlayMode("none");
     setQuery("");
-    setQueryState({ status: "idle", response: "", sources: [], errorMessage: "" });
+    setQueryState({
+      status: "idle",
+      submittedQuery: "",
+      response: "",
+      sources: [],
+      errorMessage: "",
+      thinkingPhase: 0,
+    });
   }, [setOverlayMode]);
 
   useEffect(() => {
@@ -59,35 +99,62 @@ export function OrbQueryOverlay() {
     const trimmed = query.trim();
     if (!trimmed || queryState.status === "submitting") return;
 
-    setQueryState({ status: "submitting", response: "", sources: [], errorMessage: "" });
+    // Clear input immediately and capture query text (Claude-style)
+    const capturedQuery = trimmed;
+    setQuery("");
+    setQueryState({
+      status: "submitting",
+      submittedQuery: capturedQuery,
+      response: "",
+      sources: [],
+      errorMessage: "",
+      thinkingPhase: 0,
+    });
     setAnimationState("processing");
 
     try {
       const result = await invoke<{ response: string; sources: SourceItem[] }>("orb_query", {
-        query: trimmed,
+        query: capturedQuery,
       });
-      setQueryState({
+      setQueryState((prev) => ({
+        ...prev,
         status: "answered",
         response: result.response,
         sources: result.sources ?? [],
-        errorMessage: "",
-      });
+      }));
       setAnimationState("idle");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setQueryState({ status: "error", response: "", sources: [], errorMessage: msg });
+      setQueryState((prev) => ({
+        ...prev,
+        status: "error",
+        errorMessage: msg,
+      }));
       setAnimationState("error");
     }
   }, [query, queryState.status, setAnimationState]);
 
   const handleOpenInEAC = useCallback(async () => {
+    // Route via Rust so the event is guaranteed to arrive in the main webview.
+    // Direct frontend emitTo is unreliable across separate Tauri webview windows.
+    try {
+      await invoke("relay_orb_handoff", {
+        query: queryState.submittedQuery,
+        response: queryState.response,
+      });
+    } catch {
+      // Best-effort — main window listener handles missing events gracefully
+    }
     try {
       await invoke("focus_main_window");
     } catch {
       // Main window may already be focused — ignore
     }
     handleDismiss();
-  }, [handleDismiss]);
+  }, [queryState.submittedQuery, queryState.response, handleDismiss]);
+
+  const isSubmitting = queryState.status === "submitting";
+  const hasResult = queryState.status === "answered" || queryState.status === "error";
 
   return (
     <motion.div
@@ -101,7 +168,6 @@ export function OrbQueryOverlay() {
         right: 0,
         width: OVERLAY_WIDTH,
         zIndex: 100,
-        // Liquid Glass styling
         background: "hsl(0 0% 100% / 0.12)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
@@ -116,6 +182,29 @@ export function OrbQueryOverlay() {
         fontSize: 13,
       }}
     >
+      {/* Submitted query echo — appears after input clears */}
+      <AnimatePresence>
+        {queryState.submittedQuery && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            style={{
+              marginBottom: 8,
+              fontSize: 12,
+              color: "hsl(0 0% 60%)",
+              fontStyle: "italic",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {queryState.submittedQuery}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Input row */}
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input
@@ -125,8 +214,8 @@ export function OrbQueryOverlay() {
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSubmit();
           }}
-          placeholder="Ask anything…"
-          disabled={queryState.status === "submitting"}
+          placeholder={isSubmitting ? "" : "Ask anything…"}
+          disabled={isSubmitting}
           style={{
             flex: 1,
             background: "hsl(0 0% 100% / 0.08)",
@@ -140,29 +229,89 @@ export function OrbQueryOverlay() {
         />
         <button
           onClick={handleSubmit}
-          disabled={!query.trim() || queryState.status === "submitting"}
+          disabled={!query.trim() || isSubmitting}
           style={{
             padding: "6px 12px",
             borderRadius: 8,
             border: "none",
             background:
-              !query.trim() || queryState.status === "submitting"
+              !query.trim() || isSubmitting
                 ? "hsl(0 0% 100% / 0.10)"
                 : "hsl(var(--color-primary-500))",
             color: "hsl(0 0% 95%)",
-            cursor: !query.trim() || queryState.status === "submitting" ? "default" : "pointer",
+            cursor: !query.trim() || isSubmitting ? "default" : "pointer",
             fontSize: 12,
             fontWeight: 600,
             transition: "background 0.2s",
           }}
         >
-          {queryState.status === "submitting" ? "…" : "Ask"}
+          Ask
         </button>
       </div>
 
+      {/* Animated thinking state */}
+      <AnimatePresence>
+        {isSubmitting && (
+          <motion.div
+            key="thinking"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ marginTop: 10, overflow: "hidden" }}
+          >
+            <div
+              style={{
+                paddingTop: 6,
+                borderTop: "1px solid hsl(0 0% 100% / 0.10)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {/* Three pulsing dots */}
+              <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
+                {[0, 1, 2].map((i) => (
+                  <motion.span
+                    key={i}
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{
+                      duration: 1.2,
+                      repeat: Infinity,
+                      delay: i * 0.2,
+                      ease: "easeInOut",
+                    }}
+                    style={{
+                      display: "block",
+                      width: 4,
+                      height: 4,
+                      borderRadius: "50%",
+                      background: "hsl(210 80% 65%)",
+                    }}
+                  />
+                ))}
+              </span>
+              {/* Cycling phrase */}
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={queryState.thinkingPhase}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  style={{ fontSize: 12, color: "hsl(210 80% 65%)", fontStyle: "italic" }}
+                >
+                  {THINKING_PHRASES[queryState.thinkingPhase]}…
+                </motion.span>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Response area */}
       <AnimatePresence>
-        {(queryState.status === "answered" || queryState.status === "error") && (
+        {hasResult && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -221,11 +370,7 @@ export function OrbQueryOverlay() {
                   >
                     <span style={{ opacity: 0.7 }}>📄</span>
                     <span
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
+                      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                     >
                       {src.name}
                     </span>
@@ -235,28 +380,23 @@ export function OrbQueryOverlay() {
             )}
 
             {/* Action row */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                marginTop: 8,
-              }}
-            >
-              <button
-                onClick={handleOpenInEAC}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 7,
-                  border: "1px solid hsl(0 0% 100% / 0.18)",
-                  background: "hsl(0 0% 100% / 0.08)",
-                  color: "hsl(0 0% 92%)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                Open in EAC
-              </button>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              {queryState.status === "answered" && (
+                <button
+                  onClick={handleOpenInEAC}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 7,
+                    border: "1px solid hsl(0 0% 100% / 0.18)",
+                    background: "hsl(0 0% 100% / 0.08)",
+                    color: "hsl(0 0% 92%)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Open in EAC
+                </button>
+              )}
               <button
                 onClick={handleDismiss}
                 style={{
