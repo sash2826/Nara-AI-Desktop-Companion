@@ -90,8 +90,7 @@ export function OrbNotificationOverlay() {
       style={{
         position: "absolute",
         bottom: "calc(100% + 10px)",
-        left: "50%",
-        transform: "translateX(-50%)",
+        right: 0,
         width: 360,
         zIndex: 100,
         background: "hsl(0 0% 100% / 0.12)",

@@ -85,8 +85,7 @@ export function OrbQueryOverlay() {
       style={{
         position: "absolute",
         bottom: "calc(100% + 10px)",
-        left: "50%",
-        transform: "translateX(-50%)",
+        right: 0,
         width: OVERLAY_WIDTH,
         zIndex: 100,
         // Liquid Glass styling

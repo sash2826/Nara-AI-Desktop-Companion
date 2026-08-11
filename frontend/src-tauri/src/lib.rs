@@ -1535,17 +1535,19 @@ fn create_orb_window(app: &tauri::App) {
         let logical_h = (size.height as f64 / scale) as i32;
         let logical_x = (pos.x as f64 / scale) as i32;
         let logical_y = (pos.y as f64 / scale) as i32;
+        // Window is 400 wide × 380 tall. Right edge flush with screen right (24px inset).
+        // Orb sphere sits in the bottom-right corner; overlay expands leftward inside the window.
         (
-            logical_x + logical_w - 80 - 24,
-            logical_y + logical_h - 340 - 56,
+            logical_x + logical_w - 400 - 24,
+            logical_y + logical_h - 380 - 48,
         )
     } else {
-        (1160, 640)
+        (840, 620)
     };
 
     match WebviewWindowBuilder::new(app, "orb", WebviewUrl::App("index.html".into()))
         .title("EAC Orb")
-        .inner_size(80.0, 340.0)
+        .inner_size(400.0, 380.0)
         .resizable(false)
         .always_on_top(true)
         .decorations(false)

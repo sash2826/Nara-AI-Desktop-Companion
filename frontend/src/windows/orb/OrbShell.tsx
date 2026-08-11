@@ -177,7 +177,8 @@ export function OrbShell() {
   return (
     /*
      * Outer wrapper fills the entire transparent orb window.
-     * The orb itself is centred in a small region; overlays grow above it.
+     * The orb sphere sits in the bottom-right corner; overlays expand
+     * leftward into the remaining window width.
      */
     <div
       style={{
@@ -185,12 +186,11 @@ export function OrbShell() {
         height: "100%",
         display: "flex",
         alignItems: "flex-end",
-        justifyContent: "center",
+        justifyContent: "flex-end",
         paddingBottom: 8,
+        paddingRight: 8,
         position: "relative",
-        // Tauri transparent window — no background here
         background: "transparent",
-        // Prevent text selection on drag
         userSelect: "none",
         WebkitUserSelect: "none",
       }}
