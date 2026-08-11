@@ -1550,6 +1550,7 @@ fn create_orb_window(app: &tauri::App) {
         .always_on_top(true)
         .decorations(false)
         .transparent(true)
+        .shadow(false)
         .skip_taskbar(true)
         .position(start_x as f64, start_y as f64)
         .build()

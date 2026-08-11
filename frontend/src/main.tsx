@@ -9,6 +9,20 @@ import "./styles/globals.css";
 // The orb WebviewWindow is created with label "orb" in lib.rs.
 const windowLabel = getCurrentWindow().label;
 
+// The global CSS sets body { background-color: hsl(var(--background)) } which
+// paints the orb window black. Override html+body to transparent before React
+// mounts so the Tauri transparent window actually shows through.
+if (windowLabel === "orb") {
+  const style = document.createElement("style");
+  style.textContent = `
+    html, body, #root {
+      background: transparent !important;
+      overflow: visible !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 const root = document.getElementById("root") as HTMLElement;
 
 ReactDOM.createRoot(root).render(
