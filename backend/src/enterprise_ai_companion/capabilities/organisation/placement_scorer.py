@@ -84,13 +84,19 @@ class PlacementScorer:
         if not candidate_folder_paths:
             return []
 
-        new_file_entity_ids = await self._get_entity_ids_for_document(document_id)
+        new_file_canonicals = await self._get_canonical_set_for_document(document_id)
         first_chunk_text = await self._get_first_chunk_text(document_id)
+
+        logger.info(
+            "[PLACEMENT] doc=%s canonical entities (%d): %s",
+            document_id, len(new_file_canonicals),
+            sorted(new_file_canonicals)[:20],
+        )
 
         tasks = [
             self._score_folder(
                 folder_path=folder,
-                new_file_entity_ids=new_file_entity_ids,
+                new_file_canonicals=new_file_canonicals,
                 query_text=first_chunk_text,
             )
             for folder in candidate_folder_paths
@@ -110,7 +116,10 @@ class PlacementScorer:
         )
 
         if not scored:
-            logger.info("[PLACEMENT] All %d candidate(s) below threshold %.2f — no recommendation", len(folder_scores), _SCORE_MIN_THRESHOLD)
+            logger.info(
+                "[PLACEMENT] All %d candidate(s) below threshold %.2f — no recommendation",
+                len(folder_scores), _SCORE_MIN_THRESHOLD,
+            )
 
         return [
             {"folder": fs.folder, "score": round(fs.score, 4), "label": fs.label}
@@ -120,11 +129,11 @@ class PlacementScorer:
     async def _score_folder(
         self,
         folder_path: str,
-        new_file_entity_ids: set[str],
+        new_file_canonicals: set[str],
         query_text: str,
     ) -> FolderScore:
         graph_s, rerank_s = await asyncio.gather(
-            self._graph_score(folder_path, new_file_entity_ids),
+            self._graph_score(folder_path, new_file_canonicals),
             self._rerank_score(folder_path, query_text),
         )
         combined = _GRAPH_WEIGHT * graph_s + _RERANK_WEIGHT * rerank_s
@@ -135,37 +144,68 @@ class PlacementScorer:
         )
 
     # ------------------------------------------------------------------
-    # Graph score
+    # Graph score — canonical-name Jaccard
     # ------------------------------------------------------------------
 
     async def _graph_score(
         self,
         folder_path: str,
-        new_file_entity_ids: set[str],
+        new_file_canonicals: set[str],
     ) -> float:
-        if not new_file_entity_ids:
+        """Jaccard similarity on canonical entity names between the new file and folder.
+
+        Entity UUIDs are document-specific and never match across documents.
+        Canonical names (lowercased, normalised) ARE shared vocabulary — "japan"
+        from one document matches "japan" from another, giving meaningful overlap.
+        """
+        if not new_file_canonicals:
             return 0.0
 
-        folder_entity_ids = await self._get_entity_ids_for_folder(folder_path)
-        if not folder_entity_ids:
+        folder_canonicals = await self._get_canonical_set_for_folder(folder_path)
+        if not folder_canonicals:
             return 0.0
 
-        intersection = new_file_entity_ids & folder_entity_ids
-        union = new_file_entity_ids | folder_entity_ids
+        intersection = new_file_canonicals & folder_canonicals
+        union = new_file_canonicals | folder_canonicals
+        logger.debug(
+            "[PLACEMENT] graph_score folder=%s intersection=%d union=%d",
+            folder_path, len(intersection), len(union),
+        )
         return len(intersection) / len(union) if union else 0.0
 
-    async def _get_entity_ids_for_document(self, document_id: str) -> set[str]:
-        """Return the entity IDs extracted directly from *document_id*."""
+    async def _get_canonical_set_for_document(self, document_id: str) -> set[str]:
+        """Return canonical names for entities in *document_id*, expanded 1 hop."""
         async with self._conn.execute(
-            "SELECT id FROM graph_entities WHERE source_document_id = ?",
+            "SELECT id, canonical FROM graph_entities WHERE source_document_id = ?",
             (document_id,),
         ) as cur:
             rows = await cur.fetchall()
-        return {row[0] for row in rows}
 
-    async def _get_entity_ids_for_folder(self, folder_path: str) -> set[str]:
-        """Return entity IDs for all documents in *folder_path*, expanded 1 hop."""
-        # Step 1: collect document IDs in this folder (workspace_path == folder_path).
+        if not rows:
+            return set()
+
+        entity_ids = [row[0] for row in rows]
+        canonicals: set[str] = {row[1] for row in rows if row[1]}
+
+        # Expand 1 hop — include canonical names of directly related entities.
+        placeholders = ",".join("?" * len(entity_ids))
+        async with self._conn.execute(
+            f"""
+            SELECT e.canonical FROM graph_entities e
+            WHERE e.id IN (
+                SELECT target_id FROM graph_relationships WHERE source_id IN ({placeholders})
+                UNION
+                SELECT source_id FROM graph_relationships WHERE target_id IN ({placeholders})
+            ) AND e.canonical IS NOT NULL
+            """,
+            entity_ids + entity_ids,
+        ) as cur:
+            neighbour_rows = await cur.fetchall()
+
+        return canonicals | {row[0] for row in neighbour_rows}
+
+    async def _get_canonical_set_for_folder(self, folder_path: str) -> set[str]:
+        """Return canonical names for all entities in *folder_path*, expanded 1 hop."""
         async with self._conn.execute(
             "SELECT id FROM documents WHERE workspace_path = ?",
             (folder_path,),
@@ -178,31 +218,34 @@ class PlacementScorer:
         doc_ids = [row[0] for row in doc_rows]
         placeholders = ",".join("?" * len(doc_ids))
 
-        # Step 2: seed entity IDs directly associated with those documents.
         async with self._conn.execute(
-            f"SELECT id FROM graph_entities WHERE source_document_id IN ({placeholders})",
+            f"SELECT id, canonical FROM graph_entities WHERE source_document_id IN ({placeholders})",
             doc_ids,
         ) as cur:
             entity_rows = await cur.fetchall()
 
-        seed_ids = {row[0] for row in entity_rows}
-        if not seed_ids:
+        if not entity_rows:
             return set()
 
-        # Step 3: expand 1 hop via graph_relationships (both directions).
-        ent_placeholders = ",".join("?" * len(seed_ids))
-        seed_list = list(seed_ids)
+        entity_ids = [row[0] for row in entity_rows]
+        canonicals: set[str] = {row[1] for row in entity_rows if row[1]}
+
+        # Expand 1 hop.
+        ent_placeholders = ",".join("?" * len(entity_ids))
         async with self._conn.execute(
             f"""
-            SELECT target_id FROM graph_relationships WHERE source_id IN ({ent_placeholders})
-            UNION
-            SELECT source_id FROM graph_relationships WHERE target_id IN ({ent_placeholders})
+            SELECT e.canonical FROM graph_entities e
+            WHERE e.id IN (
+                SELECT target_id FROM graph_relationships WHERE source_id IN ({ent_placeholders})
+                UNION
+                SELECT source_id FROM graph_relationships WHERE target_id IN ({ent_placeholders})
+            ) AND e.canonical IS NOT NULL
             """,
-            seed_list + seed_list,
+            entity_ids + entity_ids,
         ) as cur:
             neighbour_rows = await cur.fetchall()
 
-        return seed_ids | {row[0] for row in neighbour_rows}
+        return canonicals | {row[0] for row in neighbour_rows}
 
     # ------------------------------------------------------------------
     # Rerank score
