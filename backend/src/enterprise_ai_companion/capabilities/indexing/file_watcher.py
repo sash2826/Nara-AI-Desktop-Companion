@@ -167,12 +167,18 @@ class DebounceHandler(FileSystemEventHandler):
 
     async def _fire_new_file(self, src_path: str) -> None:
         """Index a single new file and invoke post_index_hook on success."""
+        logger.info("[PLACEMENT] _fire_new_file: %s (hook=%s)", src_path, self._post_index_hook is not None)
         document_id = await self._indexer.index_file(src_path, self._folder_path)
+        logger.info("[PLACEMENT] index_file returned doc_id=%s for %s", document_id, src_path)
         if document_id and self._post_index_hook is not None:
             try:
                 await self._post_index_hook(src_path, document_id)
             except Exception:
                 logger.exception("post_index_hook failed for %s", src_path)
+        elif not document_id:
+            logger.warning("[PLACEMENT] doc_id is None for %s — hook skipped", src_path)
+        elif self._post_index_hook is None:
+            logger.warning("[PLACEMENT] post_index_hook is None for %s — Downloads watcher has no hook wired", src_path)
 
     def cancel_all(self) -> None:
         """Cancel pending debounce timers — called when a watch is removed."""

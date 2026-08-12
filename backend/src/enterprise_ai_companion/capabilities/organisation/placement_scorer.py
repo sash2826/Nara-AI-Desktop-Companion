@@ -97,11 +97,20 @@ class PlacementScorer:
         ]
         folder_scores: list[FolderScore] = await asyncio.gather(*tasks)
 
+        for fs in folder_scores:
+            logger.info(
+                "[PLACEMENT] folder=%s score=%.4f label=%s",
+                fs.folder, fs.score, fs.label,
+            )
+
         scored = sorted(
             (fs for fs in folder_scores if fs.score >= _SCORE_MIN_THRESHOLD),
             key=lambda fs: fs.score,
             reverse=True,
         )
+
+        if not scored:
+            logger.info("[PLACEMENT] All %d candidate(s) below threshold %.2f — no recommendation", len(folder_scores), _SCORE_MIN_THRESHOLD)
 
         return [
             {"folder": fs.folder, "score": round(fs.score, 4), "label": fs.label}

@@ -50,6 +50,7 @@ class RecommendationService:
 
     async def _process(self, file_path: str, document_id: str) -> None:
         all_folders = await self._watcher.list_folders()
+        logger.info("[PLACEMENT] process_new_file: %s | all watched folders: %s", file_path, [f.path for f in all_folders])
         candidate_paths = [
             f.path
             for f in all_folders
@@ -57,8 +58,8 @@ class RecommendationService:
         ]
 
         if not candidate_paths:
-            logger.debug(
-                "No candidate folders for %s — no other watched folders registered", file_path
+            logger.info(
+                "[PLACEMENT] No candidate folders for %s — no other watched folders registered", file_path
             )
             return
 
