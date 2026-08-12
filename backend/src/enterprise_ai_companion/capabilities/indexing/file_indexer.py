@@ -239,17 +239,23 @@ class FileIndexer:
     async def index_file(self, file_path: str, workspace_path: str) -> str | None:
         """Index a single file and return its document ID on success.
 
-        Returns None if the file was skipped (unchanged hash), unsupported, or
-        caused an error. Intended for single-file triggers such as the Downloads
-        watcher, where re-indexing the entire workspace would be wasteful.
+        Returns the document ID whether the file was freshly indexed or was
+        already up-to-date (unchanged hash). Returns None only when the file
+        is unsupported, unsafe, or caused an unrecoverable error.
+
+        Returning the ID for unchanged files ensures callers (e.g. the Downloads
+        watcher hook) can still act on already-indexed files dropped into a new
+        location — the file is present in the index, just with no content change.
         """
         resolved = Path(file_path).resolve()
         if not self._is_safe_path(resolved):
             logger.warning("index_file: unsafe path rejected: %s", resolved)
             return None
 
-        indexed = await self._index_file(resolved, workspace_path)
-        if not indexed:
+        try:
+            await self._index_file(resolved, workspace_path)
+        except Exception as exc:
+            logger.warning("index_file: error indexing %s: %s", resolved.name, exc)
             return None
 
         doc = await self._doc_repo.get_by_path(str(resolved))

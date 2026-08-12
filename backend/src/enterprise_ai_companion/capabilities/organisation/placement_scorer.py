@@ -44,7 +44,7 @@ _SCORE_STRONG_THRESHOLD = 0.65
 _SCORE_GOOD_THRESHOLD = 0.35
 # Candidates below this threshold are suppressed entirely — avoids spurious
 # "Possible" suggestions when there is no meaningful topical overlap.
-_SCORE_MIN_THRESHOLD = 0.10
+_SCORE_MIN_THRESHOLD = 0.05
 
 
 @dataclass(frozen=True)
