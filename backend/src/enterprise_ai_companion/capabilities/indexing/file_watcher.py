@@ -346,8 +346,19 @@ class WatcherService:
             await self._db.commit()
             logger.info("Downloads folder auto-registered: %s", folder.path)
 
-        if self._running and str(downloads) not in self._watches:
-            self._schedule_watch(str(downloads))
+        if self._running:
+            downloads_str = str(downloads)
+            existing_entry = self._watches.get(downloads_str)
+            if existing_entry is not None:
+                _, existing_handler = existing_entry
+                # Handler was created during _async_start() before recommendation_service
+                # was assigned — replace it with one that has the hook wired.
+                if existing_handler._post_index_hook is None and self.recommendation_service is not None:
+                    logger.info("Re-wiring Downloads watcher with recommendation hook")
+                    self._unschedule_watch(downloads_str)
+                    self._schedule_watch(downloads_str)
+            else:
+                self._schedule_watch(downloads_str)
 
     def _schedule_watch(self, path: str) -> None:
         if path in self._watches:
