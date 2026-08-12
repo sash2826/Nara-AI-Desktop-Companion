@@ -42,6 +42,9 @@ _LABEL_POSSIBLE = "Possible"
 
 _SCORE_STRONG_THRESHOLD = 0.65
 _SCORE_GOOD_THRESHOLD = 0.35
+# Candidates below this threshold are suppressed entirely — avoids spurious
+# "Possible" suggestions when there is no meaningful topical overlap.
+_SCORE_MIN_THRESHOLD = 0.10
 
 
 @dataclass(frozen=True)
@@ -95,7 +98,7 @@ class PlacementScorer:
         folder_scores: list[FolderScore] = await asyncio.gather(*tasks)
 
         scored = sorted(
-            (fs for fs in folder_scores if fs.score > 0.0),
+            (fs for fs in folder_scores if fs.score >= _SCORE_MIN_THRESHOLD),
             key=lambda fs: fs.score,
             reverse=True,
         )

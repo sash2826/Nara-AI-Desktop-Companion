@@ -109,13 +109,23 @@ class DebounceHandler(FileSystemEventHandler):
         )
 
         if dest_in_folder:
-            # File renamed or moved within this watched folder — update path only.
-            coro = self._indexer.rename_file(src, dest)
+            src_ext = Path(src).suffix.lower()
+            if src_ext in SUPPORTED_EXTENSIONS:
+                # File renamed or moved within this watched folder — update path only.
+                asyncio.run_coroutine_threadsafe(
+                    self._indexer.rename_file(src, dest), self._loop
+                )
+            else:
+                # Source was a partial/temp file (e.g. .crdownload, .part) — a
+                # browser download that just completed. Treat the final file as new.
+                with self._lock:
+                    self._created_paths.add(dest)
+                self._schedule(dest, is_new=True)
         else:
             # File moved out of this watched folder — remove its index records.
-            coro = self._indexer.delete_file(src)
-
-        asyncio.run_coroutine_threadsafe(coro, self._loop)
+            asyncio.run_coroutine_threadsafe(
+                self._indexer.delete_file(src), self._loop
+            )
 
     def _schedule(self, src_path: str, is_new: bool = False) -> None:
         if _is_excluded(src_path):
