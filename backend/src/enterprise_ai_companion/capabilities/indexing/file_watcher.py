@@ -89,6 +89,34 @@ class DebounceHandler(FileSystemEventHandler):
                 self._created_paths.add(event.src_path)
             self._schedule(event.src_path, is_new=True)
 
+    def on_deleted(self, event: FileSystemEvent) -> None:
+        if not event.is_directory and not _is_excluded(event.src_path):
+            coro = self._indexer.delete_file(event.src_path)
+            asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    def on_moved(self, event: FileSystemEvent) -> None:
+        if event.is_directory:
+            return
+        src = event.src_path
+        dest = getattr(event, "dest_path", None)
+        if _is_excluded(src):
+            return
+
+        dest_in_folder = (
+            dest is not None
+            and dest.startswith(self._folder_path)
+            and Path(dest).suffix.lower() in SUPPORTED_EXTENSIONS
+        )
+
+        if dest_in_folder:
+            # File renamed or moved within this watched folder — update path only.
+            coro = self._indexer.rename_file(src, dest)
+        else:
+            # File moved out of this watched folder — remove its index records.
+            coro = self._indexer.delete_file(src)
+
+        asyncio.run_coroutine_threadsafe(coro, self._loop)
+
     def _schedule(self, src_path: str, is_new: bool = False) -> None:
         if _is_excluded(src_path):
             return

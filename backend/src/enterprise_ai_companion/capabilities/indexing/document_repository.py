@@ -79,3 +79,11 @@ class DocumentRepository:
     async def delete_by_path(self, file_path: str) -> None:
         await self._conn.execute("DELETE FROM documents WHERE file_path = ?", (file_path,))
         await self._conn.commit()
+
+    async def update_path(self, old_path: str, new_path: str) -> None:
+        """Update the stored file_path without touching any other record."""
+        await self._conn.execute(
+            "UPDATE documents SET file_path = ? WHERE file_path = ?",
+            (new_path, old_path),
+        )
+        await self._conn.commit()

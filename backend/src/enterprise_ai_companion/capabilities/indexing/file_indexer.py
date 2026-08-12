@@ -255,6 +255,42 @@ class FileIndexer:
         doc = await self._doc_repo.get_by_path(str(resolved))
         return doc.id if doc else None
 
+    async def delete_file(self, file_path: str) -> bool:
+        """Remove all index records for a file. Returns True if the file was indexed.
+
+        Cleans up chunks (SQLite + Qdrant), graph entities, graph state, and the
+        document row. Safe to call when the file no longer exists on disk.
+        """
+        resolved = str(Path(file_path).resolve())
+        doc = await self._doc_repo.get_by_path(resolved)
+        if doc is None:
+            return False
+
+        await self._chunk_repo.delete_by_document(doc.id)
+        await self._graph_service.delete_document(doc.id)
+        if self._graph_state_repo is not None:
+            await self._graph_state_repo.delete_by_document(doc.id)
+        await self._doc_repo.delete_by_path(resolved)
+
+        logger.debug("Deleted index for %s", Path(resolved).name)
+        return True
+
+    async def rename_file(self, src_path: str, dest_path: str) -> bool:
+        """Update the stored file_path when a file is renamed or moved within a workspace.
+
+        Only updates the SQLite path — no re-embedding or re-chunking. Returns
+        True when the source document was found and updated.
+        """
+        src = str(Path(src_path).resolve())
+        dest = str(Path(dest_path).resolve())
+        doc = await self._doc_repo.get_by_path(src)
+        if doc is None:
+            return False
+
+        await self._doc_repo.update_path(src, dest)
+        logger.debug("Renamed index: %s → %s", Path(src).name, Path(dest).name)
+        return True
+
     def _extract_text(self, file_path: Path) -> str:
         """Extract plain text from a file based on its extension.
 
