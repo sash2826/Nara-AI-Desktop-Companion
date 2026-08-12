@@ -186,21 +186,7 @@ export function OrbNotificationOverlay() {
                       {top.label}
                     </span>
                     {" · "}
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 11,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "inline-block",
-                        maxWidth: 220,
-                        verticalAlign: "bottom",
-                      }}
-                      title={top.folder}
-                    >
-                      {top.folder}
-                    </span>
+                    <span title={top.folder}>{top.folder.split(/[\\/]/).pop() ?? top.folder}</span>
                   </div>
                 )}
 
