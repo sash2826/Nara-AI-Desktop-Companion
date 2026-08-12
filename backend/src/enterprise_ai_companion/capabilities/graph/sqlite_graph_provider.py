@@ -247,6 +247,10 @@ class SQLiteGraphProvider(GraphProvider):
     # Maximum number of nodes returned by get_visualization to keep the
     # WebView force simulation within safe memory/CPU limits.
     _VIS_NODE_LIMIT = 150
+    # How many entities to sample per source document in the overview.
+    # Ensures every indexed document gets representation regardless of
+    # how its entity confidence compares globally.
+    _VIS_NODES_PER_DOC = 5
 
     async def get_visualization(
         self,
@@ -298,8 +302,27 @@ class SQLiteGraphProvider(GraphProvider):
             ) as cur:
                 edge_rows = await cur.fetchall()
         else:
+            # Sample up to _VIS_NODES_PER_DOC entities from each source document
+            # (ranked by confidence), then take the global top _VIS_NODE_LIMIT.
+            # This guarantees every indexed document gets representation rather
+            # than the overview being dominated by a single high-entity-count file.
             async with self._conn.execute(
-                f"{node_select} ORDER BY e.confidence DESC LIMIT 50"
+                f"""
+                {node_select}
+                WHERE e.id IN (
+                    SELECT id FROM (
+                        SELECT id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY source_document_id
+                                   ORDER BY confidence DESC
+                               ) AS rn
+                        FROM graph_entities
+                    ) ranked
+                    WHERE rn <= {self._VIS_NODES_PER_DOC}
+                )
+                ORDER BY e.confidence DESC
+                LIMIT {self._VIS_NODE_LIMIT}
+                """
             ) as cur:
                 node_rows = await cur.fetchall()
 
