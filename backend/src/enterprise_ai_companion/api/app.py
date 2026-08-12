@@ -37,6 +37,10 @@ from enterprise_ai_companion.infrastructure.config import get_config
 from enterprise_ai_companion.infrastructure.database import close_db, open_db
 from enterprise_ai_companion.infrastructure.qdrant_provider import QdrantProvider
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
