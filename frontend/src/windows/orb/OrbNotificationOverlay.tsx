@@ -9,7 +9,7 @@ interface Recommendation {
   candidates: Array<{
     folder: string;
     score: number;
-    label: "Strong" | "Good" | "Possible";
+    label: "Most Likely" | "Likely" | "Possible";
   }>;
 }
 
@@ -22,6 +22,7 @@ export function OrbNotificationOverlay() {
   const { setOverlayMode, setPendingCount } = useOrbWindowStore();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     invoke<Recommendation[]>("list_pending_recommendations")
@@ -52,12 +53,12 @@ export function OrbNotificationOverlay() {
         setRecommendations(updated);
         setPendingCount(updated.length);
         if (updated.length === 0) setOverlayMode("none");
-      } catch {
-        // Errors surface in the main window; dismiss quietly here
-        handleDismiss();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setErrors((prev) => new Map(prev).set(recId, msg));
       }
     },
-    [recommendations, setPendingCount, setOverlayMode, handleDismiss]
+    [recommendations, setPendingCount, setOverlayMode]
   );
 
   const handleSkip = useCallback(
@@ -76,8 +77,8 @@ export function OrbNotificationOverlay() {
   );
 
   const labelColor = (label: Recommendation["candidates"][0]["label"]) => {
-    if (label === "Strong") return "hsl(142 70% 55%)";
-    if (label === "Good") return "hsl(210 80% 65%)";
+    if (label === "Most Likely") return "hsl(142 70% 55%)";
+    if (label === "Likely") return "hsl(210 80% 65%)";
     return "hsl(0 0% 65%)";
   };
 
@@ -185,15 +186,23 @@ export function OrbNotificationOverlay() {
                     <span style={{ color: labelColor(top.label), fontWeight: 600 }}>
                       {top.label}
                     </span>
+                    <span style={{ color: "hsl(0 0% 55%)", marginLeft: 4 }}>
+                      {Math.round(top.score * 100)}%
+                    </span>
                     {" · "}
                     <span title={top.folder}>{top.folder.split(/[\\/]/).pop() ?? top.folder}</span>
+                  </div>
+                )}
+                {errors.get(rec.id) && (
+                  <div style={{ fontSize: 11, color: "hsl(0 75% 65%)", marginBottom: 6 }}>
+                    {errors.get(rec.id)}
                   </div>
                 )}
 
                 <div style={{ display: "flex", gap: 8 }}>
                   {top && (
                     <button
-                      onClick={() => handleAccept(rec.id, top.folder)}
+                      onClick={() => void handleAccept(rec.id, top.folder)}
                       style={{
                         padding: "4px 12px",
                         borderRadius: 7,

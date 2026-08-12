@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import platform
 import uuid
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from weakref import WeakValueDictionary
 
 from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvider
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
@@ -43,7 +46,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".xlsx"}
 
 # Directory names that are never traversed during indexing, regardless of depth.
 # Shared with file_watcher.py which imports this constant.
@@ -168,6 +171,13 @@ class FileIndexer:
         self._abbreviation_repo = abbreviation_repo
         self._graph_state_repo = graph_state_repo
         self._plugin_manager = plugin_manager
+        # Per-file locks prevent concurrent indexing of the same path, which
+        # causes FOREIGN KEY failures when one coroutine replaces the document
+        # row while another is mid-way through inserting its graph entities.
+        # WeakValueDictionary releases locks automatically when no coroutine
+        # holds a reference, so the dict never grows unbounded.
+        self._file_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
+        self._locks_meta = asyncio.Lock()
 
     def _is_safe_path(self, resolved: Path) -> bool:
         """Return False if resolved is inside a blocked OS-critical directory."""
@@ -178,6 +188,26 @@ class FileIndexer:
             except ValueError:
                 pass
         return True
+
+    @asynccontextmanager
+    async def _file_lock(self, path: str):
+        """Yield a per-file asyncio.Lock, creating it if it does not yet exist.
+
+        Serialises concurrent _index_file calls for the same path so that one
+        coroutine cannot replace the document row (invalidating its UUID) while
+        another coroutine is mid-way through inserting graph entities for the
+        old UUID, which would produce a FOREIGN KEY constraint failure.
+
+        WeakValueDictionary means the Lock is released from memory as soon as
+        no coroutine holds a live reference, so the dict never grows unbounded.
+        """
+        async with self._locks_meta:
+            lock = self._file_locks.get(path)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._file_locks[path] = lock
+        async with lock:
+            yield
 
     async def index_workspace(
         self,
@@ -321,10 +351,34 @@ class FileIndexer:
             import docx  # noqa: PLC0415
             doc = docx.Document(str(file_path))
             return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        if ext == ".xlsx":
+            import openpyxl  # noqa: PLC0415
+            wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+            parts: list[str] = []
+            for sheet in wb.worksheets:
+                if sheet.title:
+                    parts.append(sheet.title)
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = "  ".join(str(v) for v in row if v is not None)
+                    if row_text.strip():
+                        parts.append(row_text)
+            wb.close()
+            return "\n".join(parts)
         return file_path.read_text(encoding="utf-8", errors="replace")
 
     async def _index_file(self, file_path: Path, workspace_path: str) -> bool:
-        """Index a single file. Returns True if indexed, False if unchanged."""
+        """Index a single file. Returns True if indexed, False if unchanged.
+
+        Acquires a per-file lock before doing any database work so that two
+        concurrent calls for the same path are serialised.  Without this, one
+        coroutine can delete and replace the document row while another is
+        inserting graph entities for the old UUID, causing FOREIGN KEY failures.
+        """
+        async with self._file_lock(str(file_path)):
+            return await self._index_file_locked(file_path, workspace_path)
+
+    async def _index_file_locked(self, file_path: Path, workspace_path: str) -> bool:
+        """Inner implementation — called only while the per-file lock is held."""
         text = self._extract_text(file_path)
 
         # Run text through enabled TextProcessorPlugins before hashing/chunking.

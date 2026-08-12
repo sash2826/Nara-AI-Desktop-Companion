@@ -14,6 +14,7 @@ import { IPCClient, PendingRecommendation } from "@/services/ipc/IPCClient";
 function SuggestionsInbox() {
   const [recommendations, setRecommendations] = useState<PendingRecommendation[]>([]);
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [errors, setErrors] = useState<Map<string, string>>(new Map());
   // cancelRef prevents setState after unmount when the async fetch is in-flight.
   const cancelRef = useRef(false);
 
@@ -35,11 +36,18 @@ function SuggestionsInbox() {
     const top = rec.candidates[0];
     if (!top) return;
     setBusy((prev) => new Set(prev).add(rec.id));
+    setErrors((prev) => {
+      const m = new Map(prev);
+      m.delete(rec.id);
+      return m;
+    });
     try {
       await IPCClient.acceptRecommendation(rec.id, top.folder);
       setRecommendations((prev) => prev.filter((r) => r.id !== rec.id));
-    } catch {
-      // Leave in list on failure so the user can retry
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Move failed — file may no longer be in Downloads";
+      setErrors((prev) => new Map(prev).set(rec.id, msg));
     } finally {
       setBusy((prev) => {
         const next = new Set(prev);
@@ -79,6 +87,7 @@ function SuggestionsInbox() {
           const top = rec.candidates[0];
           const folderName = top ? (top.folder.split(/[\\/]/).pop() ?? top.folder) : null;
           const isLoading = busy.has(rec.id);
+          const errorMsg = errors.get(rec.id);
 
           return (
             <div
@@ -93,15 +102,18 @@ function SuggestionsInbox() {
                     <span
                       className={cn(
                         "ml-1.5 rounded px-1 py-0.5 text-2xs font-semibold",
-                        top.label === "Strong" &&
+                        top.label === "Most Likely" &&
                           "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                        top.label === "Good" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+                        top.label === "Likely" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
                         top.label === "Possible" && "bg-muted text-muted-foreground"
                       )}
                     >
                       {top.label}
                     </span>
                   </span>
+                )}
+                {errorMsg && (
+                  <span className="mt-0.5 block text-2xs text-destructive">{errorMsg}</span>
                 )}
               </div>
               <div className="flex flex-shrink-0 items-center gap-1.5">

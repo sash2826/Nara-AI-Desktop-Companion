@@ -8,6 +8,7 @@ so the async FileIndexer can be called safely from the sync observer thread.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 import uuid
@@ -24,6 +25,9 @@ from enterprise_ai_companion.capabilities.indexing.file_indexer import (
     EXCLUDED_DIRS,
     FileIndexer,
     SUPPORTED_EXTENSIONS,
+)
+from enterprise_ai_companion.capabilities.organisation.placement_scorer import (
+    _SCORE_MIN_THRESHOLD,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,12 +72,14 @@ class DebounceHandler(FileSystemEventHandler):
         indexer: FileIndexer,
         loop: asyncio.AbstractEventLoop,
         post_index_hook: "asyncio.Coroutine | None" = None,
+        post_delete_hook: "asyncio.Coroutine | None" = None,
     ) -> None:
         super().__init__()
         self._folder_path = folder_path
         self._indexer = indexer
         self._loop = loop
         self._post_index_hook = post_index_hook
+        self._post_delete_hook = post_delete_hook
         self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
         # Tracks paths that arrived via on_created (truly new files).
@@ -91,8 +97,13 @@ class DebounceHandler(FileSystemEventHandler):
 
     def on_deleted(self, event: FileSystemEvent) -> None:
         if not event.is_directory and not _is_excluded(event.src_path):
-            coro = self._indexer.delete_file(event.src_path)
-            asyncio.run_coroutine_threadsafe(coro, self._loop)
+            asyncio.run_coroutine_threadsafe(
+                self._indexer.delete_file(event.src_path), self._loop
+            )
+            if self._post_delete_hook is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self._post_delete_hook(event.src_path), self._loop
+                )
 
     def on_moved(self, event: FileSystemEvent) -> None:
         if event.is_directory:
@@ -122,10 +133,15 @@ class DebounceHandler(FileSystemEventHandler):
                     self._created_paths.add(dest)
                 self._schedule(dest, is_new=True)
         else:
-            # File moved out of this watched folder — remove its index records.
+            # File moved out of this watched folder — remove its index records
+            # and dismiss any pending placement recommendation for it.
             asyncio.run_coroutine_threadsafe(
                 self._indexer.delete_file(src), self._loop
             )
+            if self._post_delete_hook is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self._post_delete_hook(src), self._loop
+                )
 
     def _schedule(self, src_path: str, is_new: bool = False) -> None:
         if _is_excluded(src_path):
@@ -333,6 +349,99 @@ class WatcherService:
         """Return all registered watched folders."""
         return await self._load_folders()
 
+    async def reconcile_stale_files(self) -> int:
+        """Remove index records for files that no longer exist on disk.
+
+        Called at startup (as a background task) to purge records left behind
+        when files were deleted or moved while the backend was not running —
+        events that watchdog never saw.
+
+        Three passes:
+        1. Documents — for each file in `documents`, remove index records
+           (documents / chunks / graph entities) if the file is gone from disk.
+        2. Recommendations (orphan) — for each pending recommendation whose
+           source_path no longer exists on disk, auto-dismiss it. Catches
+           orphaned rows whose document was deleted by a prior watchdog run.
+        3. Recommendations (threshold) — dismiss pending recommendations whose
+           stored top score is below the current _SCORE_MIN_THRESHOLD. Cleans up
+           false-positive records produced by an older, less selective scorer.
+
+        Returns the count of stale document records removed.
+        """
+        # Pass 1 — stale document records
+        async with self._db.execute("SELECT file_path FROM documents") as cur:
+            doc_rows = await cur.fetchall()
+
+        removed_docs = 0
+        dismissed_from_docs: set[str] = set()
+        for (file_path,) in doc_rows:
+            if not Path(file_path).exists():
+                logger.info("Reconcile: stale document — removing index for %s", file_path)
+                await self._indexer.delete_file(file_path)
+                if self.recommendation_service is not None:
+                    await self.recommendation_service.dismiss_stale_for_path(file_path)
+                    dismissed_from_docs.add(file_path)
+                removed_docs += 1
+
+        # Pass 2 — orphaned pending recommendations whose document is already gone
+        if self.recommendation_service is not None:
+            async with self._db.execute(
+                "SELECT DISTINCT source_path FROM file_placement_recommendations "
+                "WHERE status = 'pending'"
+            ) as cur:
+                rec_rows = await cur.fetchall()
+
+            for (source_path,) in rec_rows:
+                if source_path in dismissed_from_docs:
+                    continue  # already handled in pass 1
+                if not Path(source_path).exists():
+                    logger.info(
+                        "Reconcile: orphaned recommendation — auto-dismissing for %s", source_path
+                    )
+                    await self.recommendation_service.dismiss_stale_for_path(source_path)
+
+        # Pass 3 — dismiss pending recommendations whose stored score is below
+        # the current minimum threshold. This cleans up records produced by an
+        # older, less selective scorer without requiring file deletion or a
+        # manual re-drop. Safe to run at every startup: dismissed records can
+        # be regenerated if the file is re-dropped into Downloads.
+        dismissed_below_threshold = 0
+        if self.recommendation_service is not None:
+            async with self._db.execute(
+                "SELECT source_path, recommendations FROM file_placement_recommendations "
+                "WHERE status = 'pending'"
+            ) as cur:
+                score_rows = await cur.fetchall()
+
+            for (source_path, recs_json) in score_rows:
+                if source_path in dismissed_from_docs:
+                    continue  # already handled in pass 1
+                try:
+                    candidates = json.loads(recs_json) if recs_json else []
+                    top_score = candidates[0]["score"] if candidates else 0.0
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    top_score = 0.0
+                if top_score < _SCORE_MIN_THRESHOLD:
+                    logger.info(
+                        "Reconcile: stale recommendation (score=%.4f < threshold=%.2f) "
+                        "— dismissing for %s",
+                        top_score, _SCORE_MIN_THRESHOLD, source_path,
+                    )
+                    await self.recommendation_service.dismiss_stale_for_path(source_path)
+                    dismissed_below_threshold += 1
+
+        total = removed_docs
+        if removed_docs or dismissed_below_threshold:
+            logger.info(
+                "Startup reconciliation complete — removed %d stale document(s), "
+                "dismissed %d below-threshold recommendation(s)",
+                removed_docs, dismissed_below_threshold,
+            )
+        else:
+            logger.debug("Startup reconciliation complete — all indexed files present on disk")
+
+        return total
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -396,8 +505,12 @@ class WatcherService:
             if existing_entry is not None:
                 _, existing_handler = existing_entry
                 # Handler was created during _async_start() before recommendation_service
-                # was assigned — replace it with one that has the hook wired.
-                if existing_handler._post_index_hook is None and self.recommendation_service is not None:
+                # was assigned — replace it with one that has both hooks wired.
+                needs_rewire = self.recommendation_service is not None and (
+                    existing_handler._post_index_hook is None
+                    or existing_handler._post_delete_hook is None
+                )
+                if needs_rewire:
                     logger.info("Re-wiring Downloads watcher with recommendation hook")
                     self._unschedule_watch(downloads_str)
                     self._schedule_watch(downloads_str)
@@ -408,18 +521,25 @@ class WatcherService:
         if path in self._watches:
             return
 
-        hook = None
-        if (
-            path == DOWNLOADS_PATH
-            and self.recommendation_service is not None
-            and hasattr(self.recommendation_service, "process_new_file")
-        ):
-            hook = self.recommendation_service.process_new_file
+        index_hook = None
+        delete_hook = None
+        if path == DOWNLOADS_PATH and self.recommendation_service is not None:
+            if hasattr(self.recommendation_service, "process_new_file"):
+                index_hook = self.recommendation_service.process_new_file
+            if hasattr(self.recommendation_service, "dismiss_stale_for_path"):
+                delete_hook = self.recommendation_service.dismiss_stale_for_path
 
-        handler = DebounceHandler(path, self._indexer, self._loop, post_index_hook=hook)
+        handler = DebounceHandler(
+            path, self._indexer, self._loop,
+            post_index_hook=index_hook,
+            post_delete_hook=delete_hook,
+        )
         watch = self._observer.schedule(handler, path, recursive=True)
         self._watches[path] = (watch, handler)
-        logger.debug("Scheduled watchdog watch on: %s (hook=%s)", path, hook is not None)
+        logger.debug(
+            "Scheduled watchdog watch on: %s (index_hook=%s, delete_hook=%s)",
+            path, index_hook is not None, delete_hook is not None,
+        )
 
     def _unschedule_watch(self, path: str) -> None:
         entry = self._watches.pop(path, None)

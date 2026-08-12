@@ -40,10 +40,17 @@ htmlcov/
 *.tmp
 *.bak
 
+# Large test/recording artifacts — store externally (OneDrive, SharePoint)
+testing/*.mp4
+testing/*.mov
+testing/*.avi
+
 # Runtime data (generated at runtime, never committed)
 qdrant_data/
 *.sqlite
 *.db
+*.db-shm
+*.db-wal
 !database/migrations/*.sql
 
 # graphify intermediate files (large extraction caches, not useful to commit)

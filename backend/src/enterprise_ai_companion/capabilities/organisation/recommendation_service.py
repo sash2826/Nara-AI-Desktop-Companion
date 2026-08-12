@@ -74,8 +74,12 @@ class RecommendationService:
 
         if not scored:
             logger.info(
-                "No scoring signal for %s — no recommendation created", file_path
+                "No scoring signal for %s — dismissing any stale pending recommendation", file_path
             )
+            # Dismiss any existing pending record produced by an older, less
+            # selective scorer run. Without this, a re-dropped file keeps its
+            # stale false-positive recommendation indefinitely.
+            await self.dismiss_stale_for_path(file_path)
             return
 
         await self._repo.create(file_path, scored)
@@ -85,3 +89,18 @@ class RecommendationService:
             scored[0]["folder"],
             scored[0]["score"],
         )
+
+    async def dismiss_stale_for_path(self, source_path: str) -> None:
+        """Dismiss any pending recommendations for a file that has been deleted or moved away.
+
+        Called by the watcher's on_deleted and on_moved handlers so that stale
+        inbox entries are cleaned up automatically rather than surfacing a broken
+        "Move here" action to the user.
+        """
+        try:
+            await self._repo.dismiss_by_source_path(source_path)
+        except Exception:
+            logger.exception(
+                "RecommendationService: failed to auto-dismiss stale recommendation for %s",
+                source_path,
+            )

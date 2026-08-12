@@ -55,11 +55,17 @@ class FileMover:
 
         # Update the documents table in-place — preserves id, chunks, and
         # all graph_entities that reference this document via source_document_id.
+        # workspace_path is also updated to the target folder so that
+        # _get_canonical_set_for_folder queries (WHERE workspace_path = ?) can
+        # find this document's entities when scoring future recommendations.
         await self._conn.execute(
-            "UPDATE documents SET file_path = ? WHERE file_path = ?",
-            (new_path, source_path),
+            "UPDATE documents SET file_path = ?, workspace_path = ? WHERE file_path = ?",
+            (new_path, target_folder, source_path),
         )
         await self._conn.commit()
-        logger.debug("SQLite documents.file_path updated: %s → %s", source_path, new_path)
+        logger.debug(
+            "SQLite documents updated: file_path %s → %s, workspace_path → %s",
+            source_path, new_path, target_folder,
+        )
 
         return new_path

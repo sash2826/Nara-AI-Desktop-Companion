@@ -170,6 +170,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     watcher.recommendation_service = recommendation_service
     await watcher._ensure_downloads_registered()
 
+    # Purge index records for files deleted while the backend was offline.
+    # Runs as a background task so it never blocks startup.
+    asyncio.create_task(watcher.reconcile_stale_files())
+
     app.state.indexing_tasks: dict = {}
 
     try:

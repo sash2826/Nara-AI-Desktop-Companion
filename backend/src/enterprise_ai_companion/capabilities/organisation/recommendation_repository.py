@@ -126,6 +126,32 @@ class RecommendationRepository:
         )
         await self._conn.commit()
 
+    async def dismiss_by_source_path(self, source_path: str) -> int:
+        """Dismiss all pending recommendations whose source file is *source_path*.
+
+        Called automatically when the watcher detects a file deletion so that
+        stale recommendations no longer appear in the inbox. Already-resolved
+        records (accepted or dismissed) are left unchanged.
+
+        Returns the number of rows updated.
+        """
+        resolved_at = datetime.now(UTC).isoformat()
+        async with self._conn.execute(
+            "UPDATE file_placement_recommendations "
+            "SET status='dismissed', resolved_at=? "
+            "WHERE source_path=? AND status='pending'",
+            (resolved_at, source_path),
+        ) as cur:
+            count = cur.rowcount
+        await self._conn.commit()
+        if count:
+            logger.info(
+                "Auto-dismissed %d stale recommendation(s) for deleted/moved file: %s",
+                count,
+                source_path,
+            )
+        return count
+
 
 def _row_to_recommendation(row: Any) -> PlacementRecommendation:
     try:
