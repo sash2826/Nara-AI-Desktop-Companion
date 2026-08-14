@@ -234,6 +234,9 @@ class FileIndexer:
         result.files_found = len(files)
 
         for file_path in files:
+            # Yield to the event loop so CancelledError is delivered promptly
+            # between files rather than waiting for the current file to finish.
+            await asyncio.sleep(0)
             if _is_cloud_stub(file_path):
                 logger.debug("Skipping cloud-only stub: %s", file_path.name)
                 result.files_skipped += 1
@@ -379,7 +382,8 @@ class FileIndexer:
 
     async def _index_file_locked(self, file_path: Path, workspace_path: str) -> bool:
         """Inner implementation — called only while the per-file lock is held."""
-        text = self._extract_text(file_path)
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(None, self._extract_text, file_path)
 
         # Run text through enabled TextProcessorPlugins before hashing/chunking.
         if self._plugin_manager:
