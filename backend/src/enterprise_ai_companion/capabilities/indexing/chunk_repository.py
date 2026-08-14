@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import logging
 from dataclasses import dataclass
 
@@ -83,7 +85,11 @@ class ChunkRepository:
             )
             for chunk, embedding in zip(chunks, embeddings)
         ]
-        self._qdrant.upsert(collection_name=CHUNKS_COLLECTION, points=points)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            functools.partial(self._qdrant.upsert, collection_name=CHUNKS_COLLECTION, points=points),
+        )
         logger.debug("Saved %d chunks to SQLite and Qdrant.", len(chunks))
 
     async def delete_by_document(self, document_id: str) -> None:
@@ -108,9 +114,14 @@ class ChunkRepository:
         )
         await self._conn.commit()
 
-        self._qdrant.delete(
-            collection_name=CHUNKS_COLLECTION,
-            points_selector=qdrant_ids,
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            functools.partial(
+                self._qdrant.delete,
+                collection_name=CHUNKS_COLLECTION,
+                points_selector=qdrant_ids,
+            ),
         )
 
     async def get_by_ids(self, chunk_ids: list[str]) -> list[Chunk]:

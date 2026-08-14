@@ -48,6 +48,11 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".xlsx"}
 
+# Maximum number of files processed concurrently during workspace indexing.
+# Higher values parallelise I/O and thread-pool work (OCR, embeddings, Qdrant)
+# but increase peak memory. 4 is a safe default for typical hardware.
+_INDEXING_CONCURRENCY = 4
+
 # Directory names that are never traversed during indexing, regardless of depth.
 # Shared with file_watcher.py which imports this constant.
 EXCLUDED_DIRS: frozenset[str] = frozenset({
@@ -233,32 +238,50 @@ class FileIndexer:
         files = _collect_files(root)
         result.files_found = len(files)
 
-        for file_path in files:
-            # Yield to the event loop so CancelledError is delivered promptly
-            # between files rather than waiting for the current file to finish.
+        # Pass 1 — text extraction + chunking + embeddings + SQLite + Qdrant.
+        # Up to _INDEXING_CONCURRENCY files run concurrently; the expensive parts
+        # (OCR, ONNX inference, Qdrant writes) all run in thread-pool executors
+        # so the event loop stays free throughout.
+        deferred_graph: list[tuple[str, str, list[str], str]] = []
+        sem = asyncio.Semaphore(_INDEXING_CONCURRENCY)
+
+        async def _process(fp: Path) -> None:
+            # Yield first so CancelledError is delivered promptly between files.
             await asyncio.sleep(0)
-            if _is_cloud_stub(file_path):
-                logger.debug("Skipping cloud-only stub: %s", file_path.name)
+            if _is_cloud_stub(fp):
+                logger.debug("Skipping cloud-only stub: %s", fp.name)
                 result.files_skipped += 1
                 if progress_cb:
                     progress_cb(result)
-                continue
+                return
             try:
-                indexed = await self._index_file(file_path, workspace_path)
+                indexed = await self._index_file(fp, workspace_path, deferred_graph)
                 if indexed:
                     result.files_indexed += 1
                 else:
                     result.files_skipped += 1
             except Exception as exc:
-                logger.warning("Failed to index %s: %s", file_path, exc)
-                result.errors.append(f"{file_path}: {exc}")
+                logger.warning("Failed to index %s: %s", fp, exc)
+                result.errors.append(f"{fp}: {exc}")
                 if self._error_repo is not None:
                     try:
-                        await self._error_repo.save(workspace_path, str(file_path), str(exc))
+                        await self._error_repo.save(workspace_path, str(fp), str(exc))
                     except Exception as repo_exc:
                         logger.warning("Failed to persist indexing error: %s", repo_exc)
             if progress_cb:
                 progress_cb(result)
+
+        async def _bounded(fp: Path) -> None:
+            async with sem:
+                await _process(fp)
+
+        await asyncio.gather(*(_bounded(fp) for fp in files))
+
+        # Pass 2 — graph entity extraction via LLM runs as a background task so
+        # search is available immediately after Pass 1 completes.
+        if deferred_graph:
+            logger.info("[PASS 2] Scheduling graph extraction for %d document(s)", len(deferred_graph))
+            asyncio.create_task(self._run_graph_pass(deferred_graph))
 
         logger.info(
             "Indexing complete: %d found, %d indexed, %d skipped, %d errors",
@@ -369,20 +392,33 @@ class FileIndexer:
             return "\n".join(parts)
         return file_path.read_text(encoding="utf-8", errors="replace")
 
-    async def _index_file(self, file_path: Path, workspace_path: str) -> bool:
+    async def _index_file(
+        self,
+        file_path: Path,
+        workspace_path: str,
+        deferred: list | None = None,
+    ) -> bool:
         """Index a single file. Returns True if indexed, False if unchanged.
 
         Acquires a per-file lock before doing any database work so that two
         concurrent calls for the same path are serialised.  Without this, one
         coroutine can delete and replace the document row while another is
         inserting graph entities for the old UUID, causing FOREIGN KEY failures.
+
+        deferred — when provided, graph extraction is appended to this list
+        instead of being run inline. Used by index_workspace (Pass 2 pattern).
         """
         async with self._file_lock(str(file_path)):
-            return await self._index_file_locked(file_path, workspace_path)
+            return await self._index_file_locked(file_path, workspace_path, deferred)
 
-    async def _index_file_locked(self, file_path: Path, workspace_path: str) -> bool:
+    async def _index_file_locked(
+        self,
+        file_path: Path,
+        workspace_path: str,
+        deferred: list | None = None,
+    ) -> bool:
         """Inner implementation — called only while the per-file lock is held."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         text = await loop.run_in_executor(None, self._extract_text, file_path)
 
         # Run text through enabled TextProcessorPlugins before hashing/chunking.
@@ -437,7 +473,10 @@ class FileIndexer:
             for i, (content, char_start, char_end) in enumerate(raw_chunks)
         ]
 
-        embeddings = self._embedding_service.generate_batch([c.content for c in chunks])
+        chunk_texts = [c.content for c in chunks]
+        embeddings = await loop.run_in_executor(
+            None, self._embedding_service.generate_batch, chunk_texts
+        )
 
         # Document row must exist before chunks are inserted (FK constraint).
         doc = IndexedDocument(
@@ -456,11 +495,41 @@ class FileIndexer:
         # Abbreviation extraction is best-effort — failure must not abort indexing.
         await self._extract_and_save_abbreviations(doc_id, text, file_path.name)
 
-        # Graph build — skip if the content hash matches the last successful build.
-        await self._build_graph_incremental(doc_id, file_hash, chunks, file_path.name)
+        # Graph build — deferred to Pass 2 during workspace indexing (unblocks search
+        # sooner), or run inline for single-file indexing (watcher-triggered).
+        if deferred is not None:
+            deferred.append((doc_id, file_hash, chunk_texts, file_path.name))
+        else:
+            await self._build_graph_incremental(doc_id, file_hash, chunks, file_path.name)
 
         logger.debug("Indexed %s (%d chunks)", file_path.name, len(chunks))
         return True
+
+    async def _run_graph_pass(
+        self,
+        builds: list[tuple[str, str, list[str], str]],
+    ) -> None:
+        """Pass 2: build knowledge graph for documents indexed in Pass 1.
+
+        Runs as a background asyncio task after index_workspace returns so
+        the user can search immediately while graph extraction proceeds.
+        Each build is best-effort — failures are logged and do not block
+        the remaining documents.
+        """
+        for doc_id, file_hash, chunk_texts, file_name in builds:
+            await asyncio.sleep(0)  # yield between documents; allows cancellation
+            try:
+                if self._graph_state_repo is not None:
+                    state = await self._graph_state_repo.get_by_document(doc_id)
+                    if state is not None and state.file_hash == file_hash:
+                        continue  # already built (e.g. unchanged re-index)
+                await self._graph_service.build_from_chunks(doc_id, chunk_texts)
+                if self._graph_state_repo is not None:
+                    await self._graph_state_repo.save(doc_id, file_hash)
+                logger.debug("[PASS 2] Graph built for %s", file_name)
+            except Exception as exc:
+                logger.warning("[PASS 2] Graph build failed for %s: %s", file_name, exc)
+        logger.info("[PASS 2] Graph extraction complete for %d document(s)", len(builds))
 
     async def _extract_and_save_abbreviations(
         self,
