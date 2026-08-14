@@ -24,14 +24,21 @@ export function OrbNotificationOverlay() {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
 
-  useEffect(() => {
+  const fetchRecommendations = useCallback(() => {
     invoke<Recommendation[]>("list_pending_recommendations")
       .then((recs) => {
         setRecommendations(recs);
+        setPendingCount(recs.length);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [setPendingCount]);
+
+  useEffect(() => {
+    fetchRecommendations();
+    const interval = setInterval(fetchRecommendations, 5_000);
+    return () => clearInterval(interval);
+  }, [fetchRecommendations]);
 
   const handleDismiss = useCallback(() => {
     setOverlayMode("none");

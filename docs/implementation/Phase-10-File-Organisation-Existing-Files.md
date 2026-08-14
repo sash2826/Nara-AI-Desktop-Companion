@@ -78,6 +78,10 @@ The Suggestions inbox (introduced in Phase 09) handles both new-file and existin
 
 Bulk actions ("Accept all Strong matches") are deferred to a later enhancement.
 
+## Real-Time Overlay Refresh
+
+The orb notification overlay polls `list_pending_recommendations` every 5 seconds while it is open. When files are deleted from Downloads (or recommendations are dismissed externally), the overlay list updates automatically without requiring the user to close and reopen it. The pending count in the orb badge is also updated on each poll, so the amber glow clears within 5 seconds of all recommendations being resolved.
+
 ---
 
 # Architecture
