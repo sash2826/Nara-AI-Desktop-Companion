@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useOrbWindowStore } from "./orbWindowStore";
 
 interface Recommendation {
@@ -66,6 +67,15 @@ export function OrbNotificationOverlay() {
       }
     },
     [recommendations, setPendingCount, setOverlayMode]
+  );
+
+  const handleChooseFolder = useCallback(
+    async (recId: string) => {
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (!selected) return;
+      await handleAccept(recId, selected as string);
+    },
+    [handleAccept]
   );
 
   const handleSkip = useCallback(
@@ -224,6 +234,20 @@ export function OrbNotificationOverlay() {
                       Move here
                     </button>
                   )}
+                  <button
+                    onClick={() => void handleChooseFolder(rec.id)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 7,
+                      border: "1px solid hsl(0 0% 100% / 0.15)",
+                      background: "hsl(0 0% 100% / 0.07)",
+                      color: "hsl(0 0% 85%)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Choose folder…
+                  </button>
                   <button
                     onClick={() => handleSkip(rec.id)}
                     style={{

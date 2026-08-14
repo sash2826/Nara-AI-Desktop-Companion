@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Folders, Files, Activity, AlertTriangle, FolderInput, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FolderList } from "@/components/workspace/FolderList";
@@ -15,22 +16,19 @@ function SuggestionsInbox() {
   const [recommendations, setRecommendations] = useState<PendingRecommendation[]>([]);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
-  // cancelRef prevents setState after unmount when the async fetch is in-flight.
-  const cancelRef = useRef(false);
-
-  useEffect(() => {
-    cancelRef.current = false;
+  const fetchRecommendations = useCallback(() => {
     IPCClient.listPendingRecommendations()
-      .then((recs) => {
-        if (!cancelRef.current) setRecommendations(recs);
-      })
+      .then((recs) => setRecommendations(recs))
       .catch(() => {
         /* backend not ready — silently skip */
       });
-    return () => {
-      cancelRef.current = true;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchRecommendations();
+    const interval = setInterval(fetchRecommendations, 5_000);
+    return () => clearInterval(interval);
+  }, [fetchRecommendations]);
 
   const handleAccept = useCallback(async (rec: PendingRecommendation) => {
     const top = rec.candidates[0];
@@ -47,6 +45,30 @@ function SuggestionsInbox() {
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Move failed — file may no longer be in Downloads";
+      setErrors((prev) => new Map(prev).set(rec.id, msg));
+    } finally {
+      setBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(rec.id);
+        return next;
+      });
+    }
+  }, []);
+
+  const handleChooseFolder = useCallback(async (rec: PendingRecommendation) => {
+    const selected = await openDialog({ directory: true, multiple: false });
+    if (!selected) return;
+    setBusy((prev) => new Set(prev).add(rec.id));
+    setErrors((prev) => {
+      const m = new Map(prev);
+      m.delete(rec.id);
+      return m;
+    });
+    try {
+      await IPCClient.acceptRecommendation(rec.id, selected as string);
+      setRecommendations((prev) => prev.filter((r) => r.id !== rec.id));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Move failed";
       setErrors((prev) => new Map(prev).set(rec.id, msg));
     } finally {
       setBusy((prev) => {
@@ -126,6 +148,13 @@ function SuggestionsInbox() {
                     Move here
                   </button>
                 )}
+                <button
+                  onClick={() => void handleChooseFolder(rec)}
+                  disabled={isLoading}
+                  className="rounded border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                >
+                  Choose folder…
+                </button>
                 <button
                   onClick={() => void handleDismiss(rec.id)}
                   disabled={isLoading}
