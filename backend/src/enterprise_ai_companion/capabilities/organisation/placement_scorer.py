@@ -102,7 +102,8 @@ def _filename_keywords(file_path: str) -> set[str]:
     Works on both file paths (uses stem) and directory paths (uses final
     directory name). Used to supplement sparse entity sets and as folder-name
     anchors so semantically-named empty folders still participate in scoring.
-    Four-digit year tokens are excluded as non-discriminative.
+    Purely-numeric tokens (e.g. version counters, doc IDs) are excluded as
+    non-discriminative.
     """
     p = Path(file_path)
     # For directories use the folder name; for files use the stem.
@@ -112,7 +113,7 @@ def _filename_keywords(file_path: str) -> set[str]:
         w for w in words
         if len(w) > 2
         and w not in _FILENAME_STOPWORDS
-        and not re.fullmatch(r"\d{4}", w)
+        and not re.fullmatch(r"\d+", w)
     }
 
 
@@ -136,7 +137,7 @@ def _expand_for_matching(canonicals: set[str]) -> set[str]:
                 t for t in tokens
                 if len(t) > 2
                 and t not in _FILENAME_STOPWORDS
-                and not re.fullmatch(r"\d{4}", t)
+                and not re.fullmatch(r"\d+", t)
             }
     return expanded
 
@@ -343,7 +344,7 @@ class PlacementScorer:
         if not new_file_canonicals:
             return 0.0
 
-        folder_canonicals = await self._get_canonical_set_for_folder(folder_path)
+        folder_canonicals, folder_has_docs = await self._get_canonical_set_for_folder(folder_path)
         if not folder_canonicals:
             return 0.0
 
@@ -355,12 +356,23 @@ class PlacementScorer:
 
         intersection = effective_new & effective_folder
 
-        # Require at least _MIN_INTERSECTION_COUNT distinct domain-specific
-        # entities to overlap. A single shared word is too fragile a signal.
-        if len(intersection) < _MIN_INTERSECTION_COUNT:
+        # For sparse new-file entity sets, relax the intersection requirement to 1
+        # — but ONLY against folders that have real indexed documents (not purely
+        # name-anchor folders whose entire entity set comes from their folder name).
+        # A folder-name-only entity set (e.g. "Photography Trip - Japan 2026" with
+        # no indexed files) has very low discriminative power; requiring 2 overlapping
+        # entities guards against false positives from accidental name token matches.
+        min_count = (
+            1
+            if len(effective_new) < _SPARSE_ENTITY_THRESHOLD and folder_has_docs
+            else _MIN_INTERSECTION_COUNT
+        )
+
+        # Require at least min_count distinct domain-specific entities to overlap.
+        if len(intersection) < min_count:
             logger.debug(
                 "[PLACEMENT] graph_score folder=%s intersection=%d < min=%d — suppressed",
-                folder_path, len(intersection), _MIN_INTERSECTION_COUNT,
+                folder_path, len(intersection), min_count,
             )
             return 0.0
 
@@ -427,8 +439,17 @@ class PlacementScorer:
 
         return canonicals
 
-    async def _get_canonical_set_for_folder(self, folder_path: str) -> set[str]:
+    async def _get_canonical_set_for_folder(
+        self, folder_path: str
+    ) -> tuple[set[str], bool]:
         """Return canonical entity names for *folder_path*, expanded 1 hop.
+
+        Returns ``(canonicals, has_docs)`` where *has_docs* is True when the
+        folder contains at least one indexed document.  Callers use *has_docs*
+        to decide whether to relax the minimum-intersection threshold: a folder
+        whose entity set is built entirely from its name keywords (no indexed
+        content) is a weaker discriminator and should not benefit from the
+        sparse-file relaxation.
 
         Always supplements with folder-name keyword terms so that a semantically
         named folder (e.g. "Photography Trip - Japan 2026" → 'photography',
@@ -444,6 +465,7 @@ class PlacementScorer:
         ) as cur:
             doc_rows = await cur.fetchall()
 
+        has_docs = bool(doc_rows)
         canonicals: set[str] = set()
 
         if doc_rows:
@@ -483,7 +505,7 @@ class PlacementScorer:
 
         # Token-expand multi-word entity strings so the folder's vocabulary
         # bridges to single-word entities in incoming files.
-        return _expand_for_matching(canonicals)
+        return _expand_for_matching(canonicals), has_docs
 
     # ------------------------------------------------------------------
     # Rerank score
