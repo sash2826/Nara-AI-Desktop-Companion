@@ -161,14 +161,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         graph_provider=graph_provider,
         embedding_service=embedding_service,
         qdrant_client=qdrant.get_client(),
-        affinity_repo=affinity_repo,
     )
 
     recommendation_service = RecommendationService(
         recommendation_repo=recommendation_repo,
         placement_scorer=placement_scorer,
         watcher_service=watcher,
-        affinity_repo=affinity_repo,
     )
     app.state.recommendation_service = recommendation_service
 

@@ -22,9 +22,8 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import aiosqlite
 
@@ -33,9 +32,6 @@ from enterprise_ai_companion.capabilities.indexing.embedding_service import Embe
 from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import (
     HybridSearchOrchestrator,
 )
-
-if TYPE_CHECKING:
-    from enterprise_ai_companion.capabilities.organisation.affinity_repository import AffinityRepository
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +98,7 @@ def _filename_keywords(file_path: str) -> set[str]:
     Works on both file paths (uses stem) and directory paths (uses final
     directory name). Used to supplement sparse entity sets and as folder-name
     anchors so semantically-named empty folders still participate in scoring.
-    Purely-numeric tokens (e.g. version counters, doc IDs) are excluded as
-    non-discriminative.
+    Four-digit year tokens are excluded as non-discriminative.
     """
     p = Path(file_path)
     # For directories use the folder name; for files use the stem.
@@ -113,7 +108,7 @@ def _filename_keywords(file_path: str) -> set[str]:
         w for w in words
         if len(w) > 2
         and w not in _FILENAME_STOPWORDS
-        and not re.fullmatch(r"\d+", w)
+        and not re.fullmatch(r"\d{4}", w)
     }
 
 
@@ -137,7 +132,7 @@ def _expand_for_matching(canonicals: set[str]) -> set[str]:
                 t for t in tokens
                 if len(t) > 2
                 and t not in _FILENAME_STOPWORDS
-                and not re.fullmatch(r"\d+", t)
+                and not re.fullmatch(r"\d{4}", t)
             }
     return expanded
 
@@ -153,10 +148,6 @@ class FolderScore:
     rerank_score: float = 0.0
 
 
-_AFFINITY_RAMP_OBS = 5     # observations required for full affinity influence
-_AFFINITY_HALFLIFE_DAYS = 90  # days for 50% weight decay
-
-
 class PlacementScorer:
     """Scores candidate folders for a newly-indexed file."""
 
@@ -166,23 +157,11 @@ class PlacementScorer:
         graph_provider: GraphProvider,
         embedding_service: EmbeddingService,
         qdrant_client: Any,
-        affinity_repo: "AffinityRepository | None" = None,
     ) -> None:
         self._conn = conn
         self._graph_provider = graph_provider
         self._embedding_service = embedding_service
         self._qdrant_client = qdrant_client
-        self._affinity_repo = affinity_repo
-
-    async def get_document_entity_names_expanded(self, document_id: str) -> set[str]:
-        """Return the expanded canonical entity name set for *document_id*.
-
-        This is the same set used internally during scoring, and is stored as
-        the entity_snapshot at recommendation creation time so affinity weights
-        can be updated when the user accepts, dismisses, or corrects.
-        """
-        raw = await self._get_canonical_set_for_document(document_id)
-        return _expand_for_matching(raw)
 
     async def score_all(
         self,
@@ -263,65 +242,13 @@ class PlacementScorer:
                 graph_score=graph_s, rerank_score=rerank_s,
             )
         combined = _GRAPH_WEIGHT * graph_s + _RERANK_WEIGHT * rerank_s
-
-        # Apply learned affinity multiplier. Multiplier is in [0, 1]: neutral (1.0)
-        # when no feedback exists, progressively suppressed as dismisses accumulate.
-        affinity = await self._affinity_multiplier(new_file_canonicals, folder_path)
-        final_score = combined * affinity
-
-        if affinity < 1.0:
-            logger.debug(
-                "[PLACEMENT] affinity multiplier=%.4f for folder=%s (combined=%.4f → %.4f)",
-                affinity, folder_path, combined, final_score,
-            )
-
         return FolderScore(
             folder=folder_path,
-            score=final_score,
-            label=_label(final_score),
+            score=combined,
+            label=_label(combined),
             graph_score=graph_s,
             rerank_score=rerank_s,
         )
-
-    async def _affinity_multiplier(
-        self,
-        entity_names: set[str],
-        folder_path: str,
-    ) -> float:
-        """Compute the affinity-based score multiplier for a candidate folder.
-
-        Returns a value in [0, 1]:
-        - 1.0 when no affinity records exist (neutral — no change to base score).
-        - < 1.0 when the user has previously dismissed this entity-folder pairing.
-
-        Formula per entity:
-          influence = min(observations / _AFFINITY_RAMP_OBS, 1.0)
-          decay     = 0.5 ^ (days_since_updated / _AFFINITY_HALFLIFE_DAYS)
-          effective = 1.0 + (weight - 1.0) * influence * decay
-
-        Multiplier = mean(effective) across entities that have records.
-        """
-        if self._affinity_repo is None or not entity_names:
-            return 1.0
-
-        records = await self._affinity_repo.get_weights(entity_names, folder_path)
-        if not records:
-            return 1.0
-
-        now = datetime.now(UTC)
-        effective_weights: list[float] = []
-        for _entity, (weight, obs, updated_at) in records.items():
-            try:
-                updated = datetime.fromisoformat(updated_at)
-                days = max(0, (now - updated).days)
-            except (ValueError, TypeError):
-                days = 0
-            decay = 0.5 ** (days / _AFFINITY_HALFLIFE_DAYS)
-            influence = min(obs / _AFFINITY_RAMP_OBS, 1.0)
-            effective = 1.0 + (weight - 1.0) * influence * decay
-            effective_weights.append(max(0.0, effective))
-
-        return sum(effective_weights) / len(effective_weights)
 
     # ------------------------------------------------------------------
     # Graph score — canonical-name Jaccard
@@ -344,7 +271,7 @@ class PlacementScorer:
         if not new_file_canonicals:
             return 0.0
 
-        folder_canonicals, folder_has_docs = await self._get_canonical_set_for_folder(folder_path)
+        folder_canonicals = await self._get_canonical_set_for_folder(folder_path)
         if not folder_canonicals:
             return 0.0
 
@@ -356,23 +283,12 @@ class PlacementScorer:
 
         intersection = effective_new & effective_folder
 
-        # For sparse new-file entity sets, relax the intersection requirement to 1
-        # — but ONLY against folders that have real indexed documents (not purely
-        # name-anchor folders whose entire entity set comes from their folder name).
-        # A folder-name-only entity set (e.g. "Photography Trip - Japan 2026" with
-        # no indexed files) has very low discriminative power; requiring 2 overlapping
-        # entities guards against false positives from accidental name token matches.
-        min_count = (
-            1
-            if len(effective_new) < _SPARSE_ENTITY_THRESHOLD and folder_has_docs
-            else _MIN_INTERSECTION_COUNT
-        )
-
-        # Require at least min_count distinct domain-specific entities to overlap.
-        if len(intersection) < min_count:
+        # Require at least _MIN_INTERSECTION_COUNT distinct domain-specific
+        # entities to overlap. A single shared word is too fragile a signal.
+        if len(intersection) < _MIN_INTERSECTION_COUNT:
             logger.debug(
                 "[PLACEMENT] graph_score folder=%s intersection=%d < min=%d — suppressed",
-                folder_path, len(intersection), min_count,
+                folder_path, len(intersection), _MIN_INTERSECTION_COUNT,
             )
             return 0.0
 
@@ -439,17 +355,8 @@ class PlacementScorer:
 
         return canonicals
 
-    async def _get_canonical_set_for_folder(
-        self, folder_path: str
-    ) -> tuple[set[str], bool]:
+    async def _get_canonical_set_for_folder(self, folder_path: str) -> set[str]:
         """Return canonical entity names for *folder_path*, expanded 1 hop.
-
-        Returns ``(canonicals, has_docs)`` where *has_docs* is True when the
-        folder contains at least one indexed document.  Callers use *has_docs*
-        to decide whether to relax the minimum-intersection threshold: a folder
-        whose entity set is built entirely from its name keywords (no indexed
-        content) is a weaker discriminator and should not benefit from the
-        sparse-file relaxation.
 
         Always supplements with folder-name keyword terms so that a semantically
         named folder (e.g. "Photography Trip - Japan 2026" → 'photography',
@@ -465,7 +372,6 @@ class PlacementScorer:
         ) as cur:
             doc_rows = await cur.fetchall()
 
-        has_docs = bool(doc_rows)
         canonicals: set[str] = set()
 
         if doc_rows:
@@ -505,7 +411,7 @@ class PlacementScorer:
 
         # Token-expand multi-word entity strings so the folder's vocabulary
         # bridges to single-word entities in incoming files.
-        return _expand_for_matching(canonicals), has_docs
+        return _expand_for_matching(canonicals)
 
     # ------------------------------------------------------------------
     # Rerank score
