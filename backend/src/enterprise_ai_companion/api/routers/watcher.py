@@ -71,7 +71,23 @@ async def remove_watched_folder(folder_id: str, request: Request) -> None:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    _cancel_indexing_tasks(folder.path, request)
     await _purge_folder_documents(folder.path, request)
+
+
+def _cancel_indexing_tasks(folder_path: str, request: Request) -> None:
+    """Cancel any running or queued indexing tasks for folder_path."""
+    tasks: dict = getattr(request.app.state, "indexing_tasks", {})
+    for task_id, task in tasks.items():
+        if task.get("workspace_path") != folder_path:
+            continue
+        if task.get("status") not in ("queued", "running"):
+            continue
+        task["status"] = "cancelled"
+        bg_task = task.get("_task")
+        if bg_task is not None and not bg_task.done():
+            bg_task.cancel()
+            logger.info("Cancelled indexing task %s for removed folder %s", task_id, folder_path)
 
 
 async def _purge_folder_documents(folder_path: str, request: Request) -> None:

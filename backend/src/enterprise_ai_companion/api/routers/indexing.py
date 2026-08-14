@@ -159,6 +159,7 @@ async def start_indexing(body: StartIndexingRequest, request: Request) -> StartI
 
     tasks[task_id] = {
         "status": "queued",
+        "workspace_path": body.workspace_path,
         "files_found": 0,
         "files_indexed": 0,
         "files_skipped": 0,
