@@ -23,7 +23,7 @@ from enterprise_ai_companion.capabilities.graph.graph_models import (
 logger = logging.getLogger(__name__)
 
 _MAX_INPUT_CHARS: int = 3_000
-_MAX_OUTPUT_TOKENS: int = 512
+_MAX_OUTPUT_TOKENS: int = 2048
 
 _REL_TYPES: str = ", ".join(r.value for r in RelationshipType)
 
@@ -108,7 +108,7 @@ class RelationshipExtractor:
                 messages, max_tokens=_MAX_OUTPUT_TOKENS, temperature=0.0
             )
         except Exception as exc:
-            logger.debug("RelationshipExtractor LLM call failed: %s", exc)
+            logger.warning("RelationshipExtractor LLM call failed: %s", exc)
             return None
 
         return _parse_json(response)
