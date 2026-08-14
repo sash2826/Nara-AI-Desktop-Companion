@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import KnowledgeGraphService
+from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
+from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
+from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
 from enterprise_ai_companion.capabilities.indexing.file_watcher import WatchedFolder
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -49,12 +57,54 @@ async def add_watched_folder(body: AddFolderRequest, request: Request) -> Watche
 
 @router.delete("/folders/{folder_id}", status_code=204)
 async def remove_watched_folder(folder_id: str, request: Request) -> None:
-    """Unregister a watched folder by its ID."""
+    """Unregister a watched folder and purge all documents indexed from it."""
     watcher = request.app.state.watcher
+
+    # Resolve folder path before removing so we can purge its documents.
+    folders = await watcher.list_folders()
+    folder = next((f for f in folders if f.id == folder_id), None)
+    if folder is None:
+        raise HTTPException(status_code=404, detail=f"Watched folder not found: {folder_id}")
+
     try:
         await watcher.remove_folder(folder_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    await _purge_folder_documents(folder.path, request)
+
+
+async def _purge_folder_documents(folder_path: str, request: Request) -> None:
+    """Delete all indexed documents whose workspace_path matches folder_path.
+
+    Mirrors the cascade used by bulk_delete_documents:
+    chunks (SQLite + Qdrant) → graph entities → document row.
+    Failures on individual documents are logged and do not abort the purge.
+    """
+    db = request.app.state.db
+    doc_repo = DocumentRepository(db)
+    qdrant_client = request.app.state.qdrant.get_client()
+    chunk_repo = ChunkRepository(db, qdrant_client)
+    graph_provider = getattr(request.app.state, "graph", None) or NullGraphProvider()
+    graph_service = KnowledgeGraphService(graph_provider)
+
+    docs = await doc_repo.list_by_workspace(folder_path)
+    if not docs:
+        logger.info("Folder purge: no indexed documents found for %s", folder_path)
+        return
+
+    logger.info("Folder purge: removing %d document(s) from %s", len(docs), folder_path)
+    for doc in docs:
+        try:
+            await chunk_repo.delete_by_document(doc.id)
+            try:
+                await graph_service.delete_document(doc.id)
+            except Exception as exc:
+                logger.warning("Folder purge: graph cleanup failed for %s: %s", doc.id, exc)
+            await doc_repo.delete_by_path(doc.file_path)
+            logger.info("Folder purge: removed %s", doc.file_path)
+        except Exception as exc:
+            logger.error("Folder purge: failed to remove %s: %s", doc.file_path, exc)
 
 
 @router.get("/folders", response_model=list[WatchedFolderResponse])
