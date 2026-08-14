@@ -22,8 +22,9 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiosqlite
 
@@ -32,6 +33,9 @@ from enterprise_ai_companion.capabilities.indexing.embedding_service import Embe
 from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import (
     HybridSearchOrchestrator,
 )
+
+if TYPE_CHECKING:
+    from enterprise_ai_companion.capabilities.organisation.affinity_repository import AffinityRepository
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +152,10 @@ class FolderScore:
     rerank_score: float = 0.0
 
 
+_AFFINITY_RAMP_OBS = 5     # observations required for full affinity influence
+_AFFINITY_HALFLIFE_DAYS = 90  # days for 50% weight decay
+
+
 class PlacementScorer:
     """Scores candidate folders for a newly-indexed file."""
 
@@ -157,11 +165,23 @@ class PlacementScorer:
         graph_provider: GraphProvider,
         embedding_service: EmbeddingService,
         qdrant_client: Any,
+        affinity_repo: "AffinityRepository | None" = None,
     ) -> None:
         self._conn = conn
         self._graph_provider = graph_provider
         self._embedding_service = embedding_service
         self._qdrant_client = qdrant_client
+        self._affinity_repo = affinity_repo
+
+    async def get_document_entity_names_expanded(self, document_id: str) -> set[str]:
+        """Return the expanded canonical entity name set for *document_id*.
+
+        This is the same set used internally during scoring, and is stored as
+        the entity_snapshot at recommendation creation time so affinity weights
+        can be updated when the user accepts, dismisses, or corrects.
+        """
+        raw = await self._get_canonical_set_for_document(document_id)
+        return _expand_for_matching(raw)
 
     async def score_all(
         self,
@@ -242,13 +262,65 @@ class PlacementScorer:
                 graph_score=graph_s, rerank_score=rerank_s,
             )
         combined = _GRAPH_WEIGHT * graph_s + _RERANK_WEIGHT * rerank_s
+
+        # Apply learned affinity multiplier. Multiplier is in [0, 1]: neutral (1.0)
+        # when no feedback exists, progressively suppressed as dismisses accumulate.
+        affinity = await self._affinity_multiplier(new_file_canonicals, folder_path)
+        final_score = combined * affinity
+
+        if affinity < 1.0:
+            logger.debug(
+                "[PLACEMENT] affinity multiplier=%.4f for folder=%s (combined=%.4f → %.4f)",
+                affinity, folder_path, combined, final_score,
+            )
+
         return FolderScore(
             folder=folder_path,
-            score=combined,
-            label=_label(combined),
+            score=final_score,
+            label=_label(final_score),
             graph_score=graph_s,
             rerank_score=rerank_s,
         )
+
+    async def _affinity_multiplier(
+        self,
+        entity_names: set[str],
+        folder_path: str,
+    ) -> float:
+        """Compute the affinity-based score multiplier for a candidate folder.
+
+        Returns a value in [0, 1]:
+        - 1.0 when no affinity records exist (neutral — no change to base score).
+        - < 1.0 when the user has previously dismissed this entity-folder pairing.
+
+        Formula per entity:
+          influence = min(observations / _AFFINITY_RAMP_OBS, 1.0)
+          decay     = 0.5 ^ (days_since_updated / _AFFINITY_HALFLIFE_DAYS)
+          effective = 1.0 + (weight - 1.0) * influence * decay
+
+        Multiplier = mean(effective) across entities that have records.
+        """
+        if self._affinity_repo is None or not entity_names:
+            return 1.0
+
+        records = await self._affinity_repo.get_weights(entity_names, folder_path)
+        if not records:
+            return 1.0
+
+        now = datetime.now(UTC)
+        effective_weights: list[float] = []
+        for _entity, (weight, obs, updated_at) in records.items():
+            try:
+                updated = datetime.fromisoformat(updated_at)
+                days = max(0, (now - updated).days)
+            except (ValueError, TypeError):
+                days = 0
+            decay = 0.5 ** (days / _AFFINITY_HALFLIFE_DAYS)
+            influence = min(obs / _AFFINITY_RAMP_OBS, 1.0)
+            effective = 1.0 + (weight - 1.0) * influence * decay
+            effective_weights.append(max(0.0, effective))
+
+        return sum(effective_weights) / len(effective_weights)
 
     # ------------------------------------------------------------------
     # Graph score — canonical-name Jaccard

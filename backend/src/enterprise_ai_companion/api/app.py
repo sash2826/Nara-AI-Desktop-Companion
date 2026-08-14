@@ -14,6 +14,7 @@ from starlette.requests import Request as StarletteRequest
 from enterprise_ai_companion.api.routers import backup, conversations, documents, embeddings, graph, indexing, orb as orb_router_module, plugins as plugins_router_module, search, stats
 from enterprise_ai_companion.api.routers import watcher as watcher_router_module
 from enterprise_ai_companion.api.routers import organisation as organisation_router_module
+from enterprise_ai_companion.capabilities.organisation.affinity_repository import AffinityRepository
 from enterprise_ai_companion.capabilities.organisation.file_mover import FileMover
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import RecommendationRepository
@@ -152,17 +153,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.file_mover = FileMover(app.state.db)
 
+    affinity_repo = AffinityRepository(app.state.db)
+    app.state.affinity_repo = affinity_repo
+
     placement_scorer = PlacementScorer(
         conn=app.state.db,
         graph_provider=graph_provider,
         embedding_service=embedding_service,
         qdrant_client=qdrant.get_client(),
+        affinity_repo=affinity_repo,
     )
 
     recommendation_service = RecommendationService(
         recommendation_repo=recommendation_repo,
         placement_scorer=placement_scorer,
         watcher_service=watcher,
+        affinity_repo=affinity_repo,
     )
     app.state.recommendation_service = recommendation_service
 

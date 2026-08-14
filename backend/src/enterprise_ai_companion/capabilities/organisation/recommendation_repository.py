@@ -2,8 +2,14 @@
 
 Each recommendation is created when a new file arrives in the OS Downloads
 folder and the placement scorer produces at least one scored candidate. It
-stays in 'pending' status until the user accepts or dismisses it via the
-orb overlay or the main-window Suggestions inbox.
+stays in 'pending' status until the user accepts, dismisses, or is overridden
+by a watchdog-detected correction.
+
+Status values:
+  pending   — awaiting user action
+  accepted  — user moved the file to the suggested folder via EAC
+  dismissed — user dismissed without moving
+  corrected — user manually moved the file to a folder not in the suggestions
 """
 
 from __future__ import annotations
@@ -19,6 +25,11 @@ import aiosqlite
 
 logger = logging.getLogger(__name__)
 
+_SELECT_COLS = (
+    "id, source_path, status, recommendations, accepted_folder, "
+    "created_at, resolved_at, entity_snapshot, corrected_folder"
+)
+
 
 @dataclass(frozen=True)
 class PlacementRecommendation:
@@ -26,11 +37,13 @@ class PlacementRecommendation:
 
     id: str
     source_path: str
-    status: str  # "pending" | "accepted" | "dismissed"
+    status: str  # "pending" | "accepted" | "dismissed" | "corrected"
     recommendations: list[dict[str, Any]]  # [{folder, score, label}, ...]
     accepted_folder: str | None
     created_at: str
     resolved_at: str | None
+    entity_snapshot: str | None  # JSON array of expanded entity names at creation time
+    corrected_folder: str | None  # set when status='corrected'
 
 
 class RecommendationRepository:
@@ -43,6 +56,7 @@ class RecommendationRepository:
         self,
         source_path: str,
         recommendations: list[dict[str, Any]],
+        entity_snapshot: str | None = None,
     ) -> PlacementRecommendation:
         """Persist a new pending recommendation and return it."""
         rec_id = str(uuid.uuid4())
@@ -52,10 +66,11 @@ class RecommendationRepository:
         await self._conn.execute(
             """
             INSERT INTO file_placement_recommendations
-                (id, source_path, status, recommendations, accepted_folder, created_at, resolved_at)
-            VALUES (?, ?, 'pending', ?, NULL, ?, NULL)
+                (id, source_path, status, recommendations, accepted_folder,
+                 created_at, resolved_at, entity_snapshot, corrected_folder)
+            VALUES (?, ?, 'pending', ?, NULL, ?, NULL, ?, NULL)
             """,
-            (rec_id, source_path, rec_json, created_at),
+            (rec_id, source_path, rec_json, created_at, entity_snapshot),
         )
         await self._conn.commit()
 
@@ -73,13 +88,14 @@ class RecommendationRepository:
             accepted_folder=None,
             created_at=created_at,
             resolved_at=None,
+            entity_snapshot=entity_snapshot,
+            corrected_folder=None,
         )
 
     async def get(self, rec_id: str) -> PlacementRecommendation | None:
         """Return a single recommendation by ID, or None if not found."""
         async with self._conn.execute(
-            "SELECT id, source_path, status, recommendations, accepted_folder, "
-            "created_at, resolved_at FROM file_placement_recommendations WHERE id = ?",
+            f"SELECT {_SELECT_COLS} FROM file_placement_recommendations WHERE id = ?",
             (rec_id,),
         ) as cur:
             row = await cur.fetchone()
@@ -88,11 +104,24 @@ class RecommendationRepository:
             return None
         return _row_to_recommendation(row)
 
+    async def get_pending_by_source_path(
+        self, source_path: str
+    ) -> PlacementRecommendation | None:
+        """Return the most recent pending recommendation for *source_path*, or None."""
+        async with self._conn.execute(
+            f"SELECT {_SELECT_COLS} FROM file_placement_recommendations "
+            "WHERE source_path = ? AND status = 'pending' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (source_path,),
+        ) as cur:
+            row = await cur.fetchone()
+
+        return _row_to_recommendation(row) if row else None
+
     async def list_pending(self) -> list[PlacementRecommendation]:
         """Return all recommendations with status='pending', oldest first."""
         async with self._conn.execute(
-            "SELECT id, source_path, status, recommendations, accepted_folder, "
-            "created_at, resolved_at FROM file_placement_recommendations "
+            f"SELECT {_SELECT_COLS} FROM file_placement_recommendations "
             "WHERE status = 'pending' ORDER BY created_at ASC"
         ) as cur:
             rows = await cur.fetchall()
@@ -126,12 +155,22 @@ class RecommendationRepository:
         )
         await self._conn.commit()
 
+    async def set_corrected(self, rec_id: str, corrected_folder: str) -> None:
+        """Mark a recommendation as corrected with the user-chosen destination."""
+        resolved_at = datetime.now(UTC).isoformat()
+        await self._conn.execute(
+            "UPDATE file_placement_recommendations "
+            "SET status='corrected', corrected_folder=?, resolved_at=? WHERE id=?",
+            (corrected_folder, resolved_at, rec_id),
+        )
+        await self._conn.commit()
+
     async def dismiss_by_source_path(self, source_path: str) -> int:
         """Dismiss all pending recommendations whose source file is *source_path*.
 
         Called automatically when the watcher detects a file deletion so that
         stale recommendations no longer appear in the inbox. Already-resolved
-        records (accepted or dismissed) are left unchanged.
+        records (accepted, dismissed, or corrected) are left unchanged.
 
         Returns the number of rows updated.
         """
@@ -166,4 +205,6 @@ def _row_to_recommendation(row: Any) -> PlacementRecommendation:
         accepted_folder=row[4],
         created_at=row[5],
         resolved_at=row[6],
+        entity_snapshot=row[7] if len(row) > 7 else None,
+        corrected_folder=row[8] if len(row) > 8 else None,
     )
