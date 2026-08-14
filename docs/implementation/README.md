@@ -2,7 +2,7 @@
 
 **Version:** 2.0.0
 **Status:** Active
-**Last Updated:** 2026-08-04
+**Last Updated:** 2026-08-14
 
 ---
 
@@ -67,9 +67,10 @@ Development is organized into the following phases.
 | Phase 04    | AI Context & Intelligence         | Complete  | Context assembly, conversation memory, reranking, source citation      |
 | Phase 05    | Knowledge Graph                   | Complete  | Graph-augmented retrieval, entity/relationship extraction               |
 | Phase 06    | Enterprise Features               | Complete  | Plugin system, security, authentication, audit logging                 |
-| Pre-08      | Graph Correctness Fixes           | Planned   | SQLite graph CTE depth cap and case-insensitive name lookup            |
-| Phase 08    | Orb Native Shell                  | Planned   | Always-on-top orb window, Liquid Glass UI, 5 animation states          |
-| Phase 09    | File Organisation — New Files     | Planned   | Downloads auto-watch, graph+rerank placement recommendations, move     |
+| Pre-08      | Graph Correctness Fixes           | Complete  | SQLite graph CTE depth cap and case-insensitive name lookup            |
+| Phase 08    | Orb Native Shell                  | Complete  | Always-on-top orb window, Liquid Glass UI, 5 animation states          |
+| Phase 09    | File Organisation — New Files     | Complete  | Downloads auto-watch, graph+rerank placement scorer (87%), move        |
+| Phase 09b   | Adaptive Placement Learning       | Planned   | Feedback capture, entity affinity weights, threshold recalibration     |
 | Phase 10    | File Organisation — Existing Files| Planned   | On-demand audit + passive background reorganisation suggestions        |
 | Phase 07    | Automation Engine                 | Deferred  | Workflow engine, task scheduling, event-driven processing (under review)|
 | Phase 11    | Polish & Release                  | Planned   | Testing, quality assurance, packaging, and production release          |
