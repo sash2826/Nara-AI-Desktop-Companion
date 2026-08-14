@@ -183,6 +183,10 @@ class FileIndexer:
         # holds a reference, so the dict never grows unbounded.
         self._file_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
         self._locks_meta = asyncio.Lock()
+        # Strong references to fire-and-forget background tasks (Pass 2 graph
+        # extraction). asyncio only holds weak refs; without this the GC can
+        # collect a running task before it finishes.
+        self._background_tasks: set[asyncio.Task] = set()
 
     def _is_safe_path(self, resolved: Path) -> bool:
         """Return False if resolved is inside a blocked OS-critical directory."""
@@ -281,7 +285,9 @@ class FileIndexer:
         # search is available immediately after Pass 1 completes.
         if deferred_graph:
             logger.info("[PASS 2] Scheduling graph extraction for %d document(s)", len(deferred_graph))
-            asyncio.create_task(self._run_graph_pass(deferred_graph))
+            task = asyncio.create_task(self._run_graph_pass(deferred_graph))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
         logger.info(
             "Indexing complete: %d found, %d indexed, %d skipped, %d errors",

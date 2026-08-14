@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import KnowledgeGraphService
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
+from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
 from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
 from enterprise_ai_companion.capabilities.indexing.file_watcher import WatchedFolder
@@ -109,6 +110,8 @@ async def _purge_folder_documents(folder_path: str, request: Request) -> None:
         logger.info("Folder purge: no indexed documents found for %s", folder_path)
         return
 
+    graph_state_repo = GraphStateRepository(db)
+
     logger.info("Folder purge: removing %d document(s) from %s", len(docs), folder_path)
     for doc in docs:
         try:
@@ -117,6 +120,10 @@ async def _purge_folder_documents(folder_path: str, request: Request) -> None:
                 await graph_service.delete_document(doc.id)
             except Exception as exc:
                 logger.warning("Folder purge: graph cleanup failed for %s: %s", doc.id, exc)
+            try:
+                await graph_state_repo.delete_by_document(doc.id)
+            except Exception as exc:
+                logger.warning("Folder purge: graph_state cleanup failed for %s: %s", doc.id, exc)
             await doc_repo.delete_by_path(doc.file_path)
             logger.info("Folder purge: removed %s", doc.file_path)
         except Exception as exc:
