@@ -647,6 +647,23 @@ async function dismissRecommendation(recommendationId: string): Promise<void> {
   return invoke<void>("dismiss_recommendation", { recommendationId });
 }
 
+/** Starts an on-demand organisation audit. Returns immediately. */
+async function runOrganisationAudit(): Promise<void> {
+  return invoke<void>("run_organisation_audit");
+}
+
+export interface AuditStatus {
+  running: boolean;
+  analysed: number;
+  total: number;
+  found: number;
+}
+
+/** Returns the current organisation audit progress. */
+async function getAuditStatus(): Promise<AuditStatus> {
+  return invoke<AuditStatus>("get_audit_status");
+}
+
 /** Sends a single-turn query to the LLM via the backend. Returns the response text. */
 async function orbQuery(query: string): Promise<string> {
   return invoke<string>("orb_query", { query });
@@ -710,5 +727,7 @@ export const IPCClient = {
   listPendingRecommendations,
   acceptRecommendation,
   dismissRecommendation,
+  runOrganisationAudit,
+  getAuditStatus,
   orbQuery,
 } as const;

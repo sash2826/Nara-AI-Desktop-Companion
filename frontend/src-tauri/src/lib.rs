@@ -1351,6 +1351,46 @@ async fn list_pending_recommendations(
         .map_err(|e| e.to_string())
 }
 
+/// Starts an on-demand organisation audit in the backend. Returns immediately (202).
+#[tauri::command]
+async fn run_organisation_audit(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/organisation/audit", base);
+    let resp = ipc_client(&state)
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "run_organisation_audit returned HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    Ok(())
+}
+
+/// Returns the current organisation audit progress.
+#[tauri::command]
+async fn get_audit_status(state: State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/organisation/audit/status", base);
+    let resp = ipc_client(&state)
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "get_audit_status returned HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    resp.json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Sends a single-turn query to the LLM through the backend.
 /// Returns both the response text and a list of source file paths.
 #[tauri::command]
@@ -1785,6 +1825,8 @@ pub fn run() {
             accept_recommendation,
             dismiss_recommendation,
             list_pending_recommendations,
+            run_organisation_audit,
+            get_audit_status,
             orb_query
         ])
         .on_window_event(|window, event| {

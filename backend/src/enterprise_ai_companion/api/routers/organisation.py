@@ -1,4 +1,4 @@
-"""REST endpoints for file organisation — placement recommendations.
+"""REST endpoints for file organisation — placement recommendations and audit.
 
 These endpoints are called by the Rust IPC layer, which bridges to the
 orb notification overlay and the main-window Suggestions inbox.
@@ -8,6 +8,8 @@ Routes:
     GET  /organisation/recommendations/pending
     POST /organisation/recommendations/{id}/accept
     POST /organisation/recommendations/{id}/dismiss
+    POST /organisation/audit
+    GET  /organisation/audit/status
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import (
@@ -48,6 +50,13 @@ class PendingRecommendationResponse(BaseModel):
 
 class AcceptBody(BaseModel):
     folder: str
+
+
+class AuditStatusResponse(BaseModel):
+    running: bool
+    analysed: int
+    total: int
+    found: int
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +141,52 @@ async def dismiss_recommendation(
 
     await repo.set_dismissed(recommendation_id)
     logger.info("Recommendation %s dismissed — file stays at %s", recommendation_id, rec.source_path)
+
+
+# ---------------------------------------------------------------------------
+# Audit endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/audit", status_code=202)
+async def run_audit(background_tasks: BackgroundTasks, request: Request) -> dict[str, str]:
+    """Start an on-demand organisation audit. Returns 202 immediately.
+
+    The audit runs as a background task and iterates all indexed documents,
+    surfacing reorganisation suggestions via the placement scorer. Poll
+    GET /organisation/audit/status for progress.
+    """
+    audit_service = getattr(request.app.state, "audit_service", None)
+    if audit_service is None:
+        raise HTTPException(status_code=503, detail="Audit service not available")
+
+    if audit_service.state.running:
+        return {"status": "already_running"}
+
+    background_tasks.add_task(_run_audit_task, audit_service)
+    logger.info("[AUDIT] Audit requested via API — starting background task")
+    return {"status": "started"}
+
+
+async def _run_audit_task(audit_service) -> None:
+    """Thin wrapper so BackgroundTasks can call the async audit."""
+    await audit_service.run_audit()
+
+
+@router.get("/audit/status", response_model=AuditStatusResponse)
+async def get_audit_status(request: Request) -> AuditStatusResponse:
+    """Return the current audit progress."""
+    audit_service = getattr(request.app.state, "audit_service", None)
+    if audit_service is None:
+        return AuditStatusResponse(running=False, analysed=0, total=0, found=0)
+
+    state = audit_service.state
+    return AuditStatusResponse(
+        running=state.running,
+        analysed=state.analysed,
+        total=state.total,
+        found=state.found,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ from enterprise_ai_companion.capabilities.organisation.affinity_repository impor
 from enterprise_ai_companion.capabilities.organisation.file_mover import FileMover
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import RecommendationRepository
+from enterprise_ai_companion.capabilities.organisation.audit_service import AuditService
 from enterprise_ai_companion.capabilities.organisation.recommendation_service import RecommendationService
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
@@ -173,6 +174,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Wire the Downloads hook and auto-register the Downloads folder.
     watcher.recommendation_service = recommendation_service
     await watcher._ensure_downloads_registered()
+
+    audit_service = AuditService(
+        document_repo=doc_repo,
+        placement_scorer=placement_scorer,
+        recommendation_repo=recommendation_repo,
+        watcher_service=watcher,
+    )
+    app.state.audit_service = audit_service
 
     # Purge index records for files deleted while the backend was offline.
     # Runs as a background task so it never blocks startup.

@@ -33,7 +33,7 @@ interface WorkspaceStore {
   sort: DocumentSort;
 
   // Active tab
-  activeTab: "folders" | "documents" | "indexing" | "errors";
+  activeTab: "folders" | "documents" | "indexing" | "errors" | "organise";
 
   // Error badge
   errorCount: number;
@@ -61,7 +61,7 @@ interface WorkspaceStore {
   clearDocumentSelection: () => void;
 
   // Tab
-  setActiveTab: (tab: "folders" | "documents" | "indexing" | "errors") => void;
+  setActiveTab: (tab: "folders" | "documents" | "indexing" | "errors" | "organise") => void;
 
   // Error badge
   setErrorCount: (count: number) => void;
