@@ -1,16 +1,16 @@
 # Graph Report - Enterprise-AI-Companion  (2026-08-14)
 
 ## Corpus Check
-- 383 files · ~198,587 words
+- 380 files · ~199,772 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3099 nodes · 6429 edges · 228 communities (154 shown, 74 thin omitted)
-- Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 620 edges (avg confidence: 0.53)
+- 3108 nodes · 6464 edges · 222 communities (150 shown, 72 thin omitted)
+- Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 624 edges (avg confidence: 0.53)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e49df34e`
+- Built from commit: `cd65795f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,32 +18,32 @@
 - lib.rs
 - plugin_manager.py
 - GraphProvider
-- app.py
+- PlacementScorer
 - BackupService
 - GraphQueryService
-- ThemeProvider.tsx
+- settingsStore.ts
 - IPCClient.ts
-- get_config
+- RelationshipExtractor
 - Technology Stack
 - MessageBubble.tsx
-- cn
+- utils.ts
 - compilerOptions
-- StatusBar.tsx
-- Path
+- MainContent.tsx
+- FileIndexer
 - context_assembler.py
 - common.py
-- Overlay
+- OrbController.ts
 - HybridSearchOrchestrator
 - dependencies
 - SearchPage.tsx
-- Relationship
+- EntityType
 - NullGraphProvider
 - DocumentRepository
-- DocumentBrowser.tsx
+- workspace.ts
 - conversations.py
 - IndexingResult
 - EmbeddingService
-- TestHybridSearchEndpoint
+- HybridSearchResult
 - Implementation Documentation Overview
 - Phase-09-File-Organisation-New-Files.md
 - TestCanonicalName
@@ -58,14 +58,14 @@
 - ConversationRepository
 - OrbAnimationEngine.tsx
 - QueryPreprocessor
-- OrbLayer.tsx
+- LivingOrb.tsx
 - TextChunker
 - _make_watcher
 - @eslint/js
 - WatchedFolder
 - GlassPromptIntegration.test.tsx
 - OrbController
-- OrbState
+- services/orb/index.ts
 - Neo4jProvider
 - _mock_db_app
 - _make_result
@@ -81,10 +81,10 @@
 - _escape_fts5_query
 - TestEntityExtractor
 - stats.py
-- IndexingErrorRepository
+- app.py
 - qdrant_provider.py
 - HomePage.tsx
-- _make_provider
+- cn
 - useConversation.ts
 - Phase-10-File-Organisation-Existing-Files.md
 - test_file_watcher.py
@@ -93,15 +93,15 @@
 - NotificationService
 - query_preprocessor.py
 - APIMProvider
-- list_plugins
+- plugins.py
 - PluginManager
 - _make_client
 - organisation.py
 - Engineering Specification (CLAUDE.md)
-- DesktopPresenceService
+- RecommendationRepository
 - default.json
 - scripts
-- ai.ts
+- ConversationServiceProvider.tsx
 - PluginRegistry
 - .send
 - compilerOptions
@@ -117,16 +117,16 @@
 - package.json
 - MockProvider.ts
 - NullProjectKnowledgeRepository.ts
-- WorkspacePage.tsx
-- MainContent.tsx
+- IPCClient
+- AssistantWidget.tsx
 - TestTokenise
 - TestRemoveStopWords
 - PluginManifest
 - TestLooksLikeTypo
-- FileIndexer
+- OrbShell.tsx
 - test_package.py
-- .log
-- database.py
+- AuditLogger
+- get_config
 - score_benchmark.py
 - SettingsService.ts
 - generate_search_pipeline_pdf.py
@@ -135,7 +135,7 @@
 - Python Sidecar (FastAPI)
 - Presentation Layer
 - File Indexing Capability
-- FolderList.tsx
+- StatusBar.tsx
 - lint-staged
 - Enterprise AI Companion App Icon (main)
 - test_conversation_repository.py
@@ -149,7 +149,7 @@
 - SearchEnricherPlugin
 - Plugin System
 - devDependencies
-- OrbController.ts
+- OrbLayer.tsx
 - autoprefixer
 - eslint-plugin-react-hooks
 - husky
@@ -193,10 +193,10 @@
 - enterprise-ai-companion
 - Enterprise AI Companion README
 - eslint-plugin-react-refresh
-- Sidebar.tsx
+- layoutStore.ts
 - lucide-react
-- IPCClient
-- services/orb/index.ts
+- useEmbedding.ts
+- PluginSettings.tsx
 - @tauri-apps/api
 - .__init__
 - zustand
@@ -210,23 +210,17 @@
 - get_db
 - embeddings.py
 - ._summarise
-- BackupSettings.tsx
-- TestHybridSearchOrchestrator
-- _normalise_bm25
-- cancel_indexing
+- IPCClient.test.ts
+- DocumentRow.tsx
+- useDashboard.ts
+- ._reachable_ids
 - organisation/__init__.py
 - eslint-config-prettier
-- ._index_file_locked
-- limit_request_body
-- manifest.json
-- config.py
-- graph_state_repository.py
-- test_api.py
-- framer-motion
-- react
-- react-markdown
-- @tauri-apps/plugin-http
-- clear_pending.py
+- .upsert_entity
+- postcss
+- react-dom
+- remark-gfm
+- @tauri-apps/plugin-opener
 
 ## God Nodes (most connected - your core abstractions)
 1. `cn()` - 124 edges
@@ -273,7 +267,7 @@
 - **Frontend Technology Stack (Tauri + Vite + React)** — frontend_public_tauri_tauri_logo, frontend_public_vite_vite_logo, frontend_src_assets_react_react_logo [INFERRED 0.95]
 - **Hybrid Search Dual Provider (BM25 + Qdrant Cosine)** — docs_search_pipeline_architecture_bm25_fts5_keyword_search, docs_search_pipeline_architecture_qdrant_vector_store, docs_search_pipeline_architecture_reciprocal_rank_fusion [EXTRACTED 1.00]
 
-## Communities (228 total, 74 thin omitted)
+## Communities (222 total, 72 thin omitted)
 
 ### Community 0 - "lib.rs"
 Cohesion: 0.09
@@ -285,11 +279,11 @@ Nodes (14): FileProcessorPlugin, ABC, Abstract base classes defining the extensi
 
 ### Community 2 - "GraphProvider"
 Cohesion: 0.06
-Nodes (31): Knowledge graph enrichment service. Runs after entity and relationship…, Extracts named entities from text using a structured LLM call. Replaces the…, Entity, GraphContext, Shared domain models for the knowledge graph capability., Context retrieved from the knowledge graph for a given query entity., GraphProvider, ABC (+23 more)
+Nodes (42): Knowledge graph enrichment service. Runs after entity and relationship…, Entity, GraphContext, Shared domain models for the knowledge graph capability., Context retrieved from the knowledge graph for a given query entity., Relationship, GraphProvider, ABC (+34 more)
 
-### Community 3 - "app.py"
-Cohesion: 0.03
-Nodes (58): lifespan(), FastAPI application for the Enterprise AI Companion backend., Reject requests that lack the per-session IPC shared secret. The token is…, Open all stores on startup; close them on shutdown., TokenVerificationMiddleware, API endpoints for plugin management., AffinityRepository, Connection (+50 more)
+### Community 3 - "PlacementScorer"
+Cohesion: 0.06
+Nodes (29): AffinityRepository, Connection, Repository for entity-folder affinity weights (Phase 09b: Adaptive Placement…, Return a scorer_config value by key, or None if not set., Upsert a scorer_config entry., Persists and retrieves entity-folder affinity weights from SQLite., Return affinity records for entities that have prior feedback against…, Apply EMA weight update for all *entity_names* against *folder_path*.… (+21 more)
 
 ### Community 4 - "BackupService"
 Cohesion: 0.05
@@ -297,67 +291,71 @@ Nodes (39): BackupResultResponse, BackupSummaryResponse, create_backup(), Create
 
 ### Community 5 - "GraphQueryService"
 Cohesion: 0.08
-Nodes (46): ConnectedDocumentsResponse, _entity_to_response(), EntityResponse, EntitySearchResponse, find_path(), get_connected_documents(), get_entity_context(), get_graph_visualization() (+38 more)
+Nodes (45): ConnectedDocumentsResponse, _entity_to_response(), EntityResponse, EntitySearchResponse, find_path(), get_connected_documents(), get_entity_context(), get_graph_visualization() (+37 more)
 
-### Community 6 - "ThemeProvider.tsx"
-Cohesion: 0.14
-Nodes (19): MODES, ThemeToggle(), ThemeToggleProps, GeneralSettings(), GeneralSettingsProps, THEME_OPTIONS, useTheme(), ThemeContext (+11 more)
+### Community 6 - "settingsStore.ts"
+Cohesion: 0.11
+Nodes (27): MODES, ThemeToggle(), ThemeToggleProps, GeneralSettings(), GeneralSettingsProps, THEME_OPTIONS, useSettings(), useTheme() (+19 more)
 
 ### Community 7 - "IPCClient.ts"
 Cohesion: 0.03
 Nodes (18): ConversationMemory, ConversationSummary, EmbedResponse, GraphContextResponse, GraphEntityItem, GraphHealthResponse, GraphRelationshipItem, HealthResponse (+10 more)
 
-### Community 8 - "get_config"
-Cohesion: 0.31
-Nodes (9): Conversation memory service — automatic summarisation of older turns. After…, _api_key(), _base_url(), chat_complete(), _model_id(), Thin async wrapper around the Volvo GenAI Hub (OpenAI-compatible) API.…, Send a chat completion request and return the assistant message content.…, get_config() (+1 more)
+### Community 8 - "RelationshipExtractor"
+Cohesion: 0.10
+Nodes (21): Conversation memory service — automatic summarisation of older turns. After…, _api_key(), _base_url(), chat_complete(), _model_id(), Thin async wrapper around the Volvo GenAI Hub (OpenAI-compatible) API.…, Send a chat completion request and return the assistant message content.…, _coerce_entity_type() (+13 more)
 
 ### Community 9 - "Technology Stack"
 Cohesion: 0.08
 Nodes (45): Capability Model, AI Services Capability, Automation Capability, Conversation Capability, File Intelligence Capability, Knowledge Management Capability, Search & Retrieval Capability, Settings & Configuration Capability (+37 more)
 
 ### Community 10 - "MessageBubble.tsx"
-Cohesion: 0.09
-Nodes (29): AssistantAvatar(), AssistantAvatarProps, SIZE_CLASSES, CitationChip(), CitationChipProps, ConversationViewProps, FilePathChip(), FilePathChipProps (+21 more)
-
-### Community 11 - "cn"
 Cohesion: 0.08
-Nodes (35): AssistantFooterProps, AttachmentButton(), AttachmentButtonProps, CONTEXT_ITEMS, ContextBar(), ContextBarProps, ContextItem, PromptComposer() (+27 more)
+Nodes (32): AssistantAvatar(), AssistantAvatarProps, SIZE_CLASSES, CitationChip(), CitationChipProps, ConversationView(), ConversationViewProps, FilePathChip() (+24 more)
+
+### Community 11 - "utils.ts"
+Cohesion: 0.13
+Nodes (18): AssistantFooterProps, PromptComposer(), PromptComposerProps, PromptInput(), PromptInputProps, QUICK_ACTIONS, QuickAction, QuickActions() (+10 more)
 
 ### Community 12 - "compilerOptions"
 Cohesion: 0.05
 Nodes (39): compilerOptions, allowImportingTsExtensions, baseUrl, isolatedModules, jsx, lib, module, moduleResolution (+31 more)
 
-### Community 13 - "StatusBar.tsx"
-Cohesion: 0.10
-Nodes (22): Logo(), LogoProps, STATUS_CLASSES, STATUS_LABELS, StatusIndicator(), StatusIndicatorProps, StatusVariant, MainContent() (+14 more)
+### Community 13 - "MainContent.tsx"
+Cohesion: 0.12
+Nodes (25): Logo(), LogoProps, MainContent(), PAGE_MAP, PAGE_TRANSITION, PageModule, TopBar(), TopBarProps (+17 more)
 
-### Community 14 - "Path"
-Cohesion: 0.14
-Nodes (12): _collect_files(), _is_cloud_stub(), Path, Return True if the file is a OneDrive cloud-only placeholder. On non-Windows…, Return False if resolved is inside a blocked OS-critical directory., Yield a per-file asyncio.Lock, creating it if it does not yet exist. Serialises…, Index all supported files under workspace_path. Returns a summary. progress_cb…, Index a single file and return its document ID on success. Returns the document… (+4 more)
+### Community 14 - "FileIndexer"
+Cohesion: 0.08
+Nodes (23): _collect_files(), FileIndexer, _is_cloud_stub(), Path, Return True if the file is a OneDrive cloud-only placeholder. On non-Windows…, Recursively indexes text files in a workspace directory. For each file that is…, Return False if resolved is inside a blocked OS-critical directory., Yield a per-file asyncio.Lock, creating it if it does not yet exist. Serialises… (+15 more)
 
 ### Community 15 - "context_assembler.py"
 Cohesion: 0.09
-Nodes (30): ContextAssembler, ContextChunk, ContextPayload, Connection, QdrantClient, Context assembly service for the AI retrieval pipeline. Wraps the hybrid search…, Retrieve and assemble context chunks for the given query. Pipeline: 1. Hybrid…, Supplement vector-retrieved chunks with graph-neighbour chunks. For each token… (+22 more)
+Nodes (28): ContextAssembler, ContextChunk, ContextPayload, Connection, QdrantClient, Context assembly service for the AI retrieval pipeline. Wraps the hybrid search…, Retrieve and assemble context chunks for the given query. Pipeline: 1. Hybrid…, Supplement vector-retrieved chunks with graph-neighbour chunks. For each token… (+20 more)
 
 ### Community 16 - "common.py"
 Cohesion: 0.14
 Nodes (31): Block, DocSpec, _ensure_dir(), Shared document-building helpers for the file-organization benchmark corpus.…, Declarative description of a single worksheet., Declarative description of a single slide., Declarative description of a single document., SheetSpec (+23 more)
 
+### Community 17 - "OrbController.ts"
+Cohesion: 0.11
+Nodes (7): DesktopPresenceService, ORB_OVERLAY_ID, OrbControllerState, OrbStateListener, Overlay, OverlayRegistry, makeService()
+
 ### Community 18 - "HybridSearchOrchestrator"
-Cohesion: 0.10
-Nodes (33): _get_db(), hybrid_search(), HybridSearchRequest, HybridSearchResponse, HybridSearchResultItem, keyword_search(), KeywordSearchRequest, KeywordSearchResponse (+25 more)
+Cohesion: 0.16
+Nodes (27): _get_db(), hybrid_search(), HybridSearchRequest, HybridSearchResponse, HybridSearchResultItem, keyword_search(), KeywordSearchRequest, KeywordSearchResponse (+19 more)
 
 ### Community 19 - "dependencies"
 Cohesion: 0.12
-Nodes (17): class-variance-authority, d3-force, dependencies, class-variance-authority, d3-force, postcss, react-dom, remark-gfm (+9 more)
+Nodes (17): class-variance-authority, d3-force, dependencies, class-variance-authority, d3-force, framer-motion, react, react-markdown (+9 more)
 
 ### Community 20 - "SearchPage.tsx"
-Cohesion: 0.10
-Nodes (27): EmptySearchState(), EmptySearchStateProps, SearchFilters(), SearchFiltersProps, TOP_K_OPTIONS, SearchInput(), SearchInputProps, MODES (+19 more)
+Cohesion: 0.11
+Nodes (24): SuggestedQueries(), SuggestedQueriesProps, EmptySearchState(), EmptySearchStateProps, SearchFilters(), SearchFiltersProps, TOP_K_OPTIONS, SearchInput() (+16 more)
 
-### Community 21 - "Relationship"
-Cohesion: 0.06
-Nodes (44): EntityType, Enum, str, Relationship, RelationshipType, _node_to_entity(), Any, Neo4j-backed knowledge graph provider. Uses the official Neo4j Python async… (+36 more)
+### Community 21 - "EntityType"
+Cohesion: 0.09
+Nodes (27): EntityType, Enum, str, RelationshipType, Connection, Insert or update a directed relationship edge., Remove all entities (and cascade-delete their relationships) for a document., Case-insensitive substring search over entity names. (+19 more)
 
 ### Community 22 - "NullGraphProvider"
 Cohesion: 0.10
@@ -365,27 +363,27 @@ Nodes (6): NullGraphProvider, TestGraphQueryService, TestTraversalEngine, provid
 
 ### Community 23 - "DocumentRepository"
 Cohesion: 0.05
-Nodes (49): bulk_delete_documents(), BulkDeleteRequest, delete_document(), DocumentResponse, list_documents(), BaseModel, delete, get (+41 more)
+Nodes (51): bulk_delete_documents(), BulkDeleteRequest, delete_document(), DocumentResponse, list_documents(), BaseModel, delete, get (+43 more)
 
-### Community 24 - "DocumentBrowser.tsx"
-Cohesion: 0.15
-Nodes (21): PendingDelete, DocumentFilters(), DocumentFiltersProps, EXTENSION_OPTIONS, SORT_OPTIONS, DocumentRow(), DocumentRowProps, EXT_ICONS (+13 more)
+### Community 24 - "workspace.ts"
+Cohesion: 0.11
+Nodes (21): PendingDelete, DocumentFilters(), DocumentFiltersProps, EXTENSION_OPTIONS, SORT_OPTIONS, FolderRow(), FolderRowProps, WatcherStatusBadge() (+13 more)
 
 ### Community 25 - "conversations.py"
 Cohesion: 0.15
 Nodes (22): ConversationMemoryResponse, ConversationResponse, ConversationSummaryResponse, get_conversation_memory(), list_conversations(), load_conversation(), MessageResponse, BaseModel (+14 more)
 
 ### Community 26 - "IndexingResult"
-Cohesion: 0.17
-Nodes (16): IndexingErrorResponse, IndexingStatusResponse, Any, BaseModel, field_validator, post, API endpoints for triggering and monitoring workspace indexing., Begin indexing a workspace directory in the background. The folder is… (+8 more)
+Cohesion: 0.11
+Nodes (27): cancel_indexing(), clear_indexing_errors(), get_indexing_status(), IndexingErrorResponse, IndexingStatusResponse, list_indexing_errors(), Any, BaseModel (+19 more)
 
 ### Community 27 - "EmbeddingService"
 Cohesion: 0.08
 Nodes (23): orb_query(), OrbQueryRequest, OrbQueryResponse, OrbSourceItem, Any, BaseModel, post, Request (+15 more)
 
-### Community 28 - "TestHybridSearchEndpoint"
-Cohesion: 0.21
-Nodes (5): _make_client(), TestClient, Tests for the hybrid search orchestrator and /search/hybrid endpoint. Covers…, Return a TestClient with mocked app.state attributes., TestHybridSearchEndpoint
+### Community 28 - "HybridSearchResult"
+Cohesion: 0.22
+Nodes (6): HybridSearchResult, A single result from the hybrid search pipeline. The rrf_score is the combined…, _make_client(), TestClient, Return a TestClient with mocked app.state attributes., TestHybridSearchEndpoint
 
 ### Community 29 - "Implementation Documentation Overview"
 Cohesion: 0.10
@@ -412,7 +410,7 @@ Cohesion: 0.08
 Nodes (23): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+15 more)
 
 ### Community 35 - "AbbreviationExtractor"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (17): AbbreviationRepository, Connection, Repository for persisting and querying discovered abbreviations. Abbreviation…, Async repository for the ``abbreviations`` table. Args: conn: An open…, Persist a batch of abbreviation matches for a single document. Uses ``INSERT OR…, Remove all abbreviation rows for the given document. Called before re-indexing…, Load all discovered abbreviations across every document. Returns a mapping…, AbbreviationExtractor (+9 more)
 
 ### Community 36 - "GraphCanvas.tsx"
@@ -420,32 +418,32 @@ Cohesion: 0.14
 Nodes (21): confidenceColor(), confidenceLabel(), EntityCard(), EntityCardProps, drawArrow(), drawFrame(), ENTITY_COLORS, entityColor() (+13 more)
 
 ### Community 37 - "KeywordSearchProvider"
-Cohesion: 0.21
-Nodes (8): KeywordSearchProvider, Connection, Full-text keyword search over indexed document chunks using SQLite FTS5. The…, asyncio, Connection, Insert one document and its chunks into both SQLite and FTS5 tables., _seed(), TestKeywordSearchProvider
+Cohesion: 0.10
+Nodes (17): KeywordSearchProvider, _normalise_bm25(), Connection, Keyword search provider backed by SQLite FTS5., Convert a raw SQLite BM25 score (negative, unbounded) to (0, 1]. SQLite's…, Full-text keyword search over indexed document chunks using SQLite FTS5. The…, Return up to *top_k* chunks matching *query* via full-text search. Args: query:…, db() (+9 more)
 
 ### Community 38 - "Phase-08-Orb-Native-Shell.md"
 Cohesion: 0.10
 Nodes (19): Animation States, Architecture, Completion Criteria, Deliverables, Dependencies, Design Decisions, Interaction Model, Modified Files (+11 more)
 
 ### Community 39 - "SearchResult"
-Cohesion: 0.28
-Nodes (4): Execute hybrid search and return merged results. Args: query: Preprocessed…, Keyword search provider backed by SQLite FTS5., Shared data models for the search capability., SearchResult
+Cohesion: 0.18
+Nodes (6): Hybrid search orchestrator combining keyword and semantic search. Uses…, Execute hybrid search and return merged results. Args: query: Preprocessed…, Look up the file_path for a document_id from SQLite., Return top_k chunks most semantically similar to query. Args: query: Natural-…, Shared data models for the search capability., SearchResult
 
 ### Community 40 - "ConversationRepository"
 Cohesion: 0.13
 Nodes (8): ConversationRepository, Atomically increment turn_count and return the new value., Persist a compressed summary for the conversation., Async repository for conversation and message persistence., TestGetOrCreateConversation, TestListConversations, TestLoadConversation, TestSaveMessage
 
 ### Community 41 - "OrbAnimationEngine.tsx"
-Cohesion: 0.08
-Nodes (39): LivingOrb(), LivingOrbProps, OrbContainer(), OrbContainerProps, OrbIcon(), OrbIconProps, ORB_BORDER_COLOR, ORB_FOCUS_RING (+31 more)
+Cohesion: 0.15
+Nodes (23): OrbIconProps, ORB_BORDER_COLOR, ORB_FOCUS_RING, ORB_GRADIENT_FROM, ORB_GRADIENT_MID, ORB_GRADIENT_TO, ORB_HIGHLIGHT_COLOR, ORB_HIGHLIGHT_SIZE (+15 more)
 
 ### Community 42 - "QueryPreprocessor"
 Cohesion: 0.17
 Nodes (6): QueryPreprocessor, QueryPreprocessorConfig, Transforms a raw user query into a structured ProcessedQuery. Designed to be…, Replace the dynamic expansion set with entries from discovered abbreviations.…, Feature flags for the preprocessing pipeline., TestQueryPreprocessor
 
-### Community 43 - "OrbLayer.tsx"
-Cohesion: 0.19
-Nodes (13): useOrbController(), DragOrigin, useOrbDrag(), UseOrbDragOptions, UseOrbDragResult, useOrbPosition(), OrbLayer(), clamp() (+5 more)
+### Community 43 - "LivingOrb.tsx"
+Cohesion: 0.13
+Nodes (16): LivingOrb(), LivingOrbProps, OrbContainer(), OrbContainerProps, OrbIcon(), DragOrigin, UseOrbDragOptions, UseOrbDragResult (+8 more)
 
 ### Community 44 - "TextChunker"
 Cohesion: 0.15
@@ -453,39 +451,35 @@ Nodes (7): Splits plain text into overlapping character-based chunks for embeddi
 
 ### Community 45 - "_make_watcher"
 Cohesion: 0.19
-Nodes (11): _client_with_watcher(), _make_watcher(), TestClient, WatchedFolder, Endpoint tests for the /watcher router. Injects a mock WatcherService into…, Build a minimal WatcherService mock for injection into app.state., Return a TestClient that has watcher injected after lifespan starts., TestAddFolder (+3 more)
+Nodes (10): _client_with_watcher(), _make_watcher(), TestClient, WatchedFolder, Build a minimal WatcherService mock for injection into app.state., Return a TestClient that has watcher injected after lifespan starts., TestAddFolder, TestListFolders (+2 more)
 
 ### Community 47 - "WatchedFolder"
 Cohesion: 0.16
 Nodes (20): add_watched_folder(), AddFolderRequest, get_watcher_status(), list_watched_folders(), BaseModel, delete, get, post (+12 more)
 
 ### Community 48 - "GlassPromptIntegration.test.tsx"
-Cohesion: 0.20
-Nodes (5): ConversationServiceContext, LLMProvider, LLMRequestOptions, ConversationService, ConversationTurn
-
-### Community 49 - "OrbController"
 Cohesion: 0.18
-Nodes (3): OrbController, makeControllableProvider(), renderIntegration()
+Nodes (6): ConversationServiceContext, LLMProvider, ConversationService, ConversationTurn, makeControllableProvider(), renderIntegration()
 
-### Community 50 - "OrbState"
-Cohesion: 0.21
-Nodes (5): OrbAnimationController, OrbAnimationDriver, OrbState, OrbStateMachine, TRANSITIONS
+### Community 50 - "services/orb/index.ts"
+Cohesion: 0.12
+Nodes (20): OrbAnimationController, OrbAnimationDriver, ErrorOccurredEvent, HoverEnterEvent, HoverLeaveEvent, InputFinishedEvent, InputStartedEvent, NotificationReceivedEvent (+12 more)
 
 ### Community 51 - "Neo4jProvider"
 Cohesion: 0.08
-Nodes (14): _build_graph_provider(), Return the appropriate graph provider based on EAC_GRAPH_PROVIDER. Default (no…, _auth(), Neo4jProvider, Create or update a directed relationship between two entity nodes. Both nodes…, Return ``{"nodes": [...], "edges": [...]}`` for the graph UI. When…, Return entities whose names contain *query* (case-insensitive substring). Args:…, Return document IDs of all entities reachable (up to 2 hops) from entity_name. (+6 more)
+Nodes (16): _auth(), Neo4jProvider, _node_to_entity(), Any, Create or update a directed relationship between two entity nodes. Both nodes…, Return the named entity plus its neighbourhood up to `depth` hops. Depth is…, Return ``{"nodes": [...], "edges": [...]}`` for the graph UI. When…, Return entities whose names contain *query* (case-insensitive substring). Args:… (+8 more)
 
 ### Community 52 - "_mock_db_app"
 Cohesion: 0.18
 Nodes (10): ConversationSummary, Return all conversations, most recent first, with their message count., _make_message(), _mock_db_app(), Tests for the conversations FastAPI endpoints using an in-memory database., Return a TestClient with a mock db in app.state., TestListConversationsEndpoint, TestLoadConversationEndpoint (+2 more)
 
 ### Community 53 - "_make_result"
-Cohesion: 0.24
-Nodes (6): Merge two ranked lists using Reciprocal Rank Fusion. Each chunk accumulates an…, _rrf_merge(), _make_result(), Verify the score for a chunk that appears at rank 1 in one list only., A chunk_id appearing in both lists should produce exactly one result., TestRrfMerge
+Cohesion: 0.14
+Nodes (10): Merge two ranked lists using Reciprocal Rank Fusion. Each chunk accumulates an…, _rrf_merge(), _make_result(), asyncio, Tests for the hybrid search orchestrator and /search/hybrid endpoint. Covers…, Verify the score for a chunk that appears at rank 1 in one list only., A chunk_id appearing in both lists should produce exactly one result., semantic_weight=0 should suppress semantic contribution. (+2 more)
 
 ### Community 54 - "App.tsx"
 Cohesion: 0.16
-Nodes (10): App(), GlassPromptBody(), AppShell(), GlassPromptContainer(), root, LayoutProvider(), LayoutProviderProps, GlassPromptStore (+2 more)
+Nodes (11): App(), useDesktopPresence(), root, DesktopPresenceContext, DesktopPresenceProvider(), DesktopPresenceProviderProps, LayoutProvider(), LayoutProviderProps (+3 more)
 
 ### Community 55 - "retrieval/index.ts"
 Cohesion: 0.29
@@ -520,40 +514,40 @@ Cohesion: 0.18
 Nodes (7): KnowledgeGraphService, Orchestrates entity extraction and graph persistence for indexed documents.…, Extract entities/relationships from each chunk and persist to the graph. After…, Remove all graph nodes and relationships sourced from this document., fixture, service(), TestBuildFromChunks
 
 ### Community 63 - "_escape_fts5_query"
-Cohesion: 0.29
-Nodes (4): _escape_fts5_query(), Escape a raw user query for safe use in an FTS5 MATCH expression. Wraps each…, Return up to *top_k* chunks matching *query* via full-text search. Args: query:…, TestEscapeFts5Query
+Cohesion: 0.39
+Nodes (3): _escape_fts5_query(), Escape a raw user query for safe use in an FTS5 MATCH expression. Wraps each…, TestEscapeFts5Query
 
 ### Community 64 - "TestEntityExtractor"
-Cohesion: 0.08
-Nodes (23): _coerce_entity_type(), EntityExtractor, _parse_json(), Any, Attempt to parse raw LLM output as JSON, stripping markdown fences., Extracts named entities from a text chunk via a structured LLM call. Usage:…, Return extracted entities from text. Returns [] on failure., ExtractedEntity (+15 more)
+Cohesion: 0.13
+Nodes (12): EntityExtractor, _parse_json(), Any, Attempt to parse raw LLM output as JSON, stripping markdown fences., Extracts named entities from a text chunk via a structured LLM call. Usage:…, Return extracted entities from text. Returns [] on failure., ExtractedEntity, Raw entity extracted by the LLM before graph persistence. (+4 more)
 
 ### Community 65 - "stats.py"
 Cohesion: 0.18
 Nodes (15): DashboardStats, _get_stats(), get_suggested_queries(), BaseModel, Connection, get, post, Request (+7 more)
 
-### Community 66 - "IndexingErrorRepository"
-Cohesion: 0.24
-Nodes (5): IndexingError, IndexingErrorRepository, Connection, Persistence layer for indexing errors., Persists per-file indexing failures to SQLite.
+### Community 66 - "app.py"
+Cohesion: 0.05
+Nodes (32): _build_graph_provider(), health(), lifespan(), limit_request_body(), get, FastAPI application for the Enterprise AI Companion backend., Reject requests that lack the per-session IPC shared secret. The token is…, Reject requests with a Content-Length header exceeding 10 MiB. (+24 more)
 
 ### Community 67 - "qdrant_provider.py"
-Cohesion: 0.21
-Nodes (12): _pid_file_path(), Path, QdrantClient, _qdrant_data_dir(), Local Qdrant vector store provider for the Enterprise AI Companion. Uses…, Open the local Qdrant store and ensure the collection exists with correct dims.…, Write the current process PID so the next startup can terminate this one., Kill the previously recorded PID if it is still running. (+4 more)
+Cohesion: 0.16
+Nodes (15): _pid_file_path(), Path, QdrantClient, _qdrant_data_dir(), QdrantProvider, Local Qdrant vector store provider for the Enterprise AI Companion. Uses…, Manages the lifecycle of a local Qdrant client and the document_chunks…, Open the local Qdrant store and ensure the collection exists with correct dims.… (+7 more)
 
 ### Community 68 - "HomePage.tsx"
-Cohesion: 0.13
-Nodes (18): fileName(), formatDate(), OpenButton(), RecentFilesList(), RecentFilesListProps, ACCENT_CLASSES, formatValue(), ICON_ACCENT_CLASSES (+10 more)
-
-### Community 69 - "_make_provider"
 Cohesion: 0.20
-Nodes (6): _entity(), _make_provider(), Connection, _rel(), _seed_doc(), TestSearchEntities
+Nodes (11): fileName(), formatDate(), OpenButton(), RecentFilesList(), RecentFilesListProps, ACCENT_CLASSES, formatValue(), ICON_ACCENT_CLASSES (+3 more)
+
+### Community 69 - "cn"
+Cohesion: 0.09
+Nodes (28): AttachmentButton(), AttachmentButtonProps, CONTEXT_ITEMS, ContextBar(), ContextBarProps, ContextItem, PlaceholderPage(), PlaceholderPageProps (+20 more)
 
 ### Community 70 - "useConversation.ts"
-Cohesion: 0.21
-Nodes (12): cosine(), heuristicRerank(), ngramTf(), RankedCandidate, tokenise(), ContextEngineContext, ConversationIdContext, ConversationIdContextValue (+4 more)
+Cohesion: 0.22
+Nodes (12): OrbHandoffListener(), OrbHandoffPayload, cosine(), heuristicRerank(), needsRetrieval(), ngramTf(), RankedCandidate, tokenise() (+4 more)
 
 ### Community 71 - "Phase-10-File-Organisation-Existing-Files.md"
-Cohesion: 0.10
-Nodes (19): Architecture, Completion Criteria, Deduplication, Deliverables, Dependencies, Design Decisions, Modified Files, New Backend Modules (+11 more)
+Cohesion: 0.11
+Nodes (18): Architecture, Completion Criteria, Deduplication, Deliverables, Dependencies, Design Decisions, Modified Files, New Backend Modules (+10 more)
 
 ### Community 72 - "test_file_watcher.py"
 Cohesion: 0.15
@@ -561,7 +555,7 @@ Nodes (7): db(), mock_indexer(), fixture, Unit tests for WatcherService and Debo
 
 ### Community 73 - "SettingsPage.tsx"
 Cohesion: 0.09
-Nodes (27): AssistantHeader(), AssistantHeaderProps, resolveStatus(), AssistantStatus(), AssistantStatusProps, STATUS_CONFIG, StatusKind, AIProviderSettings() (+19 more)
+Nodes (22): GlassPrompt(), GlassPromptProps, OVERLAY_VARIANTS, PANEL_VARIANTS, AIProviderSettings(), AIProviderSettingsProps, BackupSettings(), formatBytes() (+14 more)
 
 ### Community 74 - "ContextSnapshot"
 Cohesion: 0.28
@@ -575,9 +569,9 @@ Nodes (3): Notification, NotificationService, NullNotificationService
 Cohesion: 0.20
 Nodes (9): _has_fuzzy_candidates(), Enum, str, Query preprocessing pipeline for the search subsystem. Each stage is…, Return True if any token looks like it might be a typo. Heuristics: - Token…, Broad classification of the user's search intent., SearchIntent, Unit tests for the query preprocessing pipeline. (+1 more)
 
-### Community 78 - "list_plugins"
-Cohesion: 0.27
-Nodes (11): disable_plugin(), enable_plugin(), list_plugins(), PluginResponse, BaseModel, get, post, Request (+3 more)
+### Community 78 - "plugins.py"
+Cohesion: 0.26
+Nodes (12): disable_plugin(), enable_plugin(), list_plugins(), PluginResponse, BaseModel, get, post, Request (+4 more)
 
 ### Community 79 - "PluginManager"
 Cohesion: 0.13
@@ -588,16 +582,16 @@ Cohesion: 0.23
 Nodes (6): _make_client(), TestClient, Tests for the /graph API endpoints using NullGraphProvider injected into…, Return a TestClient with NullGraphProvider pre-loaded into app.state., TestGetGraphEntity, TestGraphHealth
 
 ### Community 81 - "organisation.py"
-Cohesion: 0.11
-Nodes (27): accept_recommendation(), AcceptBody, CandidateItem, dismiss_recommendation(), list_pending(), pending_count(), PendingRecommendationResponse, Any (+19 more)
+Cohesion: 0.10
+Nodes (30): accept_recommendation(), AcceptBody, CandidateItem, dismiss_recommendation(), list_pending(), pending_count(), PendingRecommendationResponse, Any (+22 more)
 
 ### Community 82 - "Engineering Specification (CLAUDE.md)"
 Cohesion: 0.23
 Nodes (12): AI Provider Abstraction Layer, BGE-M3 Embeddings, Engineering Specification (CLAUDE.md), Enterprise AI Companion, OpenAI GPT-5 Mini, PaddleOCR, Qdrant Vector Store, Tauri Desktop Framework (+4 more)
 
-### Community 83 - "DesktopPresenceService"
-Cohesion: 0.19
-Nodes (5): DesktopPresenceContext, DesktopPresenceProvider(), DesktopPresenceProviderProps, DesktopPresenceService, makeService()
+### Community 83 - "RecommendationRepository"
+Cohesion: 0.07
+Nodes (18): Connection, CRUD repository for file placement recommendations (migration 011). Each…, Return the number of pending recommendations., Mark a recommendation as accepted with the chosen folder., Mark a recommendation as dismissed (file stays in Downloads)., Mark a recommendation as corrected with the user-chosen destination., Dismiss all pending recommendations whose source file is *source_path*. Called…, Persists and retrieves file placement recommendations from SQLite. (+10 more)
 
 ### Community 84 - "default.json"
 Cohesion: 0.18
@@ -607,9 +601,9 @@ Nodes (10): description, identifier, permissions, $schema, windows, core:default
 Cohesion: 0.18
 Nodes (11): scripts, build, dev, format, lint, lint:fix, preview, tauri (+3 more)
 
-### Community 86 - "ai.ts"
-Cohesion: 0.22
-Nodes (7): apimEndpoint, LLM_CONFIG, LLMConfig, LLMProviderKey, providerOverride, assertNever(), createLLMProvider()
+### Community 86 - "ConversationServiceProvider.tsx"
+Cohesion: 0.15
+Nodes (13): apimEndpoint, LLM_CONFIG, LLMConfig, LLMProviderKey, providerOverride, ContextEngineContext, ConversationIdContext, ConversationIdContextValue (+5 more)
 
 ### Community 87 - "PluginRegistry"
 Cohesion: 0.13
@@ -628,8 +622,8 @@ Cohesion: 0.33
 Nodes (3): _detect_intent(), Classify the query intent from the token set using signal words., TestDetectIntent
 
 ### Community 92 - "TestEmbeddingsEndpoint"
-Cohesion: 0.24
-Nodes (3): _patch_service(), Patch the EmbeddingService singleton used by the router., TestEmbeddingsEndpoint
+Cohesion: 0.21
+Nodes (4): _patch_service(), Tests for the POST /embeddings FastAPI endpoint. Uses FastAPI's TestClient…, Patch the EmbeddingService singleton used by the router., TestEmbeddingsEndpoint
 
 ### Community 93 - "Neo4j Graph Database"
 Cohesion: 0.22
@@ -640,8 +634,8 @@ Cohesion: 0.23
 Nodes (12): _default_scan_dir(), Path, Plugin discovery and loading. Scans a directory tree for plugin subdirectories…, Discover and load all plugins found in *scan_dir*. Returns only plugins that…, Return the platform-appropriate plugin scan directory. On Windows:…, Import and return the class named by ``module:ClassName``. Temporarily prepends…, Return a list of permission mismatches. A mismatch occurs when a permission is…, _resolve_entry_point() (+4 more)
 
 ### Community 95 - "DebounceHandler"
-Cohesion: 0.15
-Nodes (9): DebounceHandler, _is_excluded(), Background file watcher that triggers automatic re-indexing on filesystem…, Index a single new file and invoke post_index_hook on success., Return True if any segment of path is in EXCLUDED_DIRS., Watchdog event handler with per-path debouncing. Consecutive events for the…, TestIsExcluded, FileSystemEvent (+1 more)
+Cohesion: 0.16
+Nodes (8): DebounceHandler, _is_excluded(), Index a single new file and invoke post_index_hook on success., Return True if any segment of path is in EXCLUDED_DIRS., Watchdog event handler with per-path debouncing. Consecutive events for the…, TestIsExcluded, FileSystemEvent, FileSystemEventHandler
 
 ### Community 96 - "TestExpand"
 Cohesion: 0.36
@@ -660,20 +654,20 @@ Cohesion: 0.22
 Nodes (8): name, pnpm, onlyBuiltDependencies, private, type, version, esbuild, @tauri-apps/cli
 
 ### Community 100 - "MockProvider.ts"
-Cohesion: 0.33
-Nodes (5): MOCK_RESPONSE_TABLE, MockProvider, MockResponseEntry, resolveResponse(), sleep()
+Cohesion: 0.32
+Nodes (7): LLMRequestOptions, LLMStreamChunk, MOCK_RESPONSE_TABLE, MockProvider, MockResponseEntry, resolveResponse(), sleep()
 
 ### Community 101 - "NullProjectKnowledgeRepository.ts"
 Cohesion: 0.47
 Nodes (3): NullProjectKnowledgeRepository, Project, ProjectKnowledgeRepository
 
-### Community 102 - "WorkspacePage.tsx"
-Cohesion: 0.17
-Nodes (17): applyFiltersAndSort(), DocumentBrowser(), FolderList(), formatTimestamp(), IndexingErrorsTab(), IndexingStatusPanel(), IndexingTaskCard(), IndexingTaskCardProps (+9 more)
+### Community 102 - "IPCClient"
+Cohesion: 0.21
+Nodes (16): applyFiltersAndSort(), DocumentBrowser(), FolderList(), formatTimestamp(), IndexingErrorsTab(), IndexingStatusPanel(), IndexingTaskCardProps, IndexingTaskState (+8 more)
 
-### Community 103 - "MainContent.tsx"
-Cohesion: 0.14
-Nodes (13): AssistantFooter(), AssistantWidget(), AssistantWidgetProps, ConversationView(), PlaceholderPage(), PlaceholderPageProps, PAGE_MAP, PAGE_TRANSITION (+5 more)
+### Community 103 - "AssistantWidget.tsx"
+Cohesion: 0.17
+Nodes (11): AssistantFooter(), AssistantHeader(), AssistantHeaderProps, resolveStatus(), AssistantStatus(), AssistantStatusProps, STATUS_CONFIG, StatusKind (+3 more)
 
 ### Community 104 - "TestTokenise"
 Cohesion: 0.39
@@ -691,17 +685,17 @@ Nodes (8): PluginManifest, Path, Plugin manifest schema and loader. Each plugin 
 Cohesion: 0.43
 Nodes (3): _looks_like_typo(), Return True when the token exhibits common typo patterns. Checks: 1. Repeated…, TestLooksLikeTypo
 
-### Community 108 - "FileIndexer"
+### Community 108 - "OrbShell.tsx"
 Cohesion: 0.25
-Nodes (6): FileIndexer, Recursively indexes text files in a workspace directory. For each file that is…, Path, Unit tests for the _extract_text dispatcher., TestExtractText, TestIndexWorkspace
+Nodes (10): OrbNotificationOverlay(), Recommendation, OrbQueryOverlay(), QueryState, SourceItem, THINKING_PHRASES, OrbShell(), OrbOverlayMode (+2 more)
 
-### Community 110 - ".log"
-Cohesion: 0.33
-Nodes (5): Any, Return a copy of details with sensitive values replaced by '<redacted>'., Record a single audit event. Args: event_type: Dot-namespaced verb, e.g.…, Return the most recent audit events, newest first., _scrub()
+### Community 110 - "AuditLogger"
+Cohesion: 0.19
+Nodes (9): AuditLogger, Any, Connection, Structured audit logging for security-relevant application events. Events are…, Return a copy of details with sensitive values replaced by '<redacted>'., Writes audit events to the audit_events table and the application log., Record a single audit event. Args: event_type: Dot-namespaced verb, e.g.…, Return the most recent audit events, newest first. (+1 more)
 
-### Community 111 - "database.py"
-Cohesion: 0.22
-Nodes (15): _apply_migrations(), close_db(), _db_path(), _find_migrations_dir(), lifespan_db(), _migrations_dir(), open_db(), Connection (+7 more)
+### Community 111 - "get_config"
+Cohesion: 0.13
+Nodes (23): AppConfig, get_config(), Centralised application configuration for the Enterprise AI Companion. All…, Application configuration loaded from environment variables and .env file., Return the singleton AppConfig, creating it on first call. Raises…, Reset the singleton — intended for use in tests only., reset_config(), _apply_migrations() (+15 more)
 
 ### Community 112 - "score_benchmark.py"
 Cohesion: 0.29
@@ -721,7 +715,7 @@ Nodes (6): Capability-Based Organization, Clean Architecture Principle, Capabili
 
 ### Community 116 - "Benchmark Scorecard — File Organisation"
 Cohesion: 0.22
-Nodes (8): Benchmark Scorecard — File Organisation, Category 1 — Obvious Matches (scored 10 / 10), Category 2 — Semantic Matches (scored 6 / 10), Category 3 — Ambiguous Matches (scored 10 / 10), Category 4 — Wrong-Project Matches (scored 7 / 8), Category 5 — Unrelated Files (scored 6 / 6), Category 6 — Duplicate / Updated Versions (scored 7 / 10), Running Total
+Nodes (8): Benchmark Scorecard — File Organisation, Category 1 — Obvious Matches (scored 10 / 10), Category 2 — Semantic Matches (scored 6 / 10), Category 3 — Ambiguous Matches (scored 10 / 10), Category 4 — Wrong-Project Matches (scored 7 / 8), Category 5 — Unrelated Files (scored 6 / 6), Category 6 — Duplicate / Updated Versions (scored 8 / 10), Running Total
 
 ### Community 117 - "Python Sidecar (FastAPI)"
 Cohesion: 0.33
@@ -735,9 +729,9 @@ Nodes (5): Architecture Decision Records (ADRs), Layered Architecture, Applicati
 Cohesion: 0.40
 Nodes (5): File Indexing Capability, FileConnector Interface, FileIndexer, LocalFileConnector, OneDriveConnector
 
-### Community 120 - "FolderList.tsx"
+### Community 120 - "StatusBar.tsx"
 Cohesion: 0.18
-Nodes (7): FolderRow(), FolderRowProps, WatcherStatusBadge(), WatcherStatusBadgeProps, WatchedFolder, WatcherStatus, WorkspaceService
+Nodes (11): STATUS_CLASSES, STATUS_LABELS, StatusIndicator(), StatusIndicatorProps, StatusVariant, DEFAULT_STATUS, fetchServiceStatus(), ServiceStatus (+3 more)
 
 ### Community 121 - "lint-staged"
 Cohesion: 0.50
@@ -767,21 +761,21 @@ Nodes (3): BackupService, Settings Page, Settings Service (Frontend)
 Cohesion: 0.22
 Nodes (9): eslint, eslint-plugin-prettier, devDependencies, eslint, eslint-plugin-prettier, typescript, @vitejs/plugin-react, typescript (+1 more)
 
-### Community 134 - "OrbController.ts"
+### Community 134 - "OrbLayer.tsx"
 Cohesion: 0.26
-Nodes (7): useDesktopPresence(), OrbControllerContext, OrbControllerProvider(), ORB_OVERLAY_ID, OrbControllerState, OrbStateListener, localStorageStore
+Nodes (6): useOrbDrag(), GlassPromptContainer(), OrbLayer(), OrbControllerContext, GlassPromptStore, useGlassPromptStore
 
-### Community 194 - "Sidebar.tsx"
-Cohesion: 0.12
-Nodes (21): SuggestedQueries(), SuggestedQueriesProps, NAV_ITEMS, NavItemConfig, NavItem(), NavItemProps, ICON_MAP, Sidebar() (+13 more)
+### Community 194 - "layoutStore.ts"
+Cohesion: 0.48
+Nodes (4): useLayout(), LayoutStore, useLayoutStore, LayoutState
 
-### Community 196 - "IPCClient"
-Cohesion: 0.13
-Nodes (11): PERMISSION_LABELS, PluginSettings(), useEmbedding(), UseEmbeddingResult, IPCClient, PluginRecord, waitForSidecar(), mockInvoke (+3 more)
+### Community 196 - "useEmbedding.ts"
+Cohesion: 0.40
+Nodes (4): useEmbedding(), UseEmbeddingResult, FAKE_VECTOR, mockGenerateEmbedding
 
-### Community 197 - "services/orb/index.ts"
-Cohesion: 0.22
-Nodes (15): ErrorOccurredEvent, HoverEnterEvent, HoverLeaveEvent, InputFinishedEvent, InputStartedEvent, NotificationReceivedEvent, OrbEvent, OrbEventType (+7 more)
+### Community 197 - "PluginSettings.tsx"
+Cohesion: 0.40
+Nodes (3): PERMISSION_LABELS, PluginSettings(), PluginRecord
 
 ### Community 208 - "get_db"
 Cohesion: 0.50
@@ -791,61 +785,45 @@ Nodes (4): get_db(), Connection, Request, Extract the shared database connection
 Cohesion: 0.27
 Nodes (8): create_embedding(), EmbedRequest, EmbedResponse, BaseModel, field_validator, post, Embeddings router — POST /embeddings., Generate a BGE-M3 embedding vector for the supplied text. Returns a…
 
-### Community 211 - "BackupSettings.tsx"
-Cohesion: 0.19
-Nodes (10): GlassPrompt(), GlassPromptProps, OVERLAY_VARIANTS, PANEL_VARIANTS, BackupSettings(), formatBytes(), formatDate(), Button (+2 more)
+### Community 211 - "IPCClient.test.ts"
+Cohesion: 0.50
+Nodes (3): waitForSidecar(), mockInvoke, mockListen
 
-### Community 212 - "TestHybridSearchOrchestrator"
-Cohesion: 0.37
-Nodes (3): asyncio, semantic_weight=0 should suppress semantic contribution., TestHybridSearchOrchestrator
+### Community 212 - "DocumentRow.tsx"
+Cohesion: 0.39
+Nodes (7): DocumentRow(), DocumentRowProps, EXT_ICONS, formatDate(), formatSize(), getExtension(), getFileName()
 
-### Community 213 - "_normalise_bm25"
-Cohesion: 0.21
-Nodes (7): _normalise_bm25(), Convert a raw SQLite BM25 score (negative, unbounded) to (0, 1]. SQLite's…, db(), fixture, Tests for KeywordSearchProvider., In-memory SQLite database with the full knowledge schema applied., TestNormaliseBm25
+### Community 213 - "useDashboard.ts"
+Cohesion: 0.36
+Nodes (7): CachedSuggestions, DashboardState, loadCachedSuggestions(), saveSuggestionsCache(), useDashboard(), HomePage(), DashboardStats
 
-### Community 214 - "cancel_indexing"
-Cohesion: 0.24
-Nodes (11): cancel_indexing(), clear_indexing_errors(), get_indexing_status(), list_indexing_errors(), delete, get, Request, Return the current status of an indexing task. (+3 more)
+### Community 214 - "._reachable_ids"
+Cohesion: 0.33
+Nodes (3): Return ``{"nodes": [...], "edges": [...]}`` for the graph UI. When…, Return entity IDs reachable from *entity_name* within *depth* hops., Recursive CTE that expands *depth* hops from *root_id* in both directions.
 
-### Community 217 - "._index_file_locked"
-Cohesion: 0.20
-Nodes (5): Extract plain text from a file based on its extension. Enabled…, Inner implementation — called only while the per-file lock is held., Extract abbreviations from *text* and persist them for *doc_id*. Clears any…, Build the knowledge graph for doc_id, skipping when the hash is unchanged.…, Rebuild the knowledge graph for doc_id using chunks already in the database.…
-
-### Community 218 - "limit_request_body"
-Cohesion: 0.29
-Nodes (7): health(), limit_request_body(), get, Reject requests with a Content-Length header exceeding 10 MiB., Liveness probe used by the Tauri IPC health_check command., middleware, StarletteRequest
-
-### Community 219 - "manifest.json"
-Cohesion: 0.25
-Nodes (7): backup_id, created_at, notes, qdrant_collections, sqlite_size_bytes, status, document_chunks
-
-### Community 220 - "config.py"
-Cohesion: 0.29
-Nodes (6): AppConfig, Centralised application configuration for the Enterprise AI Companion. All…, Application configuration loaded from environment variables and .env file., Reset the singleton — intended for use in tests only., reset_config(), BaseSettings
-
-### Community 221 - "graph_state_repository.py"
-Cohesion: 0.40
-Nodes (3): GraphState, Tracks the last successful knowledge graph build per document. Allows…, Return the stored graph state for document_id, or None if not found.
+### Community 217 - ".upsert_entity"
+Cohesion: 0.50
+Nodes (3): _canonical(), Inline canonical-name helper (mirrors enrichment_service.canonical_name). Kept…, Insert or update an entity node. Uses INSERT OR REPLACE so re-indexing the same…
 
 ## Knowledge Gaps
-- **444 isolated node(s):** `enterprise-ai-companion`, `backup_id`, `created_at`, `sqlite_size_bytes`, `document_chunks` (+439 more)
+- **437 isolated node(s):** `enterprise-ai-companion`, `$schema`, `style`, `rsc`, `tsx` (+432 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **74 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **72 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `FileIndexer` connect `FileIndexer` to `GraphProvider`, `app.py`, `AbbreviationExtractor`, `IndexingErrorRepository`, `.__init__`, `TextChunker`, `Path`, `PluginManager`, `WatchedFolder`, `NullGraphProvider`, `DocumentRepository`, `._index_file_locked`, `IndexingResult`, `EmbeddingService`, `WatcherService`, `GraphStateRepository`, `KnowledgeGraphService`, `DebounceHandler`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
-- **Why does `GraphProvider` connect `GraphProvider` to `AbbreviationExtractor`, `app.py`, `GraphQueryService`, `FileIndexer`, `context_assembler.py`, `Neo4jProvider`, `Relationship`, `NullGraphProvider`, `DocumentRepository`, `IndexingResult`, `KnowledgeGraphService`, `TestCanonicalName`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
-- **Why does `SQLiteGraphProvider` connect `Relationship` to `Neo4jProvider`, `GraphProvider`, `app.py`, `_make_provider`?**
-  _High betweenness centrality (0.019) - this node is a cross-community bridge._
+- **Why does `FileIndexer` connect `FileIndexer` to `GraphProvider`, `app.py`, `AbbreviationExtractor`, `.__init__`, `TextChunker`, `PluginManager`, `WatchedFolder`, `NullGraphProvider`, `DocumentRepository`, `WatcherService`, `IndexingResult`, `EmbeddingService`, `GraphStateRepository`, `KnowledgeGraphService`, `DebounceHandler`?**
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
+- **Why does `GraphProvider` connect `GraphProvider` to `PlacementScorer`, `GraphQueryService`, `FileIndexer`, `context_assembler.py`, `Neo4jProvider`, `EntityType`, `NullGraphProvider`, `DocumentRepository`, `IndexingResult`, `KnowledgeGraphService`, `TestCanonicalName`?**
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **Why does `SQLiteGraphProvider` connect `EntityType` to `.upsert_entity`, `app.py`, `GraphProvider`, `._reachable_ids`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Are the 28 inferred relationships involving `EmbeddingService` (e.g. with `TokenVerificationMiddleware` and `EmbedRequest`) actually correct?**
   _`EmbeddingService` has 28 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 23 inferred relationships involving `NullGraphProvider` (e.g. with `TokenVerificationMiddleware` and `BulkDeleteRequest`) actually correct?**
   _`NullGraphProvider` has 23 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 24 inferred relationships involving `FileIndexer` (e.g. with `TokenVerificationMiddleware` and `IndexingErrorResponse`) actually correct?**
   _`FileIndexer` has 24 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `enterprise-ai-companion`, `backup_id`, `created_at` to the rest of the system?**
-  _444 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `enterprise-ai-companion`, `$schema`, `style` to the rest of the system?**
+  _437 weakly-connected nodes found - possible documentation gaps or missing edges._
