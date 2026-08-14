@@ -73,7 +73,6 @@ class DebounceHandler(FileSystemEventHandler):
         loop: asyncio.AbstractEventLoop,
         post_index_hook: "asyncio.Coroutine | None" = None,
         post_delete_hook: "asyncio.Coroutine | None" = None,
-        post_correction_hook: "asyncio.Coroutine | None" = None,
     ) -> None:
         super().__init__()
         self._folder_path = folder_path
@@ -81,10 +80,6 @@ class DebounceHandler(FileSystemEventHandler):
         self._loop = loop
         self._post_index_hook = post_index_hook
         self._post_delete_hook = post_delete_hook
-        # Called with (src_path, dest_folder) when a file moves out of this
-        # watched folder to a destination that is NOT one of the top-3 suggestions.
-        # Used exclusively for the Downloads folder to detect user corrections.
-        self._post_correction_hook = post_correction_hook
         self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
         # Tracks paths that arrived via on_created (truly new files).
@@ -138,13 +133,8 @@ class DebounceHandler(FileSystemEventHandler):
                     self._created_paths.add(dest)
                 self._schedule(dest, is_new=True)
         else:
-            # File moved out of this watched folder — check for a user correction
-            # before removing index records, then dismiss any pending recommendation.
-            if self._post_correction_hook is not None and dest is not None:
-                dest_folder = str(Path(dest).parent)
-                asyncio.run_coroutine_threadsafe(
-                    self._post_correction_hook(src, dest_folder), self._loop
-                )
+            # File moved out of this watched folder — remove its index records
+            # and dismiss any pending placement recommendation for it.
             asyncio.run_coroutine_threadsafe(
                 self._indexer.delete_file(src), self._loop
             )
@@ -515,14 +505,13 @@ class WatcherService:
             if existing_entry is not None:
                 _, existing_handler = existing_entry
                 # Handler was created during _async_start() before recommendation_service
-                # was assigned — replace it with one that has all hooks wired.
+                # was assigned — replace it with one that has both hooks wired.
                 needs_rewire = self.recommendation_service is not None and (
                     existing_handler._post_index_hook is None
                     or existing_handler._post_delete_hook is None
-                    or existing_handler._post_correction_hook is None
                 )
                 if needs_rewire:
-                    logger.info("Re-wiring Downloads watcher with recommendation hooks")
+                    logger.info("Re-wiring Downloads watcher with recommendation hook")
                     self._unschedule_watch(downloads_str)
                     self._schedule_watch(downloads_str)
             else:
@@ -534,26 +523,22 @@ class WatcherService:
 
         index_hook = None
         delete_hook = None
-        correction_hook = None
         if path == DOWNLOADS_PATH and self.recommendation_service is not None:
             if hasattr(self.recommendation_service, "process_new_file"):
                 index_hook = self.recommendation_service.process_new_file
             if hasattr(self.recommendation_service, "dismiss_stale_for_path"):
                 delete_hook = self.recommendation_service.dismiss_stale_for_path
-            if hasattr(self.recommendation_service, "record_correction"):
-                correction_hook = self.recommendation_service.record_correction
 
         handler = DebounceHandler(
             path, self._indexer, self._loop,
             post_index_hook=index_hook,
             post_delete_hook=delete_hook,
-            post_correction_hook=correction_hook,
         )
         watch = self._observer.schedule(handler, path, recursive=True)
         self._watches[path] = (watch, handler)
         logger.debug(
-            "Scheduled watchdog watch on: %s (index_hook=%s, delete_hook=%s, correction_hook=%s)",
-            path, index_hook is not None, delete_hook is not None, correction_hook is not None,
+            "Scheduled watchdog watch on: %s (index_hook=%s, delete_hook=%s)",
+            path, index_hook is not None, delete_hook is not None,
         )
 
     def _unschedule_watch(self, path: str) -> None:
