@@ -122,7 +122,20 @@ class AuditService:
         # If we relied on score_all to return current_folder, a file whose
         # current folder ranks 4th or lower would yield current_score=0.0,
         # causing a false delta and a spurious "move to another folder" rec.
-        current_score = await self._placement_scorer.score_one(doc.id, current_folder)
+        #
+        # Special case: if the current folder is an ancestor of any candidate
+        # (e.g. a root dir containing subfolders), score_one would use LIKE
+        # to match all descendants, inflating current_score and suppressing
+        # valid recommendations. Treat it as 0.0 — any subfolder rec is an
+        # improvement over an unorganised root.
+        current_folder_is_ancestor = any(
+            c.startswith(current_folder.rstrip(os.sep) + os.sep)
+            for c in candidate_paths
+        )
+        if current_folder_is_ancestor:
+            current_score = 0.0
+        else:
+            current_score = await self._placement_scorer.score_one(doc.id, current_folder)
 
         # Exclude the file's own folder AND any ancestor directory from the
         # candidate list. A root folder like "test-drive" scores artificially

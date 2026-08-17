@@ -50,6 +50,7 @@ class PendingRecommendationResponse(BaseModel):
 
 class AcceptBody(BaseModel):
     folder: str
+    conflict_strategy: str = "error"  # "error" | "replace" | "rename"
 
 
 class AuditStatusResponse(BaseModel):
@@ -98,7 +99,7 @@ async def accept_recommendation(
         raise HTTPException(status_code=409, detail=f"Recommendation is already {rec.status}")
 
     try:
-        new_path = await mover.move(rec.source_path, body.folder)
+        new_path = await mover.move(rec.source_path, body.folder, body.conflict_strategy)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileExistsError as exc:

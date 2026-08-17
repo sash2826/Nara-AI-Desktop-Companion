@@ -24,6 +24,7 @@ export function OrbNotificationOverlay() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
+  const [conflicts, setConflicts] = useState<Map<string, string>>(new Map()); // id → target folder
 
   const fetchRecommendations = useCallback(() => {
     invoke<Recommendation[]>("list_pending_recommendations")
@@ -53,29 +54,75 @@ export function OrbNotificationOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleDismiss]);
 
-  const handleAccept = useCallback(
-    async (recId: string, folder: string) => {
+  const _doAccept = useCallback(
+    async (
+      recId: string,
+      folder: string,
+      conflictStrategy: "error" | "replace" | "rename" = "error"
+    ) => {
+      setErrors((prev) => {
+        const m = new Map(prev);
+        m.delete(recId);
+        return m;
+      });
+      setConflicts((prev) => {
+        const m = new Map(prev);
+        m.delete(recId);
+        return m;
+      });
       try {
-        await invoke("accept_recommendation", { recommendationId: recId, folder });
+        await invoke("accept_recommendation", {
+          recommendationId: recId,
+          folder,
+          conflictStrategy,
+        });
         const updated = recommendations.filter((r) => r.id !== recId);
         setRecommendations(updated);
         setPendingCount(updated.length);
         if (updated.length === 0) setOverlayMode("none");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setErrors((prev) => new Map(prev).set(recId, msg));
+        const msg =
+          err instanceof Error ? err.message : typeof err === "string" ? err : "Move failed";
+        if (msg.includes("already exists")) {
+          setConflicts((prev) => new Map(prev).set(recId, folder));
+        } else {
+          setErrors((prev) => new Map(prev).set(recId, msg));
+        }
       }
     },
     [recommendations, setPendingCount, setOverlayMode]
+  );
+
+  const handleAccept = useCallback(
+    (recId: string, folder: string) => void _doAccept(recId, folder),
+    [_doAccept]
   );
 
   const handleChooseFolder = useCallback(
     async (recId: string) => {
       const selected = await openDialog({ directory: true, multiple: false });
       if (!selected) return;
-      await handleAccept(recId, selected as string);
+      void _doAccept(recId, selected as string);
     },
-    [handleAccept]
+    [_doAccept]
+  );
+
+  const handleConflictReplace = useCallback(
+    (recId: string) => {
+      const folder = conflicts.get(recId);
+      if (!folder) return;
+      void _doAccept(recId, folder, "replace");
+    },
+    [_doAccept, conflicts]
+  );
+
+  const handleConflictKeepBoth = useCallback(
+    (recId: string) => {
+      const folder = conflicts.get(recId);
+      if (!folder) return;
+      void _doAccept(recId, folder, "rename");
+    },
+    [_doAccept, conflicts]
   );
 
   const handleSkip = useCallback(
@@ -174,6 +221,11 @@ export function OrbNotificationOverlay() {
           {recommendations.map((rec) => {
             const top = rec.candidates[0];
             const fileName = rec.source_path.split(/[\\/]/).pop() ?? rec.source_path;
+            const conflictFolder = conflicts.get(rec.id);
+            const conflictFolderName = conflictFolder
+              ? (conflictFolder.split(/[\\/]/).pop() ?? conflictFolder)
+              : null;
+
             return (
               <motion.div
                 key={rec.id}
@@ -198,71 +250,135 @@ export function OrbNotificationOverlay() {
                   {fileName}
                 </div>
 
-                {top && (
-                  <div style={{ fontSize: 12, color: "hsl(0 0% 72%)", marginBottom: 8 }}>
-                    <span style={{ color: labelColor(top.label), fontWeight: 600 }}>
-                      {top.label}
-                    </span>
-                    <span style={{ color: "hsl(0 0% 55%)", marginLeft: 4 }}>
-                      {Math.round(top.score * 100)}%
-                    </span>
-                    {" · "}
-                    <span title={top.folder}>{top.folder.split(/[\\/]/).pop() ?? top.folder}</span>
-                  </div>
+                {conflictFolder ? (
+                  <>
+                    <div style={{ fontSize: 11, color: "hsl(30 95% 65%)", marginBottom: 8 }}>
+                      A file named <strong>{fileName}</strong> already exists in{" "}
+                      <strong>{conflictFolderName}</strong>.
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => handleConflictReplace(rec.id)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 7,
+                          border: "1px solid hsl(30 95% 65% / 0.40)",
+                          background: "hsl(30 95% 65% / 0.15)",
+                          color: "hsl(30 95% 72%)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Replace
+                      </button>
+                      <button
+                        onClick={() => handleConflictKeepBoth(rec.id)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 7,
+                          border: "none",
+                          background: "hsl(142 60% 42%)",
+                          color: "hsl(0 0% 98%)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Keep both
+                      </button>
+                      <button
+                        onClick={() =>
+                          setConflicts((prev) => {
+                            const m = new Map(prev);
+                            m.delete(rec.id);
+                            return m;
+                          })
+                        }
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 7,
+                          border: "1px solid hsl(0 0% 100% / 0.15)",
+                          background: "hsl(0 0% 100% / 0.07)",
+                          color: "hsl(0 0% 72%)",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {top && (
+                      <div style={{ fontSize: 12, color: "hsl(0 0% 72%)", marginBottom: 8 }}>
+                        <span style={{ color: labelColor(top.label), fontWeight: 600 }}>
+                          {top.label}
+                        </span>
+                        <span style={{ color: "hsl(0 0% 55%)", marginLeft: 4 }}>
+                          {Math.round(top.score * 100)}%
+                        </span>
+                        {" · "}
+                        <span title={top.folder}>
+                          {top.folder.split(/[\\/]/).pop() ?? top.folder}
+                        </span>
+                      </div>
+                    )}
+                    {errors.get(rec.id) && (
+                      <div style={{ fontSize: 11, color: "hsl(0 75% 65%)", marginBottom: 6 }}>
+                        {errors.get(rec.id)}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {top && (
+                        <button
+                          onClick={() => handleAccept(rec.id, top.folder)}
+                          style={{
+                            padding: "4px 12px",
+                            borderRadius: 7,
+                            border: "none",
+                            background: "hsl(142 60% 42%)",
+                            color: "hsl(0 0% 98%)",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Move here
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void handleChooseFolder(rec.id)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 7,
+                          border: "1px solid hsl(0 0% 100% / 0.15)",
+                          background: "hsl(0 0% 100% / 0.07)",
+                          color: "hsl(0 0% 85%)",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Choose folder…
+                      </button>
+                      <button
+                        onClick={() => void handleSkip(rec.id)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 7,
+                          border: "1px solid hsl(0 0% 100% / 0.15)",
+                          background: "hsl(0 0% 100% / 0.07)",
+                          color: "hsl(0 0% 72%)",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </>
                 )}
-                {errors.get(rec.id) && (
-                  <div style={{ fontSize: 11, color: "hsl(0 75% 65%)", marginBottom: 6 }}>
-                    {errors.get(rec.id)}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  {top && (
-                    <button
-                      onClick={() => void handleAccept(rec.id, top.folder)}
-                      style={{
-                        padding: "4px 12px",
-                        borderRadius: 7,
-                        border: "none",
-                        background: "hsl(142 60% 42%)",
-                        color: "hsl(0 0% 98%)",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Move here
-                    </button>
-                  )}
-                  <button
-                    onClick={() => void handleChooseFolder(rec.id)}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 7,
-                      border: "1px solid hsl(0 0% 100% / 0.15)",
-                      background: "hsl(0 0% 100% / 0.07)",
-                      color: "hsl(0 0% 85%)",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Choose folder…
-                  </button>
-                  <button
-                    onClick={() => handleSkip(rec.id)}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 7,
-                      border: "1px solid hsl(0 0% 100% / 0.15)",
-                      background: "hsl(0 0% 100% / 0.07)",
-                      color: "hsl(0 0% 72%)",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Skip
-                  </button>
-                </div>
               </motion.div>
             );
           })}

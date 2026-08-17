@@ -638,8 +638,16 @@ async function listPendingRecommendations(): Promise<PendingRecommendation[]> {
 }
 
 /** Accepts a recommendation and moves the file to the chosen folder. */
-async function acceptRecommendation(recommendationId: string, folder: string): Promise<void> {
-  return invoke<void>("accept_recommendation", { recommendationId, folder });
+async function acceptRecommendation(
+  recommendationId: string,
+  folder: string,
+  conflictStrategy?: "error" | "replace" | "rename"
+): Promise<void> {
+  return invoke<void>("accept_recommendation", {
+    recommendationId,
+    folder,
+    conflictStrategy: conflictStrategy ?? "error",
+  });
 }
 
 /** Dismisses a recommendation without moving the file. */

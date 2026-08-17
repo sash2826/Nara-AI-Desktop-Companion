@@ -19,20 +19,48 @@ import aiosqlite
 logger = logging.getLogger(__name__)
 
 
+def _unique_path(path: str) -> str:
+    """Return a non-existing path by appending (1), (2), … to the stem."""
+    from pathlib import Path as _Path
+    p = _Path(path)
+    stem, suffix, parent = p.stem, p.suffix, p.parent
+    counter = 1
+    candidate = path
+    while os.path.exists(candidate):
+        candidate = str(parent / f"{stem} ({counter}){suffix}")
+        counter += 1
+    return candidate
+
+
 class FileMover:
     """Moves indexed files and keeps SQLite records consistent."""
 
     def __init__(self, conn: aiosqlite.Connection) -> None:
         self._conn = conn
 
-    async def move(self, source_path: str, target_folder: str) -> str:
+    async def move(
+        self,
+        source_path: str,
+        target_folder: str,
+        conflict_strategy: str = "error",
+    ) -> str:
         """Move *source_path* into *target_folder*.
+
+        Args:
+            source_path: Absolute path of the file to move.
+            target_folder: Destination directory.
+            conflict_strategy: What to do when a file with the same name
+                already exists in the target folder.
+                ``"error"``   — raise FileExistsError (default).
+                ``"replace"`` — overwrite the existing file.
+                ``"rename"``  — keep both by appending `` (N)`` to the stem.
 
         Returns the new absolute file path.
 
         Raises:
             FileNotFoundError: if source_path does not exist on disk.
-            FileExistsError: if a file with the same name already exists in target_folder.
+            FileExistsError: if conflict_strategy is "error" and a file with
+                the same name already exists in target_folder.
             OSError: for other filesystem errors.
         """
         if not os.path.isfile(source_path):
@@ -41,13 +69,19 @@ class FileMover:
         filename = os.path.basename(source_path)
         new_path = os.path.join(target_folder, filename)
 
-        if os.path.exists(new_path):
-            raise FileExistsError(
-                f"A file named '{filename}' already exists in '{target_folder}'. "
-                "Resolve the conflict before accepting this recommendation."
-            )
-
         os.makedirs(target_folder, exist_ok=True)
+
+        if os.path.exists(new_path):
+            if conflict_strategy == "replace":
+                os.remove(new_path)
+            elif conflict_strategy == "rename":
+                new_path = _unique_path(new_path)
+            else:
+                raise FileExistsError(
+                    f"A file named '{filename}' already exists in "
+                    f"'{os.path.basename(target_folder)}'. "
+                    "Choose Replace to overwrite it or Keep both to rename the incoming file."
+                )
 
         # Move on disk first; if this fails, no DB record is corrupted.
         shutil.move(source_path, new_path)

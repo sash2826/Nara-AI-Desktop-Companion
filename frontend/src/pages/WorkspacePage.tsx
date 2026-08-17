@@ -25,6 +25,7 @@ function OrganiseTab() {
   const [recommendations, setRecommendations] = useState<PendingRecommendation[]>([]);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
+  const [conflicts, setConflicts] = useState<Map<string, string>>(new Map()); // id → target folder
   const [auditRunning, setAuditRunning] = useState(false);
   const [auditStatus, setAuditStatus] = useState<AuditStatus | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -98,53 +99,62 @@ function OrganiseTab() {
     }
   }, [auditRunning, startAuditPoll]);
 
-  const handleAccept = useCallback(async (rec: PendingRecommendation) => {
-    const top = rec.candidates[0];
-    if (!top) return;
-    setBusy((prev) => new Set(prev).add(rec.id));
-    setErrors((prev) => {
-      const m = new Map(prev);
-      m.delete(rec.id);
-      return m;
-    });
-    try {
-      await IPCClient.acceptRecommendation(rec.id, top.folder);
-      setRecommendations((prev) => prev.filter((r) => r.id !== rec.id));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Move failed — file may no longer exist";
-      setErrors((prev) => new Map(prev).set(rec.id, msg));
-    } finally {
-      setBusy((prev) => {
-        const next = new Set(prev);
-        next.delete(rec.id);
-        return next;
+  const _doAccept = useCallback(
+    async (
+      rec: PendingRecommendation,
+      folder: string,
+      conflictStrategy: "error" | "replace" | "rename" = "error"
+    ) => {
+      setBusy((prev) => new Set(prev).add(rec.id));
+      setErrors((prev) => {
+        const m = new Map(prev);
+        m.delete(rec.id);
+        return m;
       });
-    }
-  }, []);
+      setConflicts((prev) => {
+        const m = new Map(prev);
+        m.delete(rec.id);
+        return m;
+      });
+      try {
+        await IPCClient.acceptRecommendation(rec.id, folder, conflictStrategy);
+        setRecommendations((prev) => prev.filter((r) => r.id !== rec.id));
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : typeof err === "string" ? err : "Move failed";
+        if (msg.includes("already exists")) {
+          setConflicts((prev) => new Map(prev).set(rec.id, folder));
+        } else {
+          setErrors((prev) => new Map(prev).set(rec.id, msg));
+        }
+      } finally {
+        setBusy((prev) => {
+          const next = new Set(prev);
+          next.delete(rec.id);
+          return next;
+        });
+      }
+    },
+    []
+  );
 
-  const handleChooseFolder = useCallback(async (rec: PendingRecommendation) => {
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (!selected) return;
-    setBusy((prev) => new Set(prev).add(rec.id));
-    setErrors((prev) => {
-      const m = new Map(prev);
-      m.delete(rec.id);
-      return m;
-    });
-    try {
-      await IPCClient.acceptRecommendation(rec.id, selected as string);
-      setRecommendations((prev) => prev.filter((r) => r.id !== rec.id));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Move failed";
-      setErrors((prev) => new Map(prev).set(rec.id, msg));
-    } finally {
-      setBusy((prev) => {
-        const next = new Set(prev);
-        next.delete(rec.id);
-        return next;
-      });
-    }
-  }, []);
+  const handleAccept = useCallback(
+    (rec: PendingRecommendation) => {
+      const top = rec.candidates[0];
+      if (!top) return;
+      void _doAccept(rec, top.folder);
+    },
+    [_doAccept]
+  );
+
+  const handleChooseFolder = useCallback(
+    async (rec: PendingRecommendation) => {
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (!selected) return;
+      void _doAccept(rec, selected as string);
+    },
+    [_doAccept]
+  );
 
   const handleDismiss = useCallback(async (id: string) => {
     setBusy((prev) => new Set(prev).add(id));
@@ -160,6 +170,32 @@ function OrganiseTab() {
         return next;
       });
     }
+  }, []);
+
+  const handleConflictReplace = useCallback(
+    (rec: PendingRecommendation) => {
+      const folder = conflicts.get(rec.id);
+      if (!folder) return;
+      void _doAccept(rec, folder, "replace");
+    },
+    [_doAccept, conflicts]
+  );
+
+  const handleConflictKeepBoth = useCallback(
+    (rec: PendingRecommendation) => {
+      const folder = conflicts.get(rec.id);
+      if (!folder) return;
+      void _doAccept(rec, folder, "rename");
+    },
+    [_doAccept, conflicts]
+  );
+
+  const handleConflictCancel = useCallback((id: string) => {
+    setConflicts((prev) => {
+      const m = new Map(prev);
+      m.delete(id);
+      return m;
+    });
   }, []);
 
   const statusLabel =
@@ -211,60 +247,105 @@ function OrganiseTab() {
             const folderName = top ? (top.folder.split(/[\\/]/).pop() ?? top.folder) : null;
             const isLoading = busy.has(rec.id);
             const errorMsg = errors.get(rec.id);
+            const conflictFolder = conflicts.get(rec.id);
+            const conflictFolderName = conflictFolder
+              ? (conflictFolder.split(/[\\/]/).pop() ?? conflictFolder)
+              : null;
 
             return (
               <div
                 key={rec.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-amber-500/20 bg-background px-3 py-2 text-xs"
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-xs",
+                  conflictFolder ? "border-orange-500/30" : "border-amber-500/20"
+                )}
               >
                 <div className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-foreground">{fileName}</span>
-                  {top && folderName && (
-                    <span className="text-muted-foreground">
-                      → {folderName}
-                      <span
-                        className={cn(
-                          "ml-1.5 rounded px-1 py-0.5 text-2xs font-semibold",
-                          top.label === "Most Likely" &&
-                            "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                          top.label === "Likely" &&
-                            "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-                          top.label === "Possible" && "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        {top.label}
-                      </span>
+                  {conflictFolder ? (
+                    <span className="text-orange-500 dark:text-orange-400">
+                      A file named <span className="font-semibold">{fileName}</span> already exists
+                      in <span className="font-semibold">{conflictFolderName}</span>.
                     </span>
-                  )}
-                  {errorMsg && (
-                    <span className="mt-0.5 block text-2xs text-destructive">{errorMsg}</span>
+                  ) : (
+                    <>
+                      {top && folderName && (
+                        <span className="text-muted-foreground">
+                          → {folderName}
+                          <span
+                            className={cn(
+                              "ml-1.5 rounded px-1 py-0.5 text-2xs font-semibold",
+                              top.label === "Most Likely" &&
+                                "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                              top.label === "Likely" &&
+                                "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+                              top.label === "Possible" && "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {top.label}
+                          </span>
+                        </span>
+                      )}
+                      {errorMsg && (
+                        <span className="mt-0.5 block text-2xs text-destructive">{errorMsg}</span>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-1.5">
-                  {top && (
-                    <button
-                      onClick={() => void handleAccept(rec)}
-                      disabled={isLoading}
-                      className="rounded border border-primary/30 bg-primary/10 px-2 py-1 text-2xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-                    >
-                      Move here
-                    </button>
+                  {conflictFolder ? (
+                    <>
+                      <button
+                        onClick={() => handleConflictReplace(rec)}
+                        disabled={isLoading}
+                        className="rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-2xs font-medium text-orange-600 dark:text-orange-400 transition-colors hover:bg-orange-500/20 disabled:opacity-50"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        onClick={() => handleConflictKeepBoth(rec)}
+                        disabled={isLoading}
+                        className="rounded border border-primary/30 bg-primary/10 px-2 py-1 text-2xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                      >
+                        Keep both
+                      </button>
+                      <button
+                        onClick={() => handleConflictCancel(rec.id)}
+                        disabled={isLoading}
+                        aria-label="Cancel"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                      >
+                        <X size={12} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {top && (
+                        <button
+                          onClick={() => handleAccept(rec)}
+                          disabled={isLoading}
+                          className="rounded border border-primary/30 bg-primary/10 px-2 py-1 text-2xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                        >
+                          Move here
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void handleChooseFolder(rec)}
+                        disabled={isLoading}
+                        className="rounded border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                      >
+                        Choose folder…
+                      </button>
+                      <button
+                        onClick={() => void handleDismiss(rec.id)}
+                        disabled={isLoading}
+                        aria-label="Dismiss suggestion"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                      >
+                        <X size={12} />
+                      </button>
+                    </>
                   )}
-                  <button
-                    onClick={() => void handleChooseFolder(rec)}
-                    disabled={isLoading}
-                    className="rounded border border-border px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                  >
-                    Choose folder…
-                  </button>
-                  <button
-                    onClick={() => void handleDismiss(rec.id)}
-                    disabled={isLoading}
-                    aria-label="Dismiss suggestion"
-                    className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                  >
-                    <X size={12} />
-                  </button>
                 </div>
               </div>
             );

@@ -1286,11 +1286,15 @@ async fn get_pending_recommendation_count(
 async fn accept_recommendation(
     recommendation_id: String,
     folder: String,
+    conflict_strategy: Option<String>,
     state: State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
     let base = sidecar_base(&state)?;
     let url = format!("{}/organisation/recommendations/{}/accept", base, recommendation_id);
-    let body = serde_json::json!({ "folder": folder });
+    let body = serde_json::json!({
+        "folder": folder,
+        "conflict_strategy": conflict_strategy.unwrap_or_else(|| "error".to_string()),
+    });
     let resp = ipc_client(&state)
         .post(&url)
         .json(&body)
@@ -1298,7 +1302,14 @@ async fn accept_recommendation(
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Err(format!("accept_recommendation returned HTTP {}", resp.status().as_u16()));
+        let status = resp.status().as_u16();
+        let detail = resp
+            .json::<serde_json::Value>()
+            .await
+            .ok()
+            .and_then(|v| v["detail"].as_str().map(String::from))
+            .unwrap_or_else(|| format!("HTTP {}", status));
+        return Err(detail);
     }
     Ok(())
 }
