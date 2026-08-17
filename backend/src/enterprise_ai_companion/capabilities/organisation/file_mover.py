@@ -92,14 +92,23 @@ class FileMover:
         # workspace_path is also updated to the target folder so that
         # _get_canonical_set_for_folder queries (WHERE workspace_path = ?) can
         # find this document's entities when scoring future recommendations.
-        await self._conn.execute(
-            "UPDATE documents SET file_path = ?, workspace_path = ? WHERE file_path = ?",
-            (new_path, target_folder, source_path),
-        )
-        await self._conn.commit()
-        logger.debug(
-            "SQLite documents updated: file_path %s → %s, workspace_path → %s",
-            source_path, new_path, target_folder,
-        )
+        # Wrapped in try-except: the file is already on disk at new_path, so a
+        # SQLite failure here must not surface as a 500 to the caller.
+        try:
+            await self._conn.execute(
+                "UPDATE documents SET file_path = ?, workspace_path = ? WHERE file_path = ?",
+                (new_path, target_folder, source_path),
+            )
+            await self._conn.commit()
+            logger.debug(
+                "SQLite documents updated: file_path %s → %s, workspace_path → %s",
+                source_path, new_path, target_folder,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "SQLite update failed after moving %s → %s: %s — "
+                "re-indexing the file will reconcile the record.",
+                source_path, new_path, exc,
+            )
 
         return new_path
