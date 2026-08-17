@@ -1,50 +1,28 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useOrbWindowStore } from "./orbWindowStore";
-
-interface Recommendation {
-  id: string;
-  source_path: string;
-  candidates: Array<{
-    folder: string;
-    score: number;
-    label: "Most Likely" | "Likely" | "Possible";
-  }>;
-}
+import { useRecommendations, type Recommendation } from "./useRecommendations";
 
 /**
  * Overlay showing pending file placement recommendations.
  * Appears when the user clicks the orb while it is in notification state.
  * Each item shows the file name, the top suggested folder, and Accept/Skip actions.
+ *
+ * All data fetching, polling, and action logic lives in useRecommendations.
  */
 export function OrbNotificationOverlay() {
-  const { setOverlayMode, setPendingCount } = useOrbWindowStore();
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errors, setErrors] = useState<Map<string, string>>(new Map());
-  const [conflicts, setConflicts] = useState<Map<string, string>>(new Map()); // id → target folder
-
-  const fetchRecommendations = useCallback(() => {
-    invoke<Recommendation[]>("list_pending_recommendations")
-      .then((recs) => {
-        setRecommendations(recs);
-        setPendingCount(recs.length);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [setPendingCount]);
-
-  useEffect(() => {
-    fetchRecommendations();
-    const interval = setInterval(fetchRecommendations, 5_000);
-    return () => clearInterval(interval);
-  }, [fetchRecommendations]);
-
-  const handleDismiss = useCallback(() => {
-    setOverlayMode("none");
-  }, [setOverlayMode]);
+  const {
+    recommendations,
+    loading,
+    errors,
+    conflicts,
+    handleAccept,
+    handleChooseFolder,
+    handleConflictReplace,
+    handleConflictKeepBoth,
+    handleConflictCancel,
+    handleSkip,
+    handleDismiss,
+  } = useRecommendations();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -53,101 +31,6 @@ export function OrbNotificationOverlay() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [handleDismiss]);
-
-  const _doAccept = useCallback(
-    async (
-      recId: string,
-      folder: string,
-      conflictStrategy: "error" | "replace" | "rename" = "error"
-    ) => {
-      setErrors((prev) => {
-        const m = new Map(prev);
-        m.delete(recId);
-        return m;
-      });
-      // Do NOT clear conflicts here — keep conflict UI visible (disabled) while
-      // the request is in-flight so the card never flips to "Move here" mid-request.
-      try {
-        await invoke("accept_recommendation", {
-          recommendationId: recId,
-          folder,
-          conflictStrategy,
-        });
-        // Success: clear conflict then remove the card.
-        setConflicts((prev) => {
-          const m = new Map(prev);
-          m.delete(recId);
-          return m;
-        });
-        const updated = recommendations.filter((r) => r.id !== recId);
-        setRecommendations(updated);
-        setPendingCount(updated.length);
-        if (updated.length === 0) setOverlayMode("none");
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : typeof err === "string" ? err : "Move failed";
-        if (msg.includes("already exists")) {
-          setConflicts((prev) => new Map(prev).set(recId, folder));
-        } else {
-          // Non-conflict error: clear conflict so the card returns to normal state.
-          setConflicts((prev) => {
-            const m = new Map(prev);
-            m.delete(recId);
-            return m;
-          });
-          setErrors((prev) => new Map(prev).set(recId, msg));
-        }
-      }
-    },
-    [recommendations, setPendingCount, setOverlayMode]
-  );
-
-  const handleAccept = useCallback(
-    (recId: string, folder: string) => void _doAccept(recId, folder),
-    [_doAccept]
-  );
-
-  const handleChooseFolder = useCallback(
-    async (recId: string) => {
-      const selected = await openDialog({ directory: true, multiple: false });
-      if (!selected) return;
-      void _doAccept(recId, selected as string);
-    },
-    [_doAccept]
-  );
-
-  const handleConflictReplace = useCallback(
-    (recId: string) => {
-      const folder = conflicts.get(recId);
-      if (!folder) return;
-      void _doAccept(recId, folder, "replace");
-    },
-    [_doAccept, conflicts]
-  );
-
-  const handleConflictKeepBoth = useCallback(
-    (recId: string) => {
-      const folder = conflicts.get(recId);
-      if (!folder) return;
-      void _doAccept(recId, folder, "rename");
-    },
-    [_doAccept, conflicts]
-  );
-
-  const handleSkip = useCallback(
-    async (recId: string) => {
-      try {
-        await invoke("dismiss_recommendation", { recommendationId: recId });
-        const updated = recommendations.filter((r) => r.id !== recId);
-        setRecommendations(updated);
-        setPendingCount(updated.length);
-        if (updated.length === 0) setOverlayMode("none");
-      } catch {
-        handleDismiss();
-      }
-    },
-    [recommendations, setPendingCount, setOverlayMode, handleDismiss]
-  );
 
   const labelColor = (label: Recommendation["candidates"][0]["label"]) => {
     if (label === "Most Likely") return "hsl(142 70% 55%)";
@@ -297,13 +180,7 @@ export function OrbNotificationOverlay() {
                         Keep both
                       </button>
                       <button
-                        onClick={() =>
-                          setConflicts((prev) => {
-                            const m = new Map(prev);
-                            m.delete(rec.id);
-                            return m;
-                          })
-                        }
+                        onClick={() => handleConflictCancel(rec.id)}
                         style={{
                           padding: "4px 10px",
                           borderRadius: 7,
