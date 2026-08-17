@@ -128,6 +128,60 @@ class SQLiteGraphProvider(GraphProvider):
         )
         await self._conn.commit()
 
+    async def link_shared_entities(self, max_shared_docs: int = 20) -> int:
+        """Create SIMILAR_TO edges between entities that share a canonical name
+        across different documents.
+
+        Only canonical names that appear in 2..max_shared_docs distinct documents
+        are linked — names beyond the cap are generic terms (e.g. "AI", "system")
+        whose cross-product of edges would add noise rather than signal.
+
+        The relationship ID is deterministic (uuid5 of the sorted pair + type) so
+        re-running this method is idempotent.
+        """
+        async with self._conn.execute(
+            """
+            SELECT canonical
+            FROM graph_entities
+            GROUP BY canonical
+            HAVING COUNT(DISTINCT source_document_id) BETWEEN 2 AND ?
+            """,
+            (max_shared_docs,),
+        ) as cur:
+            shared_canonicals = [r[0] for r in await cur.fetchall()]
+
+        created = 0
+        for canonical in shared_canonicals:
+            async with self._conn.execute(
+                "SELECT id, confidence FROM graph_entities WHERE canonical = ?",
+                (canonical,),
+            ) as cur:
+                entities = await cur.fetchall()
+
+            ids = [r[0] for r in entities]
+            confs = {r[0]: float(r[1]) for r in entities}
+
+            for i, src_id in enumerate(ids):
+                for tgt_id in ids[i + 1:]:
+                    # Stable ID regardless of insertion order.
+                    pair_key = ":".join(sorted([src_id, tgt_id])) + ":SIMILAR_TO"
+                    rel_id = str(uuid.uuid5(uuid.NAMESPACE_OID, pair_key))
+                    confidence = min(confs[src_id], confs[tgt_id])
+                    await self._conn.execute(
+                        """
+                        INSERT OR IGNORE INTO graph_relationships
+                            (id, source_id, target_id, relationship_type, confidence)
+                        VALUES (?, ?, ?, 'SIMILAR_TO', ?)
+                        """,
+                        (rel_id, src_id, tgt_id, confidence),
+                    )
+                    created += 1
+
+        if created:
+            await self._conn.commit()
+        logger.info("link_shared_entities: %d SIMILAR_TO edge(s) inserted", created)
+        return created
+
     async def delete_by_document(self, document_id: str) -> None:
         """Remove all entities (and cascade-delete their relationships) for a document."""
         await self._conn.execute(

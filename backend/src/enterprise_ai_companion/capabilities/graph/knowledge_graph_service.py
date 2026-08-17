@@ -78,6 +78,18 @@ class KnowledgeGraphService:
         """Remove all graph nodes and relationships sourced from this document."""
         await self._graph.delete_by_document(document_id)
 
+    async def link_shared_entities(self, max_shared_docs: int = 20) -> int:
+        """Create SIMILAR_TO edges between entities sharing a canonical name across documents.
+
+        Best called once after a full workspace index rather than after each file.
+        Returns the number of new edges created.
+        """
+        try:
+            return await self._graph.link_shared_entities(max_shared_docs)
+        except Exception as exc:
+            logger.warning("link_shared_entities failed: %s", exc)
+            return 0
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

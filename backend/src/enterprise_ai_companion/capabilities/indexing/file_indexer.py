@@ -537,6 +537,16 @@ class FileIndexer:
                 logger.warning("[PASS 2] Graph build failed for %s: %s", file_name, exc)
         logger.info("[PASS 2] Graph extraction complete for %d document(s)", len(builds))
 
+        # Pass 3 — cross-document entity linking. Runs once after all documents
+        # in this batch are graphed so shared canonical names across the full
+        # workspace are connected. No LLM calls; pure SQL.
+        try:
+            new_edges = await self._graph_service.link_shared_entities()
+            if new_edges:
+                logger.info("[PASS 3] Cross-document linking: %d new SIMILAR_TO edge(s)", new_edges)
+        except Exception as exc:
+            logger.warning("[PASS 3] Cross-document linking failed: %s", exc)
+
     async def _extract_and_save_abbreviations(
         self,
         doc_id: str,

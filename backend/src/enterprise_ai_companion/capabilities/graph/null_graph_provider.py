@@ -56,5 +56,8 @@ class NullGraphProvider(GraphProvider):
     async def get_connected_documents(self, entity_name: str) -> list[str]:
         return []
 
+    async def link_shared_entities(self, max_shared_docs: int = 20) -> int:
+        return 0
+
     async def close(self) -> None:
         pass

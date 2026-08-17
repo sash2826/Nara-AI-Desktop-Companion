@@ -78,5 +78,16 @@ class GraphProvider(ABC):
         """
 
     @abstractmethod
+    async def link_shared_entities(self, max_shared_docs: int = 20) -> int:
+        """Create SIMILAR_TO edges between entities sharing the same canonical name
+        across different documents.
+
+        Canonical names that appear in more than *max_shared_docs* documents are
+        skipped — they are likely generic terms whose edges would add noise.
+
+        Returns the number of new relationships created.
+        """
+
+    @abstractmethod
     async def close(self) -> None:
         """Release all connections."""
