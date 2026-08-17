@@ -70,6 +70,21 @@ function OrganiseTab() {
     };
   }, []);
 
+  // On mount, check if an audit was already running before this tab was visited
+  // (e.g. user started audit then switched tabs). Resume polling so the spinner
+  // and progress counter remain accurate regardless of navigation.
+  useEffect(() => {
+    IPCClient.getAuditStatus()
+      .then((status) => {
+        if (status.running) {
+          setAuditRunning(true);
+          setAuditStatus(status);
+          startAuditPoll();
+        }
+      })
+      .catch(() => {});
+  }, [startAuditPoll]);
+
   const handleOrganise = useCallback(async () => {
     if (auditRunning) return;
     setAuditRunning(true);

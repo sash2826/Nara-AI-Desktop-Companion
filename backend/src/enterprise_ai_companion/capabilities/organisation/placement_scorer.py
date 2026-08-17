@@ -65,9 +65,10 @@ _GRAPH_GATE_THRESHOLD = 0.10
 _SPARSE_ENTITY_THRESHOLD = 5
 
 # Minimum number of entities that must overlap before a graph score is awarded.
-# A single shared word (e.g. "data", "report") is too fragile and causes false
-# positives for unrelated files. Two distinct overlapping entities are required.
-_MIN_INTERSECTION_COUNT = 2
+# Set to 1: ancestor directories are now excluded from candidates, so a single
+# overlapping domain-specific term (e.g. "atlas" linking Atlas_Meeting_Room.pdf
+# to the Atlas-Workplace folder) is a meaningful signal rather than noise.
+_MIN_INTERSECTION_COUNT = 1
 
 _FILENAME_STOPWORDS: frozenset[str] = frozenset({
     "pdf", "doc", "docx", "txt", "md",
@@ -442,7 +443,13 @@ class PlacementScorer:
     # ------------------------------------------------------------------
 
     async def _rerank_score(self, folder_path: str, query_text: str) -> float:
-        """Mean RRF score of top-5 results from hybrid search scoped to *folder_path*."""
+        """Mean RRF score of top-5 results from hybrid search scoped to *folder_path*.
+
+        Searches without a workspace_path filter because all documents are stored
+        with the watched root as workspace_path — an exact match against a subfolder
+        path always returns zero results. Results are instead filtered post-hoc by
+        file_path prefix so only chunks from documents in the candidate folder count.
+        """
         if not query_text:
             return 0.0
 
@@ -452,16 +459,24 @@ class PlacementScorer:
                 qdrant_client=self._qdrant_client,
                 embedding_service=self._embedding_service,
             )
+            # Fetch a larger pool so filtering by folder still leaves enough results.
             results = await orchestrator.search(
                 query=query_text,
-                top_k=5,
-                workspace_path=folder_path,
+                top_k=30,
+                workspace_path=None,
                 semantic_weight=0.7,
                 keyword_weight=0.3,
             )
             if not results:
                 return 0.0
-            return sum(r.rrf_score for r in results) / len(results)
+
+            prefix = folder_path.rstrip(os.sep) + os.sep
+            folder_results = [r for r in results if r.document_path.startswith(prefix)]
+            if not folder_results:
+                return 0.0
+
+            top5 = folder_results[:5]
+            return sum(r.rrf_score for r in top5) / len(top5)
         except Exception:
             logger.debug("Rerank score fetch failed for folder %s", folder_path)
             return 0.0
