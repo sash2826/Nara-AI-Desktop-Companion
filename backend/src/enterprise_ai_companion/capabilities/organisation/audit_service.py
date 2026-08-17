@@ -118,18 +118,22 @@ class AuditService:
 
         current_folder = str(Path(doc.file_path).parent)
 
-        # Include current folder in scoring to compute delta
-        all_folders = list({*candidate_paths, current_folder})
-        scores = await self._placement_scorer.score_all(doc.id, all_folders)
+        # Score the current folder independently of score_all's top-3 cap.
+        # If we relied on score_all to return current_folder, a file whose
+        # current folder ranks 4th or lower would yield current_score=0.0,
+        # causing a false delta and a spurious "move to another folder" rec.
+        current_score = await self._placement_scorer.score_one(doc.id, current_folder)
+
+        # Score all non-current candidates for the top-3 suggestions.
+        non_current_candidates = [f for f in candidate_paths if f != current_folder]
+        if not non_current_candidates:
+            return
+
+        scores = await self._placement_scorer.score_all(doc.id, non_current_candidates)
         if not scores:
             return
 
-        current_score = next(
-            (s["score"] for s in scores if s["folder"] == current_folder), 0.0
-        )
-        non_current = [s for s in scores if s["folder"] != current_folder]
-        if not non_current:
-            return
+        non_current = scores
 
         top = non_current[0]
         if top["score"] < _MIN_TOP_SCORE:

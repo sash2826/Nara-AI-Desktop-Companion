@@ -164,6 +164,23 @@ class PlacementScorer:
         self._embedding_service = embedding_service
         self._qdrant_client = qdrant_client
 
+    async def score_one(self, document_id: str, folder_path: str) -> float:
+        """Return the combined score for a single folder against *document_id*.
+
+        Used by the audit to get the current folder's score independently of
+        the top-3 cap in score_all — without this, a file whose current folder
+        ranks 4th or lower would have current_score=0.0, causing a false delta.
+        """
+        raw_canonicals = await self._get_canonical_set_for_document(document_id)
+        new_file_canonicals = _expand_for_matching(raw_canonicals)
+        first_chunk_text = await self._get_first_chunk_text(document_id)
+        fs = await self._score_folder(
+            folder_path=folder_path,
+            new_file_canonicals=new_file_canonicals,
+            query_text=first_chunk_text,
+        )
+        return fs.score
+
     async def score_all(
         self,
         document_id: str,
