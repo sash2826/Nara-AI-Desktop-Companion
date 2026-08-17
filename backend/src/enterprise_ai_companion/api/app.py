@@ -16,6 +16,10 @@ from enterprise_ai_companion.api.routers import watcher as watcher_router_module
 from enterprise_ai_companion.api.routers import organisation as organisation_router_module
 from enterprise_ai_companion.capabilities.organisation.affinity_repository import AffinityRepository
 from enterprise_ai_companion.capabilities.organisation.file_mover import FileMover
+from enterprise_ai_companion.capabilities.organisation.placement_adapters import (
+    HybridRerankAdapter,
+    SqliteGraphScoreAdapter,
+)
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import RecommendationRepository
 from enterprise_ai_companion.capabilities.organisation.audit_service import AuditService
@@ -158,10 +162,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.affinity_repo = affinity_repo
 
     placement_scorer = PlacementScorer(
-        conn=app.state.db,
-        graph_provider=graph_provider,
-        embedding_service=embedding_service,
-        qdrant_client=qdrant.get_client(),
+        graph_score_port=SqliteGraphScoreAdapter(conn=app.state.db),
+        rerank_port=HybridRerankAdapter(
+            conn=app.state.db,
+            embedding_service=embedding_service,
+            qdrant_client=qdrant.get_client(),
+        ),
     )
 
     recommendation_service = RecommendationService(

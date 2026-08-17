@@ -135,7 +135,7 @@ class AuditService:
         if current_folder_is_ancestor:
             current_score = 0.0
         else:
-            current_score = await self._placement_scorer.score_one(doc.id, current_folder)
+            current_score = await self._placement_scorer.score_one(doc.id, current_folder, file_path=doc.file_path)
 
         # Exclude the file's own folder AND any ancestor directory from the
         # candidate list. A root folder like "test-drive" scores artificially
@@ -150,7 +150,7 @@ class AuditService:
         if not non_current_candidates:
             return
 
-        scores = await self._placement_scorer.score_all(doc.id, non_current_candidates)
+        scores = await self._placement_scorer.score_all(doc.id, non_current_candidates, file_path=doc.file_path)
         if not scores:
             return
 

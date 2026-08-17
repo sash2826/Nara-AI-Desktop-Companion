@@ -81,7 +81,7 @@ class RecommendationService:
             document_id,
         )
 
-        scored = await self._scorer.score_all(document_id, candidate_paths)
+        scored = await self._scorer.score_all(document_id, candidate_paths, file_path=file_path)
 
         if not scored:
             logger.info(

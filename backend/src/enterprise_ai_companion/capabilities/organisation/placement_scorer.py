@@ -4,34 +4,35 @@ Combines two signals to score each candidate folder for a newly-indexed file:
 
   score = 0.75 × graph_score + 0.25 × rerank_score
 
-graph_score — Jaccard similarity between the new file's entity IDs and the
-  entity IDs of documents already in the candidate folder (expanded 1 hop via
-  graph relationships to surface closely related entities).
+graph_score — Overlap coefficient (Szymkiewicz-Simpson) between the new
+  file's canonical entity names and those of documents already in the
+  candidate folder, each set expanded 1 hop via graph relationships.
 
-rerank_score — Mean RRF score returned by HybridSearchOrchestrator when the
-  new file's first chunk text is used as a query against each candidate folder's
+rerank_score — Mean RRF score returned by the rerank port when the new
+  file's first chunk text is used as a query against each candidate folder's
   indexed content.
 
-Only folders with a non-zero combined score are returned. The caller takes the
-top-3 and attaches confidence labels.
+Only folders with a non-zero combined score are returned. The caller takes
+the top-3 and attaches confidence labels.
+
+Storage access is delegated to two injected ports so the scoring algorithm
+can be tested without a database or Qdrant connection:
+
+  GraphScorePort  — supplies canonical entity sets and candidate folders.
+  RerankPort      — supplies the mean RRF score for a folder given a document.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
-import aiosqlite
-
-from enterprise_ai_companion.capabilities.graph.graph_provider import GraphProvider
-from enterprise_ai_companion.capabilities.indexing.embedding_service import EmbeddingService
-from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import (
-    HybridSearchOrchestrator,
+from enterprise_ai_companion.capabilities.organisation.placement_ports import (
+    GraphScorePort,
+    RerankPort,
+    expand_for_matching,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,22 +60,11 @@ _SCORE_MIN_THRESHOLD = 0.20
 # to a travel folder, or "data" linking a personal document to any project).
 _GRAPH_GATE_THRESHOLD = 0.10
 
-# When fewer than this many canonical entities are extracted (small or sparse
-# files, or FOREIGN KEY races during concurrent indexing), fall back to
-# tokenising the filename so the scorer has at least a filename-level signal.
-_SPARSE_ENTITY_THRESHOLD = 5
-
 # Minimum number of entities that must overlap before a graph score is awarded.
 # Set to 1: ancestor directories are now excluded from candidates, so a single
 # overlapping domain-specific term (e.g. "atlas" linking Atlas_Meeting_Room.pdf
 # to the Atlas-Workplace folder) is a meaningful signal rather than noise.
 _MIN_INTERSECTION_COUNT = 1
-
-_FILENAME_STOPWORDS: frozenset[str] = frozenset({
-    "pdf", "doc", "docx", "txt", "md",
-    "the", "a", "an", "of", "in", "on", "at", "for", "and", "or",
-    "to", "by", "from", "with",
-})
 
 # Generic business/document terms that appear in almost any file and cannot
 # discriminate between project folders. Filtering them from the overlap
@@ -94,51 +84,6 @@ _GENERIC_TERMS: frozenset[str] = frozenset({
 })
 
 
-def _filename_keywords(file_path: str) -> set[str]:
-    """Tokenise a file/folder stem into lowercase keyword terms.
-
-    Works on both file paths (uses stem) and directory paths (uses final
-    directory name). Used to supplement sparse entity sets and as folder-name
-    anchors so semantically-named empty folders still participate in scoring.
-    Four-digit year tokens are excluded as non-discriminative.
-    """
-    p = Path(file_path)
-    # For directories use the folder name; for files use the stem.
-    name = p.name if p.is_dir() or not p.suffix else p.stem
-    words = re.sub(r"[_\-\.\s]+", " ", name).lower().split()
-    return {
-        w for w in words
-        if len(w) > 2
-        and w not in _FILENAME_STOPWORDS
-        and not re.fullmatch(r"\d{4}", w)
-    }
-
-
-def _expand_for_matching(canonicals: set[str]) -> set[str]:
-    """Expand multi-word canonical entity strings into individual word tokens.
-
-    LLM extraction often produces multi-word entities like
-    'japan 2026 photography itinerary' or 'golden-hour'. Exact-string matching
-    misses the connection to single-word canonical terms like 'japan' or
-    'photography' that the same concept is stored under in other documents.
-
-    This function adds individual word tokens from multi-word entities so the
-    overlap computation is vocabulary-bridged. The original strings are kept
-    alongside the expansions so the entity set remains a superset.
-    """
-    expanded = set(canonicals)
-    for entity in canonicals:
-        if " " in entity or "-" in entity:
-            tokens = re.sub(r"[-\s]+", " ", entity).lower().split()
-            expanded |= {
-                t for t in tokens
-                if len(t) > 2
-                and t not in _FILENAME_STOPWORDS
-                and not re.fullmatch(r"\d{4}", t)
-            }
-    return expanded
-
-
 @dataclass(frozen=True)
 class FolderScore:
     """Score for a single candidate folder."""
@@ -151,34 +96,36 @@ class FolderScore:
 
 
 class PlacementScorer:
-    """Scores candidate folders for a newly-indexed file."""
+    """Scores candidate folders for a newly-indexed file.
+
+    All storage access is delegated to the injected ports. The scoring
+    algorithm (overlap coefficient, gate threshold, label assignment) lives
+    entirely in this class and is independent of the storage implementation.
+    """
 
     def __init__(
         self,
-        conn: aiosqlite.Connection,
-        graph_provider: GraphProvider,
-        embedding_service: EmbeddingService,
-        qdrant_client: Any,
+        graph_score_port: GraphScorePort,
+        rerank_port: RerankPort,
     ) -> None:
-        self._conn = conn
-        self._graph_provider = graph_provider
-        self._embedding_service = embedding_service
-        self._qdrant_client = qdrant_client
+        self._graph_score_port = graph_score_port
+        self._rerank_port = rerank_port
 
-    async def score_one(self, document_id: str, folder_path: str) -> float:
+    async def score_one(self, document_id: str, folder_path: str, file_path: str = "") -> float:
         """Return the combined score for a single folder against *document_id*.
 
         Used by the audit to get the current folder's score independently of
         the top-3 cap in score_all — without this, a file whose current folder
         ranks 4th or lower would have current_score=0.0, causing a false delta.
         """
-        raw_canonicals = await self._get_canonical_set_for_document(document_id)
-        new_file_canonicals = _expand_for_matching(raw_canonicals)
-        first_chunk_text = await self._get_first_chunk_text(document_id)
+        raw_canonicals = await self._graph_score_port.get_canonicals_for_document(
+            document_id, file_path
+        )
+        new_file_canonicals = expand_for_matching(raw_canonicals)
         fs = await self._score_folder(
+            document_id=document_id,
             folder_path=folder_path,
             new_file_canonicals=new_file_canonicals,
-            query_text=first_chunk_text,
         )
         return fs.score
 
@@ -186,6 +133,7 @@ class PlacementScorer:
         self,
         document_id: str,
         candidate_folder_paths: list[str],
+        file_path: str = "",
     ) -> list[dict[str, Any]]:
         """Score every candidate folder and return up to 3 results sorted by score desc.
 
@@ -195,12 +143,10 @@ class PlacementScorer:
         if not candidate_folder_paths:
             return []
 
-        raw_canonicals = await self._get_canonical_set_for_document(document_id)
-        # Expand multi-word entities into individual word tokens so that
-        # 'japan 2026 photography itinerary' contributes 'japan' and
-        # 'photography' to the matching vocabulary.
-        new_file_canonicals = _expand_for_matching(raw_canonicals)
-        first_chunk_text = await self._get_first_chunk_text(document_id)
+        raw_canonicals = await self._graph_score_port.get_canonicals_for_document(
+            document_id, file_path
+        )
+        new_file_canonicals = expand_for_matching(raw_canonicals)
 
         logger.info(
             "[PLACEMENT] doc=%s canonical entities (%d → %d after expansion): %s",
@@ -210,9 +156,9 @@ class PlacementScorer:
 
         tasks = [
             self._score_folder(
+                document_id=document_id,
                 folder_path=folder,
                 new_file_canonicals=new_file_canonicals,
-                query_text=first_chunk_text,
             )
             for folder in candidate_folder_paths
         ]
@@ -241,15 +187,30 @@ class PlacementScorer:
             for fs in scored[:3]
         ]
 
+    async def discover_candidate_folders(
+        self,
+        exclude_paths: set[str] | None = None,
+        max_candidates: int = 150,
+    ) -> list[str]:
+        """Return unique parent directories discovered from indexed file paths."""
+        return await self._graph_score_port.get_known_folder_paths(
+            exclude_paths=exclude_paths,
+            max_candidates=max_candidates,
+        )
+
+    # ------------------------------------------------------------------
+    # Internal scoring
+    # ------------------------------------------------------------------
+
     async def _score_folder(
         self,
+        document_id: str,
         folder_path: str,
         new_file_canonicals: set[str],
-        query_text: str,
     ) -> FolderScore:
         graph_s, rerank_s = await asyncio.gather(
             self._graph_score(folder_path, new_file_canonicals),
-            self._rerank_score(folder_path, query_text),
+            self._rerank_port.rerank(document_id, folder_path),
         )
         # Graph score is the gate. RRF rerank returns small positive scores for
         # ANY query, so rerank alone creates false positives for unrelated files.
@@ -269,28 +230,24 @@ class PlacementScorer:
             rerank_score=rerank_s,
         )
 
-    # ------------------------------------------------------------------
-    # Graph score — canonical-name Jaccard
-    # ------------------------------------------------------------------
-
     async def _graph_score(
         self,
         folder_path: str,
         new_file_canonicals: set[str],
     ) -> float:
-        """Overlap coefficient on canonical entity names between the new file and folder.
+        """Overlap coefficient on canonical entity names between new file and folder.
 
         Uses min(|A|, |B|) as the denominator (Szymkiewicz-Simpson / overlap
         coefficient) rather than Jaccard's union. Jaccard penalises a genuine
         match when the folder has many more entities than the new file — e.g. a
         5-entity file with 1 matching term against a 30-entity folder gives
         Jaccard = 1/34 ≈ 0.03 but Overlap = 1/5 = 0.20, which correctly
-        reflects that 20 % of the new file's topics are represented.
+        reflects that 20% of the new file's topics are represented.
         """
         if not new_file_canonicals:
             return 0.0
 
-        folder_canonicals = await self._get_canonical_set_for_folder(folder_path)
+        folder_canonicals = await self._graph_score_port.get_canonicals_for_folder(folder_path)
         if not folder_canonicals:
             return 0.0
 
@@ -302,8 +259,6 @@ class PlacementScorer:
 
         intersection = effective_new & effective_folder
 
-        # Require at least _MIN_INTERSECTION_COUNT distinct domain-specific
-        # entities to overlap. A single shared word is too fragile a signal.
         if len(intersection) < _MIN_INTERSECTION_COUNT:
             logger.debug(
                 "[PLACEMENT] graph_score folder=%s intersection=%d < min=%d — suppressed",
@@ -317,229 +272,6 @@ class PlacementScorer:
             folder_path, len(intersection), denominator,
         )
         return len(intersection) / denominator if denominator else 0.0
-
-    async def _get_canonical_set_for_document(self, document_id: str) -> set[str]:
-        """Return canonical names for entities in *document_id*, expanded 1 hop.
-
-        When fewer than _SPARSE_ENTITY_THRESHOLD entities are found (LLM
-        non-determinism, concurrent-indexing FOREIGN KEY races, or very small
-        files), the canonical set is supplemented with keyword terms tokenised
-        from the file name so the scorer has at least a filename-level signal.
-        """
-        async with self._conn.execute(
-            "SELECT id, canonical FROM graph_entities WHERE source_document_id = ?",
-            (document_id,),
-        ) as cur:
-            rows = await cur.fetchall()
-
-        if not rows:
-            entity_ids: list[str] = []
-            canonicals: set[str] = set()
-        else:
-            entity_ids = [row[0] for row in rows]
-            canonicals = {row[1] for row in rows if row[1]}
-
-        # Expand 1 hop — include canonical names of directly related entities.
-        if entity_ids:
-            placeholders = ",".join("?" * len(entity_ids))
-            async with self._conn.execute(
-                f"""
-                SELECT e.canonical FROM graph_entities e
-                WHERE e.id IN (
-                    SELECT target_id FROM graph_relationships WHERE source_id IN ({placeholders})
-                    UNION
-                    SELECT source_id FROM graph_relationships WHERE target_id IN ({placeholders})
-                ) AND e.canonical IS NOT NULL
-                """,
-                entity_ids + entity_ids,
-            ) as cur:
-                neighbour_rows = await cur.fetchall()
-            canonicals |= {row[0] for row in neighbour_rows}
-
-        # Sparse fallback: supplement with filename keyword terms so the scorer
-        # is not completely blind when LLM extraction misses obvious terms like
-        # 'tokyo' from Tokyo_Sunrise_Sunset_Times.pdf.
-        if len(canonicals) < _SPARSE_ENTITY_THRESHOLD:
-            async with self._conn.execute(
-                "SELECT file_path FROM documents WHERE id = ?", (document_id,)
-            ) as cur:
-                doc_row = await cur.fetchone()
-            if doc_row:
-                filename_terms = _filename_keywords(doc_row[0])
-                logger.debug(
-                    "[PLACEMENT] sparse entity set (%d) for doc=%s — adding filename terms: %s",
-                    len(canonicals), document_id, sorted(filename_terms),
-                )
-                canonicals |= filename_terms
-
-        return canonicals
-
-    async def _get_canonical_set_for_folder(self, folder_path: str) -> set[str]:
-        """Return canonical entity names for *folder_path*, expanded 1 hop.
-
-        Always supplements with folder-name keyword terms so that a semantically
-        named folder (e.g. "Photography Trip - Japan 2026" → 'photography',
-        'trip', 'japan') can still participate in scoring even when the folder
-        is empty or its indexed content uses different vocabulary.
-
-        Multi-word entities in the folder's corpus are further decomposed into
-        individual tokens to bridge vocabulary mismatches with incoming files.
-        """
-        # Match documents whose file lives anywhere inside folder_path.
-        # workspace_path is always the watched root (e.g. "Documents"), never a
-        # subfolder — using it here caused all subfolders to score zero and the
-        # root to score against the entire corpus, making every recommendation
-        # point to the same watched root the file was already in.
-        prefix = folder_path.rstrip(os.sep) + os.sep
-        async with self._conn.execute(
-            "SELECT id FROM documents WHERE file_path LIKE ?",
-            (prefix + "%",),
-        ) as cur:
-            doc_rows = await cur.fetchall()
-
-        canonicals: set[str] = set()
-
-        if doc_rows:
-            doc_ids = [row[0] for row in doc_rows]
-            placeholders = ",".join("?" * len(doc_ids))
-
-            async with self._conn.execute(
-                f"SELECT id, canonical FROM graph_entities WHERE source_document_id IN ({placeholders})",
-                doc_ids,
-            ) as cur:
-                entity_rows = await cur.fetchall()
-
-            if entity_rows:
-                entity_ids = [row[0] for row in entity_rows]
-                canonicals = {row[1] for row in entity_rows if row[1]}
-
-                # Expand 1 hop via relationships.
-                ent_placeholders = ",".join("?" * len(entity_ids))
-                async with self._conn.execute(
-                    f"""
-                    SELECT e.canonical FROM graph_entities e
-                    WHERE e.id IN (
-                        SELECT target_id FROM graph_relationships WHERE source_id IN ({ent_placeholders})
-                        UNION
-                        SELECT source_id FROM graph_relationships WHERE target_id IN ({ent_placeholders})
-                    ) AND e.canonical IS NOT NULL
-                    """,
-                    entity_ids + entity_ids,
-                ) as cur:
-                    neighbour_rows = await cur.fetchall()
-                canonicals |= {row[0] for row in neighbour_rows}
-
-        # Folder-name semantic anchors — always present regardless of indexed
-        # content. An empty "Photography Trip - Japan 2026" folder gains
-        # {'photography', 'trip', 'japan'} as matching vocabulary.
-        canonicals |= _filename_keywords(folder_path)
-
-        # Token-expand multi-word entity strings so the folder's vocabulary
-        # bridges to single-word entities in incoming files.
-        return _expand_for_matching(canonicals)
-
-    # ------------------------------------------------------------------
-    # Rerank score
-    # ------------------------------------------------------------------
-
-    async def _rerank_score(self, folder_path: str, query_text: str) -> float:
-        """Mean RRF score of top-5 results from hybrid search scoped to *folder_path*.
-
-        Searches without a workspace_path filter because all documents are stored
-        with the watched root as workspace_path — an exact match against a subfolder
-        path always returns zero results. Results are instead filtered post-hoc by
-        file_path prefix so only chunks from documents in the candidate folder count.
-        """
-        if not query_text:
-            return 0.0
-
-        try:
-            orchestrator = HybridSearchOrchestrator(
-                conn=self._conn,
-                qdrant_client=self._qdrant_client,
-                embedding_service=self._embedding_service,
-            )
-            # Fetch a larger pool so filtering by folder still leaves enough results.
-            results = await orchestrator.search(
-                query=query_text,
-                top_k=30,
-                workspace_path=None,
-                semantic_weight=0.7,
-                keyword_weight=0.3,
-            )
-            if not results:
-                return 0.0
-
-            prefix = folder_path.rstrip(os.sep) + os.sep
-            folder_results = [r for r in results if r.document_path.startswith(prefix)]
-            if not folder_results:
-                return 0.0
-
-            top5 = folder_results[:5]
-            return sum(r.rrf_score for r in top5) / len(top5)
-        except Exception:
-            logger.debug("Rerank score fetch failed for folder %s", folder_path)
-            return 0.0
-
-    # ------------------------------------------------------------------
-    # Chunk text helper
-    # ------------------------------------------------------------------
-
-    async def _get_first_chunk_text(self, document_id: str) -> str:
-        """Return the text of the first chunk for *document_id*, or empty string."""
-        async with self._conn.execute(
-            "SELECT content FROM chunks WHERE document_id = ? ORDER BY chunk_index LIMIT 1",
-            (document_id,),
-        ) as cur:
-            row = await cur.fetchone()
-        return str(row[0]) if row else ""
-
-    async def discover_candidate_folders(
-        self,
-        exclude_paths: set[str] | None = None,
-        max_candidates: int = 150,
-    ) -> list[str]:
-        """Return unique parent directories discovered from indexed file paths.
-
-        This reflects the actual subfolder structure the user has, rather than
-        the coarser watched-root list. Folders are ranked by document count so
-        the most-populated (and therefore most meaningful) destinations appear
-        first when the list is capped.
-
-        Args:
-            exclude_paths: Folder paths to omit (e.g. Downloads).
-            max_candidates: Hard cap to avoid scoring hundreds of tiny folders.
-        """
-        async with self._conn.execute(
-            "SELECT file_path FROM documents"
-        ) as cur:
-            rows = await cur.fetchall()
-
-        exclude = exclude_paths or set()
-        folder_counts: dict[str, int] = {}
-        for row in rows:
-            parent = str(Path(row[0]).parent)
-            if parent not in exclude:
-                folder_counts[parent] = folder_counts.get(parent, 0) + 1
-
-        # Sort by doc count descending so well-populated folders are prioritised
-        # when the candidate list is trimmed.
-        ranked = sorted(folder_counts, key=lambda p: folder_counts[p], reverse=True)
-        capped = ranked[:max_candidates]
-
-        # Remove any folder that is an ancestor of another folder in the same
-        # set. A parent directory's entity set is the union of all its children,
-        # so it will always outscore every specific subfolder — but it is not a
-        # meaningful placement destination. Keep only leaf directories.
-        capped_set = set(capped)
-        leaves = [
-            f for f in capped
-            if not any(
-                other != f and other.startswith(f.rstrip(os.sep) + os.sep)
-                for other in capped_set
-            )
-        ]
-        return leaves
 
 
 def _label(score: float) -> str:
