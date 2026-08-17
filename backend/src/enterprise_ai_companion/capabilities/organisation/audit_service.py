@@ -3,18 +3,14 @@
 import asyncio
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import (
     RecommendationRepository,
 )
-
-if TYPE_CHECKING:
-    from enterprise_ai_companion.capabilities.indexing.file_watcher import WatcherService
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +42,10 @@ class AuditService:
         document_repo: DocumentRepository,
         placement_scorer: PlacementScorer,
         recommendation_repo: RecommendationRepository,
-        watcher_service: "WatcherService",
     ) -> None:
         self._doc_repo = document_repo
-        self._scorer = placement_scorer
+        self._placement_scorer = placement_scorer
         self._rec_repo = recommendation_repo
-        self._watcher = watcher_service
         self.state = AuditState()
 
     async def run_audit(self) -> None:
@@ -76,12 +70,6 @@ class AuditService:
             )
 
     async def _run(self) -> None:
-        watched = await self._watcher.list_folders()
-        candidate_paths = [f.path for f in watched if f.path != _DOWNLOADS_PATH]
-        if not candidate_paths:
-            logger.info("[AUDIT] No candidate folders — nothing to audit")
-            return
-
         pending = await self._rec_repo.list_pending()
         pending_paths: set[str] = {rec.source_path for rec in pending}
 
@@ -97,9 +85,25 @@ class AuditService:
             if len(page) < _PAGE_SIZE:
                 break
 
-        eligible = [doc for doc in all_docs if doc.workspace_path != _DOWNLOADS_PATH]
+        eligible = [doc for doc in all_docs if str(Path(doc.file_path).parent) != _DOWNLOADS_PATH]
         self.state.total = len(eligible)
         logger.info("[AUDIT] %d eligible file(s) to analyse", self.state.total)
+
+        # Derive candidates from the actual subdirectory structure of indexed
+        # documents rather than watched-root paths. When a user indexes a large
+        # folder like "Documents", watched roots = ["Documents"] — a single root
+        # that contains everything. Every file scores high against that root
+        # because it IS there, producing useless "move to current folder" recs.
+        # Using real subdirs (e.g. Finance/, HR/, IT/) gives the scorer
+        # meaningful destinations to discriminate between.
+        candidate_paths = await self._placement_scorer.discover_candidate_folders(
+            exclude_paths={_DOWNLOADS_PATH}
+        )
+        if not candidate_paths:
+            logger.info("[AUDIT] No candidate subfolders discovered — nothing to audit")
+            return
+
+        logger.info("[AUDIT] %d candidate subfolder(s) discovered", len(candidate_paths))
 
         for doc in eligible:
             await self._score_doc(doc, candidate_paths, pending_paths)
@@ -116,7 +120,7 @@ class AuditService:
 
         # Include current folder in scoring to compute delta
         all_folders = list({*candidate_paths, current_folder})
-        scores = await self._scorer.score_all(doc.id, all_folders)
+        scores = await self._placement_scorer.score_all(doc.id, all_folders)
         if not scores:
             return
 

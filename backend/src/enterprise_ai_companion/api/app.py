@@ -167,7 +167,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     recommendation_service = RecommendationService(
         recommendation_repo=recommendation_repo,
         placement_scorer=placement_scorer,
-        watcher_service=watcher,
     )
     app.state.recommendation_service = recommendation_service
 
@@ -179,7 +178,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         document_repo=doc_repo,
         placement_scorer=placement_scorer,
         recommendation_repo=recommendation_repo,
-        watcher_service=watcher,
     )
     app.state.audit_service = audit_service
 

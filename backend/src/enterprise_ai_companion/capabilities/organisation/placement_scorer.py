@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -366,9 +367,15 @@ class PlacementScorer:
         Multi-word entities in the folder's corpus are further decomposed into
         individual tokens to bridge vocabulary mismatches with incoming files.
         """
+        # Match documents whose file lives anywhere inside folder_path.
+        # workspace_path is always the watched root (e.g. "Documents"), never a
+        # subfolder — using it here caused all subfolders to score zero and the
+        # root to score against the entire corpus, making every recommendation
+        # point to the same watched root the file was already in.
+        prefix = folder_path.rstrip(os.sep) + os.sep
         async with self._conn.execute(
-            "SELECT id FROM documents WHERE workspace_path = ?",
-            (folder_path,),
+            "SELECT id FROM documents WHERE file_path LIKE ?",
+            (prefix + "%",),
         ) as cur:
             doc_rows = await cur.fetchall()
 
@@ -454,6 +461,39 @@ class PlacementScorer:
         ) as cur:
             row = await cur.fetchone()
         return str(row[0]) if row else ""
+
+    async def discover_candidate_folders(
+        self,
+        exclude_paths: set[str] | None = None,
+        max_candidates: int = 150,
+    ) -> list[str]:
+        """Return unique parent directories discovered from indexed file paths.
+
+        This reflects the actual subfolder structure the user has, rather than
+        the coarser watched-root list. Folders are ranked by document count so
+        the most-populated (and therefore most meaningful) destinations appear
+        first when the list is capped.
+
+        Args:
+            exclude_paths: Folder paths to omit (e.g. Downloads).
+            max_candidates: Hard cap to avoid scoring hundreds of tiny folders.
+        """
+        async with self._conn.execute(
+            "SELECT file_path FROM documents"
+        ) as cur:
+            rows = await cur.fetchall()
+
+        exclude = exclude_paths or set()
+        folder_counts: dict[str, int] = {}
+        for row in rows:
+            parent = str(Path(row[0]).parent)
+            if parent not in exclude:
+                folder_counts[parent] = folder_counts.get(parent, 0) + 1
+
+        # Sort by doc count descending so well-populated folders are prioritised
+        # when the candidate list is trimmed.
+        ranked = sorted(folder_counts, key=lambda p: folder_counts[p], reverse=True)
+        return ranked[:max_candidates]
 
 
 def _label(score: float) -> str:

@@ -28,11 +28,9 @@ class RecommendationService:
         self,
         recommendation_repo: RecommendationRepository,
         placement_scorer: PlacementScorer,
-        watcher_service: object,  # WatcherService — forward reference avoids circular import
     ) -> None:
         self._repo = recommendation_repo
         self._scorer = placement_scorer
-        self._watcher = watcher_service
 
     async def process_new_file(self, file_path: str, document_id: str) -> None:
         """Score candidate folders and persist a recommendation for *file_path*.
@@ -49,17 +47,21 @@ class RecommendationService:
             )
 
     async def _process(self, file_path: str, document_id: str) -> None:
-        all_folders = await self._watcher.list_folders()
-        logger.info("[PLACEMENT] process_new_file: %s | all watched folders: %s", file_path, [f.path for f in all_folders])
-        candidate_paths = [
-            f.path
-            for f in all_folders
-            if f.path != _DOWNLOADS_PATH
-        ]
+        # Discover candidate folders from the actual subdirectory structure of
+        # indexed documents. Using watched-root paths here caused new Downloads
+        # files to be scored only against top-level roots like "Documents",
+        # which contain the entire corpus and score trivially high.
+        candidate_paths = await self._scorer.discover_candidate_folders(
+            exclude_paths={_DOWNLOADS_PATH}
+        )
+        logger.info(
+            "[PLACEMENT] process_new_file: %s | %d subfolder candidate(s)",
+            file_path, len(candidate_paths),
+        )
 
         if not candidate_paths:
             logger.info(
-                "[PLACEMENT] No candidate folders for %s — no other watched folders registered", file_path
+                "[PLACEMENT] No candidate folders for %s — no indexed subfolders found", file_path
             )
             return
 
