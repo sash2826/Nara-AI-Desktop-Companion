@@ -65,16 +65,19 @@ export function OrbNotificationOverlay() {
         m.delete(recId);
         return m;
       });
-      setConflicts((prev) => {
-        const m = new Map(prev);
-        m.delete(recId);
-        return m;
-      });
+      // Do NOT clear conflicts here — keep conflict UI visible (disabled) while
+      // the request is in-flight so the card never flips to "Move here" mid-request.
       try {
         await invoke("accept_recommendation", {
           recommendationId: recId,
           folder,
           conflictStrategy,
+        });
+        // Success: clear conflict then remove the card.
+        setConflicts((prev) => {
+          const m = new Map(prev);
+          m.delete(recId);
+          return m;
         });
         const updated = recommendations.filter((r) => r.id !== recId);
         setRecommendations(updated);
@@ -86,6 +89,12 @@ export function OrbNotificationOverlay() {
         if (msg.includes("already exists")) {
           setConflicts((prev) => new Map(prev).set(recId, folder));
         } else {
+          // Non-conflict error: clear conflict so the card returns to normal state.
+          setConflicts((prev) => {
+            const m = new Map(prev);
+            m.delete(recId);
+            return m;
+          });
           setErrors((prev) => new Map(prev).set(recId, msg));
         }
       }

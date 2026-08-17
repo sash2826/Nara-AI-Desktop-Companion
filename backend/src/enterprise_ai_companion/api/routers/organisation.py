@@ -108,18 +108,29 @@ async def accept_recommendation(
         logger.error("File move failed for %s: %s", rec.source_path, exc)
         raise HTTPException(status_code=500, detail="File move failed") from exc
 
-    await repo.set_accepted(recommendation_id, body.folder)
+    # File is on disk at new_path — mark accepted even if the DB update fails so
+    # we never return 500 to the client after a successful OS-level move.
+    try:
+        await repo.set_accepted(recommendation_id, body.folder)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "set_accepted failed for %s after successful move to %s: %s",
+            recommendation_id, new_path, exc,
+        )
 
     if audit:
-        await audit.log(
-            "organisation.file_moved",
-            {
-                "recommendation_id": recommendation_id,
-                "source_path": rec.source_path,
-                "target_path": new_path,
-                "target_folder": body.folder,
-            },
-        )
+        try:
+            await audit.log(
+                "organisation.file_moved",
+                {
+                    "recommendation_id": recommendation_id,
+                    "source_path": rec.source_path,
+                    "target_path": new_path,
+                    "target_folder": body.folder,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Audit log failed for recommendation %s: %s", recommendation_id, exc)
 
     logger.info(
         "Recommendation %s accepted: %s → %s", recommendation_id, rec.source_path, new_path

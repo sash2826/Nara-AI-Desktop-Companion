@@ -111,13 +111,16 @@ function OrganiseTab() {
         m.delete(rec.id);
         return m;
       });
-      setConflicts((prev) => {
-        const m = new Map(prev);
-        m.delete(rec.id);
-        return m;
-      });
+      // Do NOT clear conflicts here — keep the conflict UI visible (disabled) while
+      // the request is in-flight so the card never flips to "Move here" mid-request.
       try {
         await IPCClient.acceptRecommendation(rec.id, folder, conflictStrategy);
+        // Success: clear conflict then remove the card.
+        setConflicts((prev) => {
+          const m = new Map(prev);
+          m.delete(rec.id);
+          return m;
+        });
         setRecommendations((prev) => prev.filter((r) => r.id !== rec.id));
       } catch (err) {
         const msg =
@@ -125,6 +128,12 @@ function OrganiseTab() {
         if (msg.includes("already exists")) {
           setConflicts((prev) => new Map(prev).set(rec.id, folder));
         } else {
+          // Non-conflict error: clear conflict so the card returns to normal state.
+          setConflicts((prev) => {
+            const m = new Map(prev);
+            m.delete(rec.id);
+            return m;
+          });
           setErrors((prev) => new Map(prev).set(rec.id, msg));
         }
       } finally {
