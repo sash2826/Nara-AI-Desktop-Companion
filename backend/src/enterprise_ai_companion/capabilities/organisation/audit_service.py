@@ -15,8 +15,8 @@ from enterprise_ai_companion.capabilities.organisation.recommendation_repository
 logger = logging.getLogger(__name__)
 
 _DOWNLOADS_PATH = str(Path.home() / "Downloads")
-_MIN_TOP_SCORE = 0.55
-_MIN_SCORE_DELTA = 0.20
+_MIN_TOP_SCORE = 0.30
+_MIN_SCORE_DELTA = 0.10
 _PAGE_SIZE = 100
 
 

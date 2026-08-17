@@ -112,6 +112,7 @@ async def open_db() -> aiosqlite.Connection:
     conn = await aiosqlite.connect(path)
     conn.row_factory = aiosqlite.Row
     await conn.execute("PRAGMA journal_mode=WAL")
+    await conn.execute("PRAGMA busy_timeout=10000")
     await conn.execute("PRAGMA foreign_keys=ON")
     await _apply_migrations(conn)
     return conn

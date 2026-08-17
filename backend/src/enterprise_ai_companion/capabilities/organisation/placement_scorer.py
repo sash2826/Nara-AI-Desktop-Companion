@@ -49,9 +49,9 @@ _SCORE_GOOD_THRESHOLD = 0.30
 # "Possible" suggestions when there is no meaningful topical overlap.
 # Calibrated for Overlap coefficient scoring (not Jaccard). Files with zero
 # intersection always score 0.0, so any positive threshold suffices to filter
-# them. 0.05 allows a 1-entity overlap on a 5-entity file (score = 0.14)
-# while excluding noise from rerank alone.
-_SCORE_MIN_THRESHOLD = 0.10
+# them. 0.20 filters out weak rerank-only signals and avoids spurious
+# recommendations for unrelated files that share only generic terms.
+_SCORE_MIN_THRESHOLD = 0.20
 
 # The graph score must reach this value before the rerank signal is added.
 # Raising from >0.0 to >=0.10 eliminates false positives caused by a single
@@ -525,7 +525,21 @@ class PlacementScorer:
         # Sort by doc count descending so well-populated folders are prioritised
         # when the candidate list is trimmed.
         ranked = sorted(folder_counts, key=lambda p: folder_counts[p], reverse=True)
-        return ranked[:max_candidates]
+        capped = ranked[:max_candidates]
+
+        # Remove any folder that is an ancestor of another folder in the same
+        # set. A parent directory's entity set is the union of all its children,
+        # so it will always outscore every specific subfolder — but it is not a
+        # meaningful placement destination. Keep only leaf directories.
+        capped_set = set(capped)
+        leaves = [
+            f for f in capped
+            if not any(
+                other != f and other.startswith(f.rstrip(os.sep) + os.sep)
+                for other in capped_set
+            )
+        ]
+        return leaves
 
 
 def _label(score: float) -> str:
