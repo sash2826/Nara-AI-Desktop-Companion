@@ -49,9 +49,12 @@ logger = logging.getLogger(__name__)
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".xlsx"}
 
 # Maximum number of files processed concurrently during workspace indexing.
-# Higher values parallelise I/O and thread-pool work (OCR, embeddings, Qdrant)
-# but increase peak memory. 4 is a safe default for typical hardware.
-_INDEXING_CONCURRENCY = 4
+# Kept at 1 because all repositories share a single aiosqlite connection; with
+# concurrent coroutines the transaction-state tracking (in_transaction flag)
+# desynchronises — one coroutine's COMMIT unexpectedly finalises another's
+# in-flight writes, leading to "cannot start a transaction within a transaction"
+# and SQLITE_MISUSE errors under watchdog-triggered multi-file drops.
+_INDEXING_CONCURRENCY = 1
 
 # Directory names that are never traversed during indexing, regardless of depth.
 # Shared with file_watcher.py which imports this constant.
@@ -183,6 +186,12 @@ class FileIndexer:
         # holds a reference, so the dict never grows unbounded.
         self._file_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
         self._locks_meta = asyncio.Lock()
+        # Per-workspace locks prevent two watcher-triggered index_workspace calls
+        # for the same folder from running concurrently. Even with
+        # _INDEXING_CONCURRENCY=1, two concurrent calls would still interleave
+        # their single-file sequences and race on the shared DB connection.
+        self._workspace_locks: dict[str, asyncio.Lock] = {}
+        self._workspace_locks_meta = asyncio.Lock()
         # Strong references to fire-and-forget background tasks (Pass 2 graph
         # extraction). asyncio only holds weak refs; without this the GC can
         # collect a running task before it finishes.
@@ -218,6 +227,18 @@ class FileIndexer:
         async with lock:
             yield
 
+    @asynccontextmanager
+    async def _workspace_lock(self, path: str):
+        """Yield a per-workspace asyncio.Lock, serialising concurrent index_workspace
+        calls for the same folder (e.g. two rapid watcher events)."""
+        async with self._workspace_locks_meta:
+            lock = self._workspace_locks.get(path)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._workspace_locks[path] = lock
+        async with lock:
+            yield
+
     async def index_workspace(
         self,
         workspace_path: str,
@@ -228,6 +249,14 @@ class FileIndexer:
         progress_cb is called after every file is processed so callers can track
         live progress rather than waiting for the full run to finish.
         """
+        async with self._workspace_lock(workspace_path):
+            return await self._index_workspace_locked(workspace_path, progress_cb)
+
+    async def _index_workspace_locked(
+        self,
+        workspace_path: str,
+        progress_cb: Callable[[IndexingResult], None] | None = None,
+    ) -> IndexingResult:
         root = Path(workspace_path).resolve()
 
         if not self._is_safe_path(root):
