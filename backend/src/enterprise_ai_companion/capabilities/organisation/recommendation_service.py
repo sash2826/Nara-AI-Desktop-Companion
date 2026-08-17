@@ -8,6 +8,7 @@ the top-3 results, and logs the outcome.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
@@ -64,6 +65,14 @@ class RecommendationService:
                 "[PLACEMENT] No candidate folders for %s — no indexed subfolders found", file_path
             )
             return
+
+        # Exclude ancestor directories — a folder that contains the file's
+        # current location is not a meaningful move destination.
+        file_parent = str(Path(file_path).parent)
+        candidate_paths = [
+            f for f in candidate_paths
+            if not file_parent.startswith(f.rstrip(os.sep) + os.sep)
+        ]
 
         logger.info(
             "Scoring %d candidate folder(s) for %s (doc_id=%s)",

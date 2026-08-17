@@ -124,8 +124,16 @@ class AuditService:
         # causing a false delta and a spurious "move to another folder" rec.
         current_score = await self._placement_scorer.score_one(doc.id, current_folder)
 
-        # Score all non-current candidates for the top-3 suggestions.
-        non_current_candidates = [f for f in candidate_paths if f != current_folder]
+        # Exclude the file's own folder AND any ancestor directory from the
+        # candidate list. A root folder like "test-drive" scores artificially
+        # high because its entity set is the union of every subfolder — it is
+        # not a meaningful destination and the file already lives inside it.
+        current_sep = current_folder.rstrip(os.sep) + os.sep
+        non_current_candidates = [
+            f for f in candidate_paths
+            if f != current_folder
+            and not current_folder.startswith(f.rstrip(os.sep) + os.sep)
+        ]
         if not non_current_candidates:
             return
 
