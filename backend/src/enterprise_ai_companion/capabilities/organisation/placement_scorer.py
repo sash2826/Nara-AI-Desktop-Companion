@@ -134,6 +134,7 @@ class PlacementScorer:
         document_id: str,
         candidate_folder_paths: list[str],
         file_path: str = "",
+        graph_gate: float = _GRAPH_GATE_THRESHOLD,
     ) -> list[dict[str, Any]]:
         """Score every candidate folder and return up to 3 results sorted by score desc.
 
@@ -159,6 +160,7 @@ class PlacementScorer:
                 document_id=document_id,
                 folder_path=folder,
                 new_file_canonicals=new_file_canonicals,
+                graph_gate=graph_gate,
             )
             for folder in candidate_folder_paths
         ]
@@ -207,6 +209,7 @@ class PlacementScorer:
         document_id: str,
         folder_path: str,
         new_file_canonicals: set[str],
+        graph_gate: float = _GRAPH_GATE_THRESHOLD,
     ) -> FolderScore:
         graph_s, rerank_s = await asyncio.gather(
             self._graph_score(folder_path, new_file_canonicals),
@@ -214,9 +217,11 @@ class PlacementScorer:
         )
         # Graph score is the gate. RRF rerank returns small positive scores for
         # ANY query, so rerank alone creates false positives for unrelated files.
-        # We require graph_s >= _GRAPH_GATE_THRESHOLD (not merely >0) so that a
-        # single coincidental entity overlap (score ≈ 0.05–0.08) is suppressed.
-        if graph_s < _GRAPH_GATE_THRESHOLD:
+        # We require graph_s >= graph_gate (default _GRAPH_GATE_THRESHOLD) so
+        # that a single coincidental entity overlap is suppressed. Callers such
+        # as AuditService may pass graph_gate=0.0 to allow rerank-only signals
+        # for files whose vocabulary doesn't overlap the graph entity set.
+        if graph_s < graph_gate:
             return FolderScore(
                 folder=folder_path, score=0.0, label=_LABEL_POSSIBLE,
                 graph_score=graph_s, rerank_score=rerank_s,

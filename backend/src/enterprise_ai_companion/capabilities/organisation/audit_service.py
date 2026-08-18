@@ -15,7 +15,7 @@ from enterprise_ai_companion.capabilities.organisation.recommendation_repository
 logger = logging.getLogger(__name__)
 
 _DOWNLOADS_PATH = str(Path.home() / "Downloads")
-_MIN_TOP_SCORE = 0.30
+_MIN_TOP_SCORE = 0.22
 _MIN_SCORE_DELTA = 0.10
 _PAGE_SIZE = 100
 
@@ -150,7 +150,12 @@ class AuditService:
         if not non_current_candidates:
             return
 
-        scores = await self._placement_scorer.score_all(doc.id, non_current_candidates, file_path=doc.file_path)
+        # graph_gate=0.0: for existing indexed files the graph signal alone may
+        # not overlap (generic vocabulary, indirect topics). Allow rerank to
+        # provide the recommendation signal when graph overlap is zero.
+        scores = await self._placement_scorer.score_all(
+            doc.id, non_current_candidates, file_path=doc.file_path, graph_gate=0.0
+        )
         if not scores:
             return
 

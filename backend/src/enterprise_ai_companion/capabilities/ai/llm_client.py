@@ -10,9 +10,17 @@ The model deployment ID is also configurable:
 
 from __future__ import annotations
 
+import asyncio
+import logging
+
 import httpx
 
 from enterprise_ai_companion.infrastructure.config import get_config
+
+logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = [1.0, 2.0, 4.0]  # seconds between attempts
 
 _API_VERSION = "preview"
 
@@ -54,8 +62,26 @@ async def chat_complete(
     }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
+        last_exc: httpx.HTTPStatusError | None = None
+        for attempt in range(_MAX_RETRIES):
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code < 500:
+                response.raise_for_status()
+                break
+            last_exc = httpx.HTTPStatusError(
+                message=f"Server error '{response.status_code}' for url '{url}'",
+                request=response.request,
+                response=response,
+            )
+            if attempt < _MAX_RETRIES - 1:
+                delay = _RETRY_BACKOFF[attempt]
+                logger.warning(
+                    "LLM API returned %s — retrying in %.0fs (attempt %d/%d)",
+                    response.status_code, delay, attempt + 1, _MAX_RETRIES,
+                )
+                await asyncio.sleep(delay)
+        else:
+            raise last_exc  # type: ignore[misc]
 
     data = response.json()
     return str(data["choices"][0]["message"]["content"])
