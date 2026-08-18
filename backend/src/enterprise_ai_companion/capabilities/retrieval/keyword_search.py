@@ -116,19 +116,41 @@ class KeywordSearchProvider:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _escape_fts5_query(query: str) -> str:
-    """Escape a raw user query for safe use in an FTS5 MATCH expression.
+_STOP_WORDS: frozenset[str] = frozenset(
+    {
+        "a", "an", "the", "is", "in", "it", "of", "to", "for", "and", "or",
+        "on", "at", "by", "from", "with", "me", "my", "our", "your", "their",
+        "find", "show", "get", "give", "list", "tell", "what", "which", "how",
+        "where", "when", "who", "why", "can", "could", "would", "should",
+        "do", "does", "did", "we", "i", "you", "he", "she", "they", "this",
+        "that", "these", "those", "are", "was", "were", "been", "be", "has",
+        "had", "have", "not", "but", "so", "any", "all", "some", "about",
+        "related", "regarding", "concerning", "information", "document",
+        "documents", "file", "files", "please",
+    }
+)
 
-    Wraps each whitespace-delimited token in double quotes so that special FTS5
-    characters (AND, OR, NOT, *, ^, etc.) are treated as literals.  This keeps
-    the behaviour predictable for end-users who are not familiar with FTS5 syntax.
+
+def _escape_fts5_query(query: str) -> str:
+    """Build an FTS5 MATCH expression from a natural language query.
+
+    Each token is quoted to prevent FTS5 operator injection, then meaningful
+    tokens are joined with OR so that a natural language query like
+    "find me any documents about vendor proposals" still matches chunks that
+    contain "vendor" or "proposals" even though "find", "me", "any", "about"
+    never appear in the indexed text.
+
+    Stop words are filtered first; if filtering removes every token the full
+    token list is used as a fallback so single-word queries are never lost.
 
     Example:
-        "hello world"  →  '"hello" "world"'
-        "c++ tutorial" →  '"c++" "tutorial"'
+        "find me any vendor proposals"  →  '"vendor" OR "proposals"'
+        "c++ tutorial"                  →  '"c++" OR "tutorial"'
     """
-    tokens = re.split(r"\s+", query.strip())
-    return " ".join(f'"{t}"' for t in tokens if t)
+    tokens = [t for t in re.split(r"\s+", query.strip()) if t]
+    meaningful = [t for t in tokens if t.lower() not in _STOP_WORDS]
+    chosen = meaningful if meaningful else tokens
+    return " OR ".join(f'"{t}"' for t in chosen)
 
 
 def _normalise_bm25(raw: float) -> float:

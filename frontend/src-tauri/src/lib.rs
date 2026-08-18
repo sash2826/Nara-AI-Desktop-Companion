@@ -1251,12 +1251,20 @@ async fn focus_main_window(app: AppHandle) -> Result<(), String> {
 /// windows. Routing through Rust (`window.emit`) guarantees delivery to the
 /// correct webview's event listener.
 #[tauri::command]
-async fn relay_orb_handoff(app: AppHandle, query: String, response: String) -> Result<(), String> {
+async fn relay_orb_handoff(
+    app: AppHandle,
+    query: String,
+    response: String,
+    sources: Vec<serde_json::Value>,
+) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "Main window not found".to_string())?;
     window
-        .emit("orb-handoff", serde_json::json!({ "query": query, "response": response }))
+        .emit(
+            "orb-handoff",
+            serde_json::json!({ "query": query, "response": response, "sources": sources }),
+        )
         .map_err(|e| format!("Failed to relay orb handoff: {}", e))
 }
 

@@ -141,6 +141,7 @@ export function OrbQueryOverlay() {
       await invoke("relay_orb_handoff", {
         query: queryState.submittedQuery,
         response: queryState.response,
+        sources: queryState.sources,
       });
     } catch {
       // Best-effort — main window listener handles missing events gracefully
