@@ -43,10 +43,7 @@
         "languages": ["English"],
         "displayLanguageSelector": false,
         "installMode": "currentUser",
-        "shortcutName": "Enterprise AI Companion",
-        "createDesktopShortcut": true,
-        "createStartMenuShortcut": true,
-        "startMenuFolderName": "Volvo Group"
+        "startMenuFolder": "Volvo Group"
       },
       "webviewInstallMode": {
         "type": "skip"

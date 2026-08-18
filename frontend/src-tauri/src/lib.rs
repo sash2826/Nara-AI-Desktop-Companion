@@ -1673,49 +1673,76 @@ fn register_global_shortcut(app: &tauri::App) {
 /// stores the port in AppState, and emits `sidecar-ready` to the frontend.
 fn start_sidecar(app_handle: AppHandle, state: Arc<AppState>) {
     std::thread::spawn(move || {
-        // Locate the backend directory relative to the workspace root.
-        // In dev the working directory is the Tauri source; in production the
-        // backend is expected to be a bundled sidecar binary (future phase).
-        let backend_dir = {
-            let exe = std::env::current_exe().unwrap_or_default();
-            // Walk up from <repo>/frontend/src-tauri/target/... to <repo>/backend
-            let mut candidate = exe.clone();
-            let mut found = None;
-            for _ in 0..10 {
-                candidate = match candidate.parent() {
-                    Some(p) => p.to_path_buf(),
-                    None => break,
-                };
-                let backend = candidate.join("backend");
-                if backend.exists() {
-                    found = Some(backend);
-                    break;
+        // ① Prefer the bundled sidecar binary (production installer).
+        //    Tauri places externalBin entries alongside the app executable.
+        let bundled_exe = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("eac-backend.exe")));
+        let use_bundled = bundled_exe.as_deref().map_or(false, |p| p.exists());
+
+        let mut child = if use_bundled {
+            let exe_path = bundled_exe.unwrap();
+            println!("[sidecar] starting bundled binary: {}", exe_path.display());
+            let mut cmd = Command::new(&exe_path);
+            cmd.env("HF_HUB_DISABLE_XET", "1")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit());
+            // Suppress the console window on Windows — stdout pipe still works.
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            }
+            match cmd.spawn() {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[sidecar] failed to spawn bundled binary: {}", e);
+                    return;
                 }
             }
-            found.unwrap_or_else(|| std::path::PathBuf::from("../../backend"))
-        };
-
-        let venv_python = backend_dir.join(".venv/Scripts/python.exe");
-        let python_cmd = if venv_python.exists() {
-            venv_python.to_str().unwrap_or("python").to_string()
         } else {
-            "python".to_string()
-        };
+            // ② Dev-mode fallback: walk up to find backend/ and use .venv python.
+            let backend_dir = {
+                let exe = std::env::current_exe().unwrap_or_default();
+                // Walk up from <repo>/frontend/src-tauri/target/... to <repo>/backend
+                let mut candidate = exe.clone();
+                let mut found = None;
+                for _ in 0..10 {
+                    candidate = match candidate.parent() {
+                        Some(p) => p.to_path_buf(),
+                        None => break,
+                    };
+                    let backend = candidate.join("backend");
+                    if backend.exists() {
+                        found = Some(backend);
+                        break;
+                    }
+                }
+                found.unwrap_or_else(|| std::path::PathBuf::from("../../backend"))
+            };
 
-        println!("[sidecar] starting: {} -m enterprise_ai_companion", python_cmd);
+            let venv_python = backend_dir.join(".venv/Scripts/python.exe");
+            let python_cmd = if venv_python.exists() {
+                venv_python.to_str().unwrap_or("python").to_string()
+            } else {
+                "python".to_string()
+            };
 
-        let mut child = match Command::new(&python_cmd)
-            .args(["-m", "enterprise_ai_companion"])
-            .current_dir(&backend_dir)
-            .env("HF_HUB_DISABLE_XET", "1")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-        {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("[sidecar] failed to spawn Python process: {}", e);
-                return;
+            println!("[sidecar] starting: {} -m enterprise_ai_companion", python_cmd);
+
+            match Command::new(&python_cmd)
+                .args(["-m", "enterprise_ai_companion"])
+                .current_dir(&backend_dir)
+                .env("HF_HUB_DISABLE_XET", "1")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::inherit())
+                .spawn()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[sidecar] failed to spawn Python process: {}", e);
+                    return;
+                }
             }
         };
 
