@@ -303,33 +303,16 @@ export function useConversation() {
           store.updateMessageStatus(messageId, "complete");
           store.setStreaming(false);
 
-          // Attach only the chunks the LLM actually cited in its response.
-          // The model is instructed to cite paths in [path/to/file] format —
-          // we extract those and cross-reference against retrieved chunks so
-          // the Sources bar never shows a document the model didn't use.
+          // Store all retrieved chunks as citations, preserving their original
+          // 1-based position so inline [N] badges in the response map correctly.
           if (retrievedChunks && retrievedChunks.length > 0) {
-            const citedPaths = new Set(
-              [...finalContent.matchAll(/\[([^\]]+\.[a-zA-Z0-9]+)\]/g)].map((m) => m[1].trim())
-            );
-            const matched = retrievedChunks.filter((c) => {
-              const norm = c.documentPath.replace(/\\/g, "/");
-              const filename = norm.split("/").at(-1) ?? "";
-              return (
-                citedPaths.has(c.documentPath) ||
-                citedPaths.has(norm) ||
-                [...citedPaths].some((p) => norm.endsWith(p) || filename === p)
-              );
-            });
-            const toShow = matched.length > 0 ? matched : [];
-            if (toShow.length > 0) {
-              const citations: CitationMeta[] = toShow.map((c) => ({
-                chunkId: c.chunkId,
-                documentPath: c.documentPath,
-                chunkIndex: c.chunkIndex,
-                rrfScore: c.rrfScore,
-              }));
-              store.updateMessageCitations(messageId, citations);
-            }
+            const citations: CitationMeta[] = retrievedChunks.map((c) => ({
+              chunkId: c.chunkId,
+              documentPath: c.documentPath,
+              chunkIndex: c.chunkIndex,
+              rrfScore: c.rrfScore,
+            }));
+            store.updateMessageCitations(messageId, citations);
           }
 
           // Persist the completed assistant message — fire-and-forget.

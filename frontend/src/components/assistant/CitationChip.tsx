@@ -24,7 +24,9 @@ export function CitationChip({ citation, index }: CitationChipProps) {
   const [hovered, setHovered] = useState(false);
 
   const normalised = citation.documentPath.replace(/\\/g, "/");
-  const filename = normalised.split("/").at(-1) ?? citation.documentPath;
+  const segments = normalised.split("/").filter(Boolean);
+  const filename = segments.at(-1) ?? citation.documentPath;
+  const parentFolder = segments.at(-2) ?? null;
   const isOneDrive = /\/OneDrive[^/]*/i.test(normalised);
 
   const scorePercent = Math.round(citation.rrfScore * 100);
@@ -68,7 +70,7 @@ export function CitationChip({ citation, index }: CitationChipProps) {
         ) : (
           <FileText size={10} className="flex-shrink-0" strokeWidth={1.5} />
         )}
-        <span className="max-w-[140px] truncate">{filename}</span>
+        <span className="max-w-[200px] truncate">{filename}</span>
         {isOneDrive && (
           <Cloud
             size={9}
@@ -91,7 +93,7 @@ export function CitationChip({ citation, index }: CitationChipProps) {
           role="tooltip"
         >
           <p className="mb-1 break-all font-mono text-2xs text-foreground">
-            {citation.documentPath}
+            {parentFolder ? `${parentFolder} / ${filename}` : filename}
           </p>
           <div className="flex items-center gap-3 text-2xs text-muted-foreground">
             {isOneDrive && (

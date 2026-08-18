@@ -187,13 +187,11 @@ export class ConversationService {
 
     if (hasChunks && context.retrievedChunks) {
       const excerptBlock = context.retrievedChunks
-        .map((c, i) => `[${i + 1}] File: ${c.documentPath} (chunk ${c.chunkIndex})\n${c.content}`)
+        .map((c, i) => {
+          const filename = c.documentPath.replace(/\\/g, "/").split("/").at(-1) ?? c.documentPath;
+          return `[${i + 1}] ${filename}\n${c.content}`;
+        })
         .join("\n\n---\n\n");
-
-      // List the EXACT paths the model is allowed to cite — prevents hallucination
-      const allowedPaths = [...new Set(context.retrievedChunks.map((c) => c.documentPath))]
-        .map((p) => `  - ${p}`)
-        .join("\n");
 
       parts.push(
         `You are an AI assistant with access to the user's indexed knowledge base.\n` +
@@ -201,13 +199,12 @@ export class ConversationService {
           `Excerpt [1] is the most relevant; lower-numbered excerpts should be weighted accordingly,\n` +
           `but you MUST synthesise across all of them — do not ignore later excerpts.\n\n` +
           `CITATION RULES — you MUST follow ALL of these exactly:\n` +
-          `1. You may ONLY cite file paths from the list below. Do NOT invent, guess, or paraphrase any file path.\n` +
-          `   Allowed source paths:\n${allowedPaths}\n` +
-          `2. Cite a path immediately after the claim it supports, in square brackets: [exact/path/here]\n` +
-          `3. Synthesise across ALL provided excerpts — do not rely on only the first one.\n` +
-          `4. If excerpts conflict, surface the contradiction explicitly.\n` +
-          `5. Clearly distinguish between information from the excerpts and your general knowledge.\n` +
-          `6. If the excerpts do not contain enough information to answer, say so — do NOT fill gaps with invented details.\n\n` +
+          `1. Cite sources using their excerpt number in square brackets immediately after the claim, e.g. [1] or [2].\n` +
+          `   Do NOT include file paths or folder names in your response — the UI displays sources separately.\n` +
+          `2. Synthesise across ALL provided excerpts — do not rely on only the first one.\n` +
+          `3. If excerpts conflict, surface the contradiction explicitly.\n` +
+          `4. Clearly distinguish between information from the excerpts and your general knowledge.\n` +
+          `5. If the excerpts do not contain enough information to answer, say so — do NOT fill gaps with invented details.\n\n` +
           `Retrieved excerpts (ordered by relevance, most relevant first):\n\n${excerptBlock}`
       );
     } else if (hasLegacyContext && context.retrievedContext) {

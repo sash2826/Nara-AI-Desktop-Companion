@@ -90,15 +90,15 @@ EAC watches the OS Downloads folder automatically. When a new file arrives:
 
 For existing indexed files, an on-demand "Organise" audit and a passive background suggester surface reorganisation opportunities over time using the same scoring formula.
 
-## Phase Roadmap (as of 2026-08-11)
+## Phase Roadmap (as of 2026-08-18)
 
 | Phase    | Name                               | Status    |
 | -------- | ---------------------------------- | --------- |
 | 00–06    | Foundation through Security        | Complete  |
-| Pre-08   | SQLite Graph Correctness Fixes     | Planned   |
-| 08       | Orb Native Shell                   | Planned   |
-| 09       | File Organisation — New Files      | Planned   |
-| 10       | File Organisation — Existing Files | Planned   |
+| Pre-08   | SQLite Graph Correctness Fixes     | Complete  |
+| 08       | Orb Native Shell                   | Complete  |
+| 09       | File Organisation — New Files      | Complete  |
+| 10       | File Organisation — Existing Files | Complete  |
 | 07       | Automation Engine                  | Deferred — under review |
 | 11       | Polish & Release                   | Planned   |
 
