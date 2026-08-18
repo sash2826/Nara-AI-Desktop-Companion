@@ -28,7 +28,6 @@ class DocumentRepository:
             INSERT INTO documents (id, workspace_path, file_path, file_hash, char_count, chunk_count, indexed_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(file_path) DO UPDATE SET
-                id             = excluded.id,
                 workspace_path = excluded.workspace_path,
                 file_hash      = excluded.file_hash,
                 char_count     = excluded.char_count,

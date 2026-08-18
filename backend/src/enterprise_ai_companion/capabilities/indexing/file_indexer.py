@@ -495,7 +495,12 @@ class FileIndexer:
         if not raw_chunks:
             return False
 
-        doc_id = str(uuid.uuid4())
+        # Reuse the existing document id when re-indexing a changed file.
+        # Generating a fresh UUID and updating documents.id via ON CONFLICT DO
+        # UPDATE would change the primary key while child rows (chunks,
+        # graph_entities) may still reference the old id mid-flight, causing
+        # FOREIGN KEY constraint failures under concurrent file drops.
+        doc_id = existing.id if existing else str(uuid.uuid4())
         chunks = [
             Chunk(
                 id=str(uuid.uuid4()),
