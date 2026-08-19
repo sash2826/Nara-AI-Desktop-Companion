@@ -133,6 +133,12 @@ _GENERIC_TERMS: frozenset[str] = frozenset({
     # "budget" and "notes" are document-type words that appear across all projects
     # and cannot discriminate between them.
     "budget", "notes",
+    # "planning" is as generic as "plan" and "strategy" — appears in logistics,
+    # events, analytics, and every other domain. Filename bigrams like
+    # "night planning" would otherwise match "route planning" entities in
+    # Horizon-Logistics, creating false positives for personal files such as
+    # Movie_Night_Planning.xlsx.
+    "planning",
 })
 
 

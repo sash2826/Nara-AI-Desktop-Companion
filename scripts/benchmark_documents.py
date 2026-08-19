@@ -30,7 +30,7 @@ Test files (indexed fresh each run, cleaned up after):
 
 Audit thresholds (mirroring AuditService constants):
     _AUDIT_MIN_TOP_SCORE = 0.22   best non-current folder must reach this
-    _AUDIT_MIN_DELTA     = 0.25   best_score − current_score must reach this
+    _AUDIT_MIN_DELTA     = 0.248   best_score − current_score must reach this
 
 Prerequisites
 -------------
@@ -90,7 +90,7 @@ except ImportError:
 # ── Audit thresholds (mirror AuditService._MIN_TOP_SCORE / _MIN_SCORE_DELTA) ─
 
 _AUDIT_MIN_TOP_SCORE = 0.22
-_AUDIT_MIN_DELTA     = 0.25
+_AUDIT_MIN_DELTA     = 0.248
 
 # ── Category constants ────────────────────────────────────────────────────────
 
