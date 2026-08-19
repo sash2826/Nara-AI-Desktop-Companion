@@ -39,6 +39,21 @@ def filename_keywords(file_path: str) -> set[str]:
     }
 
 
+def filename_bigrams(file_path: str) -> set[str]:
+    """Extract adjacent-word bigrams from the filename stem.
+
+    Bigrams like 'depot charging' or 'warehouse picking' are compound domain
+    concepts that match multi-word corpus entities directly, giving sparse files
+    (Excel sheets, short PDFs) 2+ intersection points without requiring the LLM
+    to extract those terms from limited content.
+    """
+    p = Path(file_path)
+    name = p.name if p.is_dir() or not p.suffix else p.stem
+    words = re.sub(r"[_\-\.\s]+", " ", name).lower().split()
+    words = [w for w in words if len(w) > 2 and w not in _FILENAME_STOPWORDS and not re.fullmatch(r"\d+", w)]
+    return {f"{words[i]} {words[i + 1]}" for i in range(len(words) - 1)}
+
+
 def expand_for_matching(canonicals: set[str]) -> set[str]:
     """Expand multi-word canonical entity strings into individual word tokens.
 

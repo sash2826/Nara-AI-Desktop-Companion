@@ -85,14 +85,16 @@ _GRAPH_GATE_THRESHOLD = 0.10
 # from RRF rank arithmetic) and normalising them would amplify spurious matches.
 _RERANK_NORM_FLOOR = 0.006
 
-# Minimum number of entities that must overlap before a graph score is awarded.
-# Set to 2: requires at least two distinct domain-specific terms to overlap
-# between the new file and a candidate folder. A single coincidental match
-# (e.g. "travel" linking a personal travel document to Meridian-Travel, or
-# "renovation" linking a home budget to Redwood-Facilities) is suppressed.
-# Project-name files always have 2+ matching entities; semantic files that
-# genuinely belong to a folder also share multiple domain terms.
-_MIN_INTERSECTION_COUNT = 2
+# Minimum number of domain-specific entity overlaps before a graph score is
+# awarded. Set to 1 now that filename bigrams are injected into new_file_canonicals
+# (see placement_adapters.py) — a single discriminative term (e.g. "picking"
+# matching "warehouse picking" in Horizon-Logistics, or "meridian" matching the
+# project-name entity) is enough when combined with the existing graph gate
+# (_GRAPH_GATE_THRESHOLD) and minimum combined-score threshold. "travel" has been
+# added to _GENERIC_TERMS below to prevent bare "travel" from the filename of
+# personal documents (e.g. Family_Travel_Insurance_Policy) linking them to the
+# Meridian-Travel project folder.
+_MIN_INTERSECTION_COUNT = 1
 
 # Generic business/document terms that appear in almost any file and cannot
 # discriminate between project folders. Filtering them from the overlap
@@ -117,6 +119,20 @@ _GENERIC_TERMS: frozenset[str] = frozenset({
     # Cardinal directions and region labels extracted from spreadsheet columns
     # (e.g. "Region: North", "Zone: Central") — not project-discriminative.
     "north", "south", "east", "west", "central", "region", "zone",
+    # Bare "travel" appears in personal documents (Family_Travel_Insurance_Policy,
+    # Personal_Travel_Plans) and would link them to the Meridian-Travel folder at
+    # MIN_INTERSECTION_COUNT=1. Domain files genuinely belonging to Meridian-Travel
+    # share compound terms ("corporate travel", "duty of care", "travel booking")
+    # whose individual tokens ("corporate", "booking", "duty") still discriminate.
+    "travel",
+    # Single-word personal-context tokens that appear in filenames of private
+    # documents but never in legitimate corporate project files.  Filtering them
+    # prevents coincidental 1-entity matches against work-project folders now that
+    # MIN_INTERSECTION_COUNT has been lowered to 1.
+    "personal", "home", "family", "tax", "renovation",
+    # "budget" and "notes" are document-type words that appear across all projects
+    # and cannot discriminate between them.
+    "budget", "notes",
 })
 
 

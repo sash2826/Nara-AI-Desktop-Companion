@@ -18,6 +18,7 @@ from enterprise_ai_companion.capabilities.organisation.placement_ports import (
     GraphScorePort,
     RerankPort,
     expand_for_matching,
+    filename_bigrams,
     filename_keywords,
 )
 from enterprise_ai_companion.capabilities.retrieval.hybrid_orchestrator import (
@@ -91,6 +92,10 @@ class SqliteGraphScoreAdapter(GraphScorePort):
                 len(canonicals), document_id, sorted(filename_terms),
             )
         canonicals |= filename_terms
+        # Bigrams (e.g. "depot charging", "warehouse picking") are compound
+        # domain signals that directly match multi-word corpus entities, giving
+        # sparse files enough intersection points to clear the MIN_INTERSECTION gate.
+        canonicals |= filename_bigrams(file_path)
 
         return canonicals
 
