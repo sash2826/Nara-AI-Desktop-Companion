@@ -93,31 +93,37 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
             if results:
                 snippets = []
                 seen_paths: set[str] = set()
-                for r in results[:5]:
+                for r in results[:8]:
                     path = r.document_path
-                    name = path.replace("\\", "/").split("/")[-1]
-                    snippets.append(f"[{name}]\n{r.content[:400]}")
+                    parts = path.replace("\\", "/").split("/")
+                    # Include parent folder so LLM sees project context:
+                    # "Atlas-Workplace/Project_Overview.pdf" not just "Project_Overview.pdf"
+                    label = "/".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
+                    name = parts[-1]
+                    snippets.append(f"[{label}]\n{r.content[:600]}")
                     if path not in seen_paths:
                         seen_paths.add(path)
                         sources.append(OrbSourceItem(path=path, name=name))
-                context_text = "\n\n".join(snippets[:3])
+                context_text = "\n\n".join(snippets[:5])
         except Exception:
             logger.debug("Orb RAG context fetch failed — proceeding without context")
 
     if context_text:
         system_content = (
-            "You are a helpful AI assistant with access to the user's indexed knowledge base. "
-            "The context below contains real files from the user's system. "
-            "When the user asks about file locations, cite the exact filename from the context. "
-            "Answer concisely — the response appears in a compact overlay (3–4 sentences max). "
-            "Do not use markdown headers or bullet lists.\n\n"
+            "You are a helpful AI assistant with access to the user's indexed knowledge base.\n"
+            "The context below contains real excerpts from the user's files.\n"
+            "Rules:\n"
+            "- Name the specific document title and project (e.g. 'Atlas Workplace — Access Control Plan').\n"
+            "- Use the exact names, people, document IDs, and terms as they appear in the sources.\n"
+            "- If the source includes a document ID (e.g. 'AW-DOC-004'), mention it.\n"
+            "- Answer concisely — 3–4 sentences max. No markdown headers or bullet lists.\n\n"
             f"Indexed files context:\n{context_text}"
         )
     else:
         system_content = (
             "You are a helpful AI assistant with access to the user's indexed knowledge base. "
             "No relevant files were found for this query. "
-            "Answer concisely (3–4 sentences max). Do not use markdown headers or bullet lists."
+            "Answer concisely (3–4 sentences max). No markdown headers or bullet lists."
         )
 
     messages = [
