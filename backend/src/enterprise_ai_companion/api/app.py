@@ -70,6 +70,59 @@ def _build_graph_provider(
     return SQLiteGraphProvider(conn)
 
 
+async def _purge_orphaned_folder_documents(state: object) -> None:
+    """Remove document rows whose workspace folder is no longer watched.
+
+    Runs at startup as a background task.  Catches orphans left behind when the
+    exact-equality workspace_path match in the purge query silently missed rows.
+    The document rows are deleted directly; graph_entities cascade automatically
+    via ON DELETE CASCADE.  Qdrant vectors for orphaned documents are not cleaned
+    here — they are inert (never queried for an existing document) and will be
+    evicted by normal Qdrant garbage collection.
+    """
+    import os as _os
+
+    try:
+        db = state.db  # type: ignore[attr-defined]
+        watcher = state.watcher  # type: ignore[attr-defined]
+
+        watched_paths: set[str] = set(watcher.watched_paths)
+
+        async with db.execute("SELECT DISTINCT workspace_path FROM documents") as cur:
+            rows = await cur.fetchall()
+        stored_workspace_paths: list[str] = [row[0] for row in rows if row[0]]
+
+        # A stored workspace_path is "covered" when a currently-watched folder
+        # is either the same path or an ancestor of it.
+        def _is_covered(wp: str) -> bool:
+            for watched in watched_paths:
+                if wp == watched:
+                    return True
+                if wp.startswith(watched.rstrip("/\\") + _os.sep):
+                    return True
+            return False
+
+        orphaned = [wp for wp in stored_workspace_paths if not _is_covered(wp)]
+        if not orphaned:
+            return
+
+        logger.info(
+            "Startup: %d orphaned workspace path(s) found — purging document rows",
+            len(orphaned),
+        )
+        from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
+        doc_repo = DocumentRepository(db)
+        for workspace_path in orphaned:
+            count = await doc_repo.delete_all_under_path(workspace_path)
+            if count:
+                logger.info(
+                    "Startup: purged %d orphan document row(s) from removed folder %s",
+                    count, workspace_path,
+                )
+    except Exception as exc:
+        logger.warning("Startup orphan folder purge failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Open all stores on startup; close them on shutdown."""
@@ -190,6 +243,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Purge index records for files deleted while the backend was offline.
     # Runs as a background task so it never blocks startup.
     asyncio.create_task(watcher.reconcile_stale_files())
+
+    # Purge documents belonging to workspace folders that are no longer watched.
+    # Catches orphans left behind when a folder was removed while the backend
+    # was running (exact workspace_path mismatch in the purge query) or when
+    # the folder was removed outside the app entirely.
+    asyncio.create_task(_purge_orphaned_folder_documents(app.state))
 
     app.state.indexing_tasks: dict = {}
 

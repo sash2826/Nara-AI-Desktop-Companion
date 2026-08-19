@@ -92,11 +92,12 @@ def _cancel_indexing_tasks(folder_path: str, request: Request) -> None:
 
 
 async def _purge_folder_documents(folder_path: str, request: Request) -> None:
-    """Delete all indexed documents whose workspace_path matches folder_path.
+    """Delete all indexed documents under folder_path.
 
-    Mirrors the cascade used by bulk_delete_documents:
-    chunks (SQLite + Qdrant) → graph entities → document row.
-    Failures on individual documents are logged and do not abort the purge.
+    Cascade order: chunks (SQLite + Qdrant) → graph entities → graph state →
+    document row.  Failures on individual documents are logged but do not abort
+    the purge.  A final bulk DELETE by file_path prefix acts as a safety net so
+    that partial failures or path-mismatch edge cases never leave orphan rows.
     """
     db = request.app.state.db
     doc_repo = DocumentRepository(db)
@@ -104,30 +105,35 @@ async def _purge_folder_documents(folder_path: str, request: Request) -> None:
     chunk_repo = ChunkRepository(db, qdrant_client)
     graph_provider = getattr(request.app.state, "graph", None) or NullGraphProvider()
     graph_service = KnowledgeGraphService(graph_provider)
+    graph_state_repo = GraphStateRepository(db)
 
     docs = await doc_repo.list_by_workspace(folder_path)
     if not docs:
         logger.info("Folder purge: no indexed documents found for %s", folder_path)
-        return
-
-    graph_state_repo = GraphStateRepository(db)
-
-    logger.info("Folder purge: removing %d document(s) from %s", len(docs), folder_path)
-    for doc in docs:
-        try:
-            await chunk_repo.delete_by_document(doc.id)
+    else:
+        logger.info("Folder purge: removing %d document(s) from %s", len(docs), folder_path)
+        for doc in docs:
             try:
-                await graph_service.delete_document(doc.id)
+                await chunk_repo.delete_by_document(doc.id)
+                try:
+                    await graph_service.delete_document(doc.id)
+                except Exception as exc:
+                    logger.warning("Folder purge: graph cleanup failed for %s: %s", doc.id, exc)
+                try:
+                    await graph_state_repo.delete_by_document(doc.id)
+                except Exception as exc:
+                    logger.warning("Folder purge: graph_state cleanup failed for %s: %s", doc.id, exc)
+                await doc_repo.delete_by_path(doc.file_path)
+                logger.info("Folder purge: removed %s", doc.file_path)
             except Exception as exc:
-                logger.warning("Folder purge: graph cleanup failed for %s: %s", doc.id, exc)
-            try:
-                await graph_state_repo.delete_by_document(doc.id)
-            except Exception as exc:
-                logger.warning("Folder purge: graph_state cleanup failed for %s: %s", doc.id, exc)
-            await doc_repo.delete_by_path(doc.file_path)
-            logger.info("Folder purge: removed %s", doc.file_path)
-        except Exception as exc:
-            logger.error("Folder purge: failed to remove %s: %s", doc.file_path, exc)
+                logger.error("Folder purge: failed to remove %s: %s", doc.file_path, exc)
+
+    # Safety net: bulk-delete any document rows still under this path.
+    # Catches rows that were missed by the loop (partial failure, path-mismatch
+    # between stored workspace_path and the folder_path we were given).
+    orphans = await doc_repo.delete_all_under_path(folder_path)
+    if orphans:
+        logger.info("Folder purge: safety-net removed %d orphan document row(s) from %s", orphans, folder_path)
 
 
 @router.get("/folders", response_model=list[WatchedFolderResponse])

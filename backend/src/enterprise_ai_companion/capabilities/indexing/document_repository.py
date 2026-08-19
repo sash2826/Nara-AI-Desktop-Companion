@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import aiosqlite
+
+
+def _like_prefix(folder_path: str) -> str:
+    """Return a LIKE pattern that matches any file_path under folder_path.
+
+    Strips trailing separators, appends the OS separator, then escapes the
+    two LIKE wildcards (% and _) that could appear in real folder names.
+    The pattern ends with a bare % so SQLite does a prefix scan.
+    """
+    base = folder_path.rstrip("/\\") + os.sep
+    escaped = base.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return escaped + "%"
 
 
 @dataclass(frozen=True)
@@ -58,13 +71,37 @@ class DocumentRepository:
         return IndexedDocument(**dict(row))
 
     async def list_by_workspace(self, workspace_path: str) -> list[IndexedDocument]:
+        """Return all documents belonging to workspace_path.
+
+        Uses both exact workspace_path equality AND a file_path prefix match so
+        that minor path variations (trailing separator, case differences between
+        the stored workspace_path and the one supplied by the caller) never
+        cause the purge to silently return an empty list.
+        """
         async with self._conn.execute(
             "SELECT id, workspace_path, file_path, file_hash, char_count, chunk_count, indexed_at "
-            "FROM documents WHERE workspace_path = ? ORDER BY file_path ASC",
-            (workspace_path,),
+            "FROM documents "
+            "WHERE workspace_path = ?1 OR file_path LIKE ?2 ESCAPE '\\' "
+            "ORDER BY file_path ASC",
+            (workspace_path, _like_prefix(workspace_path)),
         ) as cur:
             rows = await cur.fetchall()
         return [IndexedDocument(**dict(row)) for row in rows]
+
+    async def delete_all_under_path(self, folder_path: str) -> int:
+        """Bulk-delete every document whose file_path falls under folder_path.
+
+        Acts as a safety net after the per-document purge loop in case a document
+        was missed (e.g. a partial failure mid-loop left the row behind).
+        Returns the number of rows deleted.
+        """
+        cursor = await self._conn.execute(
+            "DELETE FROM documents "
+            "WHERE workspace_path = ?1 OR file_path LIKE ?2 ESCAPE '\\'",
+            (folder_path, _like_prefix(folder_path)),
+        )
+        await self._conn.commit()
+        return cursor.rowcount or 0
 
     async def list_all(self, limit: int = 500, offset: int = 0) -> list[IndexedDocument]:
         async with self._conn.execute(
