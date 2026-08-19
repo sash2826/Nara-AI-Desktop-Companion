@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".xlsx"}
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".xlsx", ".pptx"}
 
 # Maximum number of files processed concurrently during workspace indexing.
 # Kept at 1 because all repositories share a single aiosqlite connection; with
@@ -440,6 +440,21 @@ class FileIndexer:
                             parts.append("  ".join(str(v) for v in row if v is not None))
             wb.close()
             return "\n".join(p for p in parts if p.strip())
+        if ext == ".pptx":
+            import pptx  # noqa: PLC0415
+            prs = pptx.Presentation(str(file_path))
+            parts: list[str] = []
+            for i, slide in enumerate(prs.slides, start=1):
+                slide_parts: list[str] = []
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for para in shape.text_frame.paragraphs:
+                            text = para.text.strip()
+                            if text:
+                                slide_parts.append(text)
+                if slide_parts:
+                    parts.append(f"Slide {i}:\n" + "\n".join(slide_parts))
+            return "\n\n".join(parts)
         return file_path.read_text(encoding="utf-8", errors="replace")
 
     async def _index_file(

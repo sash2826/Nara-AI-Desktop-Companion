@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 _DOWNLOADS_PATH = str(Path.home() / "Downloads")
 _MIN_TOP_SCORE = 0.22
-_MIN_SCORE_DELTA = 0.10
+# Raised from 0.10: at 0.10, files with a marginal competing-folder score
+# (delta 0.23–0.24) were falsely flagged for relocation. All confirmed
+# misplacements in benchmark testing showed delta >= 0.29, so 0.25 cleanly
+# separates real misplacements from noise without missing genuine ones.
+_MIN_SCORE_DELTA = 0.25
 _PAGE_SIZE = 100
 
 
