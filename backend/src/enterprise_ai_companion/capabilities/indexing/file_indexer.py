@@ -417,14 +417,29 @@ class FileIndexer:
             wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
             parts: list[str] = []
             for sheet in wb.worksheets:
-                if sheet.title:
-                    parts.append(sheet.title)
-                for row in sheet.iter_rows(values_only=True):
-                    row_text = "  ".join(str(v) for v in row if v is not None)
-                    if row_text.strip():
-                        parts.append(row_text)
+                parts.append(f"Sheet: {sheet.title}")
+                headers: list[str] = []
+                for i, row in enumerate(sheet.iter_rows(values_only=True)):
+                    cells = [v for v in row if v is not None]
+                    if not cells:
+                        continue
+                    if i == 0:
+                        # Treat first non-empty row as column headers.
+                        headers = [str(v) for v in row if v is not None]
+                        parts.append("  ".join(headers))
+                    else:
+                        if headers:
+                            # Pair each value with its column header for context.
+                            pairs = [
+                                f"{headers[j]}: {v}"
+                                for j, v in enumerate(row)
+                                if v is not None and j < len(headers)
+                            ]
+                            parts.append("  |  ".join(pairs) if pairs else "")
+                        else:
+                            parts.append("  ".join(str(v) for v in row if v is not None))
             wb.close()
-            return "\n".join(parts)
+            return "\n".join(p for p in parts if p.strip())
         return file_path.read_text(encoding="utf-8", errors="replace")
 
     async def _index_file(

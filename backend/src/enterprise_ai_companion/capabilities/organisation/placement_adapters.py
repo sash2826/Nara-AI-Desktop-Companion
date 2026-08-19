@@ -79,13 +79,18 @@ class SqliteGraphScoreAdapter(GraphScorePort):
                 neighbour_rows = await cur.fetchall()
             canonicals |= {row[0] for row in neighbour_rows}
 
+        # Always supplement with filename keywords — the filename is a strong
+        # placement signal (e.g. "Access_Control_Plan_v2" → "access") and
+        # is cheap to compute. The sparse-entity fallback below kept this
+        # conditional, but graph extraction is occasionally incomplete due to
+        # LLM non-determinism or FK races, so we always add it.
+        filename_terms = filename_keywords(file_path)
         if len(canonicals) < _SPARSE_ENTITY_THRESHOLD:
-            filename_terms = filename_keywords(file_path)
             logger.debug(
-                "[PLACEMENT] sparse entity set (%d) for doc=%s — adding filename terms: %s",
+                "[PLACEMENT] sparse entity set (%d) for doc=%s — filename terms: %s",
                 len(canonicals), document_id, sorted(filename_terms),
             )
-            canonicals |= filename_terms
+        canonicals |= filename_terms
 
         return canonicals
 

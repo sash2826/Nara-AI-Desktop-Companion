@@ -54,11 +54,36 @@ _SCORE_GOOD_THRESHOLD = 0.30
 # recommendations for unrelated files that share only generic terms.
 _SCORE_MIN_THRESHOLD = 0.20
 
+# Minimum combined score for the rerank-only fallback path. Higher than
+# _SCORE_MIN_THRESHOLD because there is no graph gate backing this signal —
+# we require the best folder's rerank_norm contribution to be meaningful.
+# 0.25 × rerank_norm >= 0.18 means rerank_norm >= 0.72 (top folder must be
+# clearly the best semantic match, not just marginally ahead).
+_SCORE_RERANK_FALLBACK_THRESHOLD = 0.18
+
+# Minimum raw rerank score the best-ranked folder must reach before the
+# rerank-only fallback is activated. Higher than _RERANK_NORM_FLOOR (0.006)
+# because the fallback has no graph gate backing it — we need a genuinely
+# strong semantic signal, not just distinguishable noise. Calibrated against
+# observed values: genuine matches produce ~0.014–0.016; noise is ~0.004–0.008.
+_RERANK_FALLBACK_MIN_RAW = 0.012
+
+# Minimum ratio of best-folder raw rerank to second-best before the fallback
+# is activated. A genuine semantic match has one folder clearly ahead
+# (observed ~4× for a matched file); an unrelated file has all folders
+# roughly equal (~1.1–1.3×). Setting to 2.5 separates the two populations.
+_RERANK_FALLBACK_RATIO = 2.5
+
 # The graph score must reach this value before the rerank signal is added.
 # Raising from >0.0 to >=0.10 eliminates false positives caused by a single
 # coincidental shared entity (e.g. "photography" linking an equipment guide
 # to a travel folder, or "data" linking a personal document to any project).
 _GRAPH_GATE_THRESHOLD = 0.10
+
+# Minimum raw rerank value the best folder must reach before normalisation is
+# applied. Below this the scores are indistinguishable noise (~0.001–0.004
+# from RRF rank arithmetic) and normalising them would amplify spurious matches.
+_RERANK_NORM_FLOOR = 0.006
 
 # Minimum number of entities that must overlap before a graph score is awarded.
 # Set to 1: ancestor directories are now excluded from candidates, so a single
@@ -70,6 +95,7 @@ _MIN_INTERSECTION_COUNT = 1
 # discriminate between project folders. Filtering them from the overlap
 # computation prevents spurious matches caused by boilerplate vocabulary.
 _GENERIC_TERMS: frozenset[str] = frozenset({
+    # Document / business boilerplate
     "data", "report", "analysis", "management", "system",
     "process", "review", "plan", "strategy", "performance", "service",
     "solution", "information", "project", "team", "work", "business",
@@ -81,6 +107,13 @@ _GENERIC_TERMS: frozenset[str] = frozenset({
     "total", "list", "type", "use", "based", "level", "area",
     "structure", "approach", "objective", "result", "output", "input",
     "value", "quality", "standard", "policy", "procedure", "control",
+    # Additional domain-generic terms that appear across all project types
+    # and create false graph-overlap matches between unrelated folders.
+    "framework", "monitoring", "reporting", "vendor", "supplier",
+    "req",       # requirement abbreviation used as a doc-ID prefix everywhere
+    # Cardinal directions and region labels extracted from spreadsheet columns
+    # (e.g. "Region: North", "Zone: Central") — not project-discriminative.
+    "north", "south", "east", "west", "central", "region", "zone",
 })
 
 
@@ -138,6 +171,11 @@ class PlacementScorer:
     ) -> list[dict[str, Any]]:
         """Score every candidate folder and return up to 3 results sorted by score desc.
 
+        Rerank scores are normalised within this call (best folder = 1.0) so
+        the semantic signal is actually discriminative. Raw RRF values are
+        ~0.005–0.02 and would contribute less than 0.005 to the combined
+        score without normalisation — effectively making rerank a no-op.
+
         Returns a list of dicts suitable for JSON serialisation:
         ``[{"folder": str, "score": float, "label": str}, ...]``
         """
@@ -155,21 +193,45 @@ class PlacementScorer:
             sorted(new_file_canonicals)[:20],
         )
 
-        tasks = [
-            self._score_folder(
-                document_id=document_id,
-                folder_path=folder,
-                new_file_canonicals=new_file_canonicals,
-                graph_gate=graph_gate,
-            )
-            for folder in candidate_folder_paths
-        ]
-        folder_scores: list[FolderScore] = await asyncio.gather(*tasks)
+        # Pass 1 — collect raw (graph_s, rerank_s) for every folder in parallel.
+        raw_pairs: list[tuple[float, float]] = list(
+            await asyncio.gather(*[
+                self._raw_scores(document_id, folder, new_file_canonicals)
+                for folder in candidate_folder_paths
+            ])
+        )
 
-        for fs in folder_scores:
+        # Normalise rerank so the folder with the strongest semantic match
+        # scores 1.0. Only normalise when max raw rerank clears the noise
+        # floor — below it, all RRF scores are indistinguishable and
+        # normalisation would amplify spurious matches.
+        max_rerank = max((r for _, r in raw_pairs), default=0.0)
+
+        # Pass 2 — apply graph gate and compute combined score.
+        folder_scores: list[FolderScore] = []
+        for folder, (graph_s, rerank_s) in zip(candidate_folder_paths, raw_pairs):
+            rerank_norm = (
+                (rerank_s / max_rerank)
+                if max_rerank >= _RERANK_NORM_FLOOR
+                else 0.0
+            )
+            if graph_s < graph_gate:
+                combined = 0.0
+                label = _LABEL_POSSIBLE
+            else:
+                combined = _GRAPH_WEIGHT * graph_s + _RERANK_WEIGHT * rerank_norm
+                label = _label(combined)
+            fs = FolderScore(
+                folder=folder,
+                score=combined,
+                label=label,
+                graph_score=graph_s,
+                rerank_score=rerank_s,
+            )
+            folder_scores.append(fs)
             logger.info(
-                "[PLACEMENT] folder=%s graph=%.4f rerank=%.4f score=%.4f label=%s",
-                fs.folder, fs.graph_score, fs.rerank_score, fs.score, fs.label,
+                "[PLACEMENT] folder=%s graph=%.4f rerank=%.4f rerank_norm=%.4f score=%.4f label=%s",
+                fs.folder, graph_s, rerank_s, rerank_norm, combined, label,
             )
 
         scored = sorted(
@@ -178,10 +240,47 @@ class PlacementScorer:
             reverse=True,
         )
 
+        sorted_reranks = sorted((r for _, r in raw_pairs), reverse=True)
+        second_rerank = sorted_reranks[1] if len(sorted_reranks) > 1 else 0.0
+        rerank_ratio = (max_rerank / second_rerank) if second_rerank > 0 else float("inf")
+
+        if not scored and max_rerank >= _RERANK_FALLBACK_MIN_RAW and rerank_ratio >= _RERANK_FALLBACK_RATIO:
+            # All folders were blocked by the graph gate (no entity overlap) but
+            # one folder stands clearly ahead in semantic similarity (ratio check
+            # ensures a single folder dominates, not all folders being equally noisy).
+            # This catches semantically-placed files whose vocabulary doesn't match
+            # graph entity sets — e.g. a data quality framework belonging in an
+            # analytics folder but sharing no specific entity names with it.
+            logger.info(
+                "[PLACEMENT] Graph gate blocked all %d candidates — rerank-only fallback "
+                "(max_rerank=%.5f ratio=%.2f)",
+                len(folder_scores), max_rerank, rerank_ratio,
+            )
+            fallback_scores: list[FolderScore] = []
+            for folder, (graph_s, rerank_s) in zip(candidate_folder_paths, raw_pairs):
+                rerank_norm = rerank_s / max_rerank
+                combined = _RERANK_WEIGHT * rerank_norm
+                fallback_scores.append(FolderScore(
+                    folder=folder,
+                    score=combined,
+                    label=_label(combined),
+                    graph_score=graph_s,
+                    rerank_score=rerank_s,
+                ))
+                logger.info(
+                    "[PLACEMENT] fallback folder=%s rerank_norm=%.4f score=%.4f",
+                    folder, rerank_norm, combined,
+                )
+            scored = sorted(
+                (fs for fs in fallback_scores if fs.score >= _SCORE_RERANK_FALLBACK_THRESHOLD),
+                key=lambda fs: fs.score,
+                reverse=True,
+            )
+
         if not scored:
             logger.info(
-                "[PLACEMENT] All %d candidate(s) below threshold %.2f — no recommendation",
-                len(folder_scores), _SCORE_MIN_THRESHOLD,
+                "[PLACEMENT] All %d candidate(s) below threshold — no recommendation",
+                len(folder_scores),
             )
 
         return [
@@ -203,6 +302,19 @@ class PlacementScorer:
     # ------------------------------------------------------------------
     # Internal scoring
     # ------------------------------------------------------------------
+
+    async def _raw_scores(
+        self,
+        document_id: str,
+        folder_path: str,
+        new_file_canonicals: set[str],
+    ) -> tuple[float, float]:
+        """Return (graph_s, rerank_s) without applying gate or weighting."""
+        graph_s, rerank_s = await asyncio.gather(
+            self._graph_score(folder_path, new_file_canonicals),
+            self._rerank_port.rerank(document_id, folder_path),
+        )
+        return graph_s, rerank_s
 
     async def _score_folder(
         self,

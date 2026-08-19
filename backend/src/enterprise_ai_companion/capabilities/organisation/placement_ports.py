@@ -35,7 +35,7 @@ def filename_keywords(file_path: str) -> set[str]:
         w for w in words
         if len(w) > 2
         and w not in _FILENAME_STOPWORDS
-        and not re.fullmatch(r"\d{4}", w)
+        and not re.fullmatch(r"\d+", w)
     }
 
 
@@ -46,6 +46,9 @@ def expand_for_matching(canonicals: set[str]) -> set[str]:
     'japan 2026 photography itinerary'. Exact-string matching misses the
     connection to single-word terms like 'japan' stored in other documents.
     Original strings are kept alongside expansions so the set is a superset.
+
+    All-numeric tokens (document IDs, sequence numbers) are excluded — they
+    appear across all folders and generate false graph-overlap matches.
     """
     expanded = set(canonicals)
     for entity in canonicals:
@@ -55,7 +58,7 @@ def expand_for_matching(canonicals: set[str]) -> set[str]:
                 t for t in tokens
                 if len(t) > 2
                 and t not in _FILENAME_STOPWORDS
-                and not re.fullmatch(r"\d{4}", t)
+                and not re.fullmatch(r"\d+", t)
             }
     return expanded
 
