@@ -86,10 +86,13 @@ _GRAPH_GATE_THRESHOLD = 0.10
 _RERANK_NORM_FLOOR = 0.006
 
 # Minimum number of entities that must overlap before a graph score is awarded.
-# Set to 1: ancestor directories are now excluded from candidates, so a single
-# overlapping domain-specific term (e.g. "atlas" linking Atlas_Meeting_Room.pdf
-# to the Atlas-Workplace folder) is a meaningful signal rather than noise.
-_MIN_INTERSECTION_COUNT = 1
+# Set to 2: requires at least two distinct domain-specific terms to overlap
+# between the new file and a candidate folder. A single coincidental match
+# (e.g. "travel" linking a personal travel document to Meridian-Travel, or
+# "renovation" linking a home budget to Redwood-Facilities) is suppressed.
+# Project-name files always have 2+ matching entities; semantic files that
+# genuinely belong to a folder also share multiple domain terms.
+_MIN_INTERSECTION_COUNT = 2
 
 # Generic business/document terms that appear in almost any file and cannot
 # discriminate between project folders. Filtering them from the overlap
