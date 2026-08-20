@@ -18,17 +18,34 @@ const RETRIEVAL_MAX_CHUNKS = 5;
 const RETRIEVAL_MAX_CHARS = 12_000;
 const RETRIEVAL_MIN_RRF_SCORE = 0.01; // min viable RRF: rank-1 semantic-only hit scores ~0.016
 const RETRIEVAL_MIN_RERANK_SCORE = 0.08; // drop chunks with low blended score
-const RETRIEVAL_MIN_COSINE_SCORE = 0.01; // drop chunks with no n-gram overlap with the query
+// Raised from 0.01 — prevents chunks with no meaningful n-gram overlap from passing.
+// The RRF position weight (0.3) can otherwise inflate scores for irrelevant chunks
+// that happen to appear in search results for unrelated general-knowledge queries.
+const RETRIEVAL_MIN_COSINE_SCORE = 0.08;
 
 // Queries shorter than this word count or matching common conversational patterns
 // are assumed to not require document retrieval.
 const RETRIEVAL_MIN_WORDS = 4;
 const CONVERSATIONAL_RE =
-  /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|sure|great|good|bye|goodbye|how are you|what can you do|who are you)\W*$/i;
+  /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|sure|great|good|bye|goodbye|how are you|what can you do|who are you|what('s| is) (the |your )?(time|date|day|weather|temperature)|what time is it|tell me a joke|are you (there|ready|okay)|can you help)\W*$/i;
+
+// Queries that open with a generative verb signal intent to create from the model's
+// own knowledge rather than recall from indexed files.
+const GENERATIVE_RE =
+  /^(write|create|generate|make|build|implement|code|draft|design|produce|give me|show me|explain|describe|define|list|calculate|convert|translate|fix|refactor|optimise|optimize|summarise|summarize|format|rewrite)\b/i;
+
+// Phrases that explicitly anchor a query to the user's indexed documents.
+// When present alongside a generative verb, retrieval is still warranted.
+const DOCUMENT_ANCHOR_RE =
+  /\b(from (the |my |our |this )?(doc(ument)?|file|report|pdf|spec|notes?|meeting|presentation|slide)|based on (the |my |our )?|according to (the |my |our )?|as (described|mentioned|defined|outlined|stated) in|in (the |my |our )?(doc(ument)?|file|report)|\.pdf|\.docx?|\.pptx?|\.txt|\.md)\b/i;
 
 function needsRetrieval(query: string): boolean {
-  if (CONVERSATIONAL_RE.test(query.trim())) return false;
-  if (query.trim().split(/\s+/).length < RETRIEVAL_MIN_WORDS) return false;
+  const trimmed = query.trim();
+  if (CONVERSATIONAL_RE.test(trimmed)) return false;
+  // Skip retrieval for generative queries only when the user is not explicitly
+  // referencing their own documents (e.g. "write a program based on the spec").
+  if (GENERATIVE_RE.test(trimmed) && !DOCUMENT_ANCHOR_RE.test(trimmed)) return false;
+  if (trimmed.split(/\s+/).length < RETRIEVAL_MIN_WORDS) return false;
   return true;
 }
 
