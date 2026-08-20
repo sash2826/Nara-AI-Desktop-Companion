@@ -4,75 +4,69 @@
  * Maps raw palette tokens to semantic roles.
  * All component colors must reference these — never the raw palette directly.
  * Supports light, dark, and system (auto) themes via class and media-query strategies.
- *
- * NOTE: All values are inlined as direct HSL channel triplets to avoid multi-level
- * var() chains that can silently fail in WebView2 when wrapped by Tailwind's hsl().
  */
 
 /* ─── Light Theme ─────────────────────────────────────────────────────────── */
 :root,
 .theme-light {
-  /* Core surfaces — Volvo GPT light: warm grey body, white cards */
-  --background: 240 5% 94%; /* #EFEFEF */
-  --foreground: 222 16% 10%;
+  /* Core surfaces — warm white */
+  --background: 40 33% 98%;
+  --foreground: var(--color-neutral-900);
 
-  /* Card — white panels lift off the light-grey body */
-  --card: 0 0% 100%;
-  --card-foreground: 222 16% 10%;
+  /* Card */
+  --card: 40 40% 99%;
+  --card-foreground: var(--color-neutral-900);
 
   /* Popover / dropdown */
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 16% 10%;
+  --popover: 40 40% 99%;
+  --popover-foreground: var(--color-neutral-900);
 
   /* Layered surfaces */
-  --surface: 0 0% 100%;
-  --surface-elevated: 0 0% 100%;
-  --surface-overlay: 240 5% 97%;
+  --surface: 40 30% 97%;
+  --surface-elevated: 40 40% 99%;
+  --surface-overlay: 40 33% 98%;
 
-  /* Primary action — Volvo Blue #2D6FB5 */
-  --primary: 211 60% 44%;
-  --primary-foreground: 0 0% 100%;
+  /* Primary action */
+  --primary: var(--color-primary-600);
+  --primary-foreground: var(--color-neutral-0);
 
   /* Secondary action */
-  --secondary: 220 15% 94%;
-  --secondary-foreground: 220 13% 18%;
+  --secondary: 40 24% 93%;
+  --secondary-foreground: var(--color-neutral-800);
 
   /* Muted / subdued */
-  --muted: 220 15% 94%;
-  --muted-foreground: 220 7% 46%;
+  --muted: 40 24% 93%;
+  --muted-foreground: var(--color-neutral-600);
 
   /* Accent */
-  --accent: 211 100% 96%;
-  --accent-foreground: 211 64% 37%;
+  --accent: var(--color-primary-50);
+  --accent-foreground: var(--color-primary-700);
 
   /* Destructive */
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
+  --destructive: var(--color-destructive-600);
+  --destructive-foreground: var(--color-neutral-0);
 
   /* Semantic status */
-  --success: 142 72% 38%;
-  --success-foreground: 0 0% 100%;
-  --warning: 32 95% 44%;
-  --warning-foreground: 0 0% 100%;
-  --info: 200 98% 39%;
-  --info-foreground: 0 0% 100%;
+  --success: var(--color-success-600);
+  --success-foreground: var(--color-neutral-0);
+  --warning: var(--color-warning-600);
+  --warning-foreground: var(--color-neutral-0);
+  --info: var(--color-info-600);
+  --info-foreground: var(--color-neutral-0);
 
   /* Borders & inputs */
-  --border: 220 12% 86%;
-  --input: 220 12% 86%;
-  --ring: 211 60% 44%;
+  --border: 38 14% 74%;
+  --input: 38 14% 74%;
+  --ring: var(--color-primary-500);
 
-  /* Sidebar — near-black rail matching Volvo GPT, even in light mode */
-  --sidebar: 0 0% 10%; /* #1A1A1A */
-  --sidebar-foreground: 220 12% 86%;
-  --sidebar-border: 0 0% 15%;
-  --sidebar-accent: 0 0% 14%;
-  --sidebar-accent-foreground: 220 15% 94%;
+  /* Sidebar */
+  --sidebar: 40 30% 97%;
+  --sidebar-foreground: var(--color-neutral-800);
+  --sidebar-border: 38 15% 85%;
+  --sidebar-accent: 40 24% 92%;
+  --sidebar-accent-foreground: var(--color-neutral-800);
 
-  /* Navigation icon — theme-sensitive search colour */
-  --nav-search: 27 79% 60%;
-
-  /* Border radius (semantic default) */
+  /* Border radius (semantic default) — Volvo GPT soft rounding */
   --radius: var(--radius-lg);
 
   /* Elevation shadows — light */
@@ -86,82 +80,79 @@
     0 4px 8px hsl(var(--shadow-color) / 0.08), 0 8px 24px hsl(var(--shadow-color) / 0.14);
 
   /* Focus ring */
-  --focus-ring-color: hsl(211 60% 44% / 0.5);
+  --focus-ring-color: hsl(var(--color-primary-500) / 0.5);
   --focus-ring-width: 3px;
 
   /* Scrollbar */
-  --scrollbar-thumb: hsl(220 10% 75%);
+  --scrollbar-thumb: hsl(var(--color-neutral-300));
   --scrollbar-track: transparent;
 }
 
 /* ─── Dark Theme ──────────────────────────────────────────────────────────── */
 .dark,
 .theme-dark {
-  /* Core surfaces — Volvo GPT dark: near-black body, slightly lighter cards */
-  --background: 0 0% 8%; /* #141414 */
-  --foreground: 220 15% 94%;
+  /* Core surfaces — Claude warm dark */
+  --background: 36 6% 15%;
+  --foreground: 45 22% 89%;
 
-  /* Card — #1C1C1C lifts off the #141414 body */
-  --card: 0 0% 11%; /* #1C1C1C */
-  --card-foreground: 220 15% 94%;
+  /* Card */
+  --card: 36 6% 18%;
+  --card-foreground: 45 22% 89%;
 
   /* Popover / dropdown */
-  --popover: 0 0% 11%;
-  --popover-foreground: 220 15% 94%;
+  --popover: 36 6% 18%;
+  --popover-foreground: 45 22% 89%;
 
   /* Layered surfaces */
-  --surface: 0 0% 11%;
-  --surface-elevated: 0 0% 14%;
-  --surface-overlay: 0 0% 10%;
+  --surface: 36 6% 15%;
+  --surface-elevated: 36 6% 19%;
+  --surface-overlay: 36 6% 17%;
 
-  /* Primary action — slightly brighter Volvo Blue for dark-mode contrast */
-  --primary: 211 67% 55%;
-  --primary-foreground: 0 0% 100%;
+  /* Primary action — Claude coral */
+  --primary: 17 60% 60%;
+  --primary-foreground: 30 12% 12%;
 
   /* Secondary action */
-  --secondary: 0 0% 16%;
-  --secondary-foreground: 220 12% 86%;
+  --secondary: 36 5% 22%;
+  --secondary-foreground: 45 20% 88%;
 
   /* Muted / subdued */
-  --muted: 0 0% 16%;
-  --muted-foreground: 220 8% 60%;
+  --muted: 36 5% 22%;
+  --muted-foreground: 40 8% 62%;
 
   /* Accent */
-  --accent: 211 72% 15%;
-  --accent-foreground: 211 72% 65%;
+  --accent: 36 6% 22%;
+  --accent-foreground: 45 22% 89%;
 
   /* Destructive */
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
+  --destructive: var(--color-destructive-500);
+  --destructive-foreground: var(--color-neutral-0);
 
   /* Semantic status */
-  --success: 142 71% 45%;
-  --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 0 0% 100%;
-  --info: 199 89% 48%;
-  --info-foreground: 0 0% 100%;
+  --success: var(--color-success-500);
+  --success-foreground: var(--color-neutral-0);
+  --warning: var(--color-warning-500);
+  --warning-foreground: var(--color-neutral-0);
+  --info: var(--color-info-500);
+  --info-foreground: var(--color-neutral-0);
 
   /* Borders & inputs */
-  --border: 0 0% 18%;
-  --input: 0 0% 18%;
-  --ring: 211 67% 55%;
+  --border: 36 6% 24%;
+  --input: 36 6% 24%;
+  --ring: 17 55% 58%;
 
-  /* Sidebar — same near-black rail as light mode */
-  --sidebar: 0 0% 10%; /* #1A1A1A */
-  --sidebar-foreground: 220 12% 86%;
-  --sidebar-border: 0 0% 15%;
-  --sidebar-accent: 0 0% 14%;
-  --sidebar-accent-foreground: 220 15% 94%;
+  /* Sidebar */
+  --sidebar: 40 6% 11%;
+  --sidebar-foreground: 40 10% 78%;
+  --sidebar-border: 36 6% 20%;
+  --sidebar-accent: 36 6% 20%;
+  --sidebar-accent-foreground: 45 22% 89%;
 
-  /* Navigation icon — theme-sensitive search colour */
-  --nav-search: 12 48% 52%;
-
-  /* Border radius (semantic default) */
+  /* Border radius (semantic default) — Volvo GPT soft rounding */
   --radius: var(--radius-lg);
 
   /* Elevation shadows — dark */
-  --shadow-color: 0deg 0% 0%;
+  --shadow-color: 30deg 18% 3%;
   --shadow-elevation-1: 0 1px 2px hsl(var(--shadow-color) / 0.4);
   --shadow-elevation-2:
     0 1px 2px hsl(var(--shadow-color) / 0.3), 0 2px 6px hsl(var(--shadow-color) / 0.5);
@@ -171,51 +162,51 @@
     0 4px 8px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.6);
 
   /* Focus ring */
-  --focus-ring-color: hsl(211 67% 55% / 0.5);
+  --focus-ring-color: hsl(17 55% 58% / 0.5);
 
   /* Scrollbar */
-  --scrollbar-thumb: hsl(0 0% 22%);
+  --scrollbar-thumb: hsl(36 6% 34%);
   --scrollbar-track: transparent;
 }
 
 /* ─── System theme (auto) ─────────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   .theme-system {
-    --background: 0 0% 8%;
-    --foreground: 220 15% 94%;
-    --card: 0 0% 11%;
-    --card-foreground: 220 15% 94%;
-    --popover: 0 0% 11%;
-    --popover-foreground: 220 15% 94%;
-    --surface: 0 0% 11%;
-    --surface-elevated: 0 0% 14%;
-    --surface-overlay: 0 0% 10%;
-    --primary: 211 67% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 16%;
-    --secondary-foreground: 220 12% 86%;
-    --muted: 0 0% 16%;
-    --muted-foreground: 220 8% 60%;
-    --accent: 211 72% 15%;
-    --accent-foreground: 211 72% 65%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 211 67% 55%;
-    --sidebar: 0 0% 10%;
-    --sidebar-foreground: 220 12% 86%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 220 15% 94%;
-    --nav-search: 12 48% 52%;
-    --shadow-color: 0deg 0% 0%;
+    /* Core surfaces — Claude warm dark */
+    --background: 36 6% 15%;
+    --foreground: 45 22% 89%;
+    --card: 36 6% 18%;
+    --card-foreground: 45 22% 89%;
+    --popover: 36 6% 18%;
+    --popover-foreground: 45 22% 89%;
+    --surface: 36 6% 15%;
+    --surface-elevated: 36 6% 19%;
+    --surface-overlay: 36 6% 17%;
+    --primary: 17 60% 60%;
+    --primary-foreground: 30 12% 12%;
+    --secondary: 36 5% 22%;
+    --secondary-foreground: 45 20% 88%;
+    --muted: 36 5% 22%;
+    --muted-foreground: 40 8% 62%;
+    --accent: 36 6% 22%;
+    --accent-foreground: 45 22% 89%;
+    --destructive: var(--color-destructive-500);
+    --destructive-foreground: var(--color-neutral-0);
+    --success: var(--color-success-500);
+    --success-foreground: var(--color-neutral-0);
+    --warning: var(--color-warning-500);
+    --warning-foreground: var(--color-neutral-0);
+    --info: var(--color-info-500);
+    --info-foreground: var(--color-neutral-0);
+    --border: 36 6% 24%;
+    --input: 36 6% 24%;
+    --ring: 17 55% 58%;
+    --sidebar: 40 6% 11%;
+    --sidebar-foreground: 40 10% 78%;
+    --sidebar-border: 36 6% 20%;
+    --sidebar-accent: 36 6% 20%;
+    --sidebar-accent-foreground: 45 22% 89%;
+    --shadow-color: 30deg 18% 3%;
     --shadow-elevation-1: 0 1px 2px hsl(var(--shadow-color) / 0.4);
     --shadow-elevation-2:
       0 1px 2px hsl(var(--shadow-color) / 0.3), 0 2px 6px hsl(var(--shadow-color) / 0.5);
@@ -223,7 +214,7 @@
       0 2px 4px hsl(var(--shadow-color) / 0.35), 0 4px 12px hsl(var(--shadow-color) / 0.55);
     --shadow-elevation-4:
       0 4px 8px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.6);
-    --focus-ring-color: hsl(211 67% 55% / 0.5);
-    --scrollbar-thumb: hsl(0 0% 22%);
+    --focus-ring-color: hsl(17 55% 58% / 0.5);
+    --scrollbar-thumb: hsl(36 6% 34%);
   }
 }

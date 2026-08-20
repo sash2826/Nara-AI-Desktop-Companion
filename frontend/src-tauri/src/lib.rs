@@ -8,6 +8,9 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 #[cfg(target_os = "windows")]
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
+mod auth;
+mod auth_config;
+
 // ─── App state ────────────────────────────────────────────────────────────────
 
 /// Shared application state injected into every Tauri command.
@@ -20,6 +23,9 @@ pub struct AppState {
     pub ipc_token: Mutex<Option<String>>,
     /// Handle to the Python child process for lifecycle management.
     pub sidecar_process: Mutex<Option<Child>>,
+    /// Current Azure AD access token (and refresh token + expiry).
+    /// Populated by `auth_check` on app open or `auth_login` on first login.
+    pub azure_token: Mutex<Option<auth::AzureTokenData>>,
 }
 
 impl AppState {
@@ -28,6 +34,7 @@ impl AppState {
             sidecar_port: Mutex::new(None),
             ipc_token: Mutex::new(None),
             sidecar_process: Mutex::new(None),
+            azure_token: Mutex::new(None),
         }
     }
 }
@@ -346,15 +353,28 @@ fn ipc_token(state: &AppState) -> Option<String> {
 /// but unauthenticated — the middleware on the Python side only enforces the
 /// token when `EAC_IPC_SECRET` is set.
 fn ipc_client(state: &AppState) -> reqwest::Client {
-    let mut builder = reqwest::Client::builder();
+    let mut headers = reqwest::header::HeaderMap::new();
+
     if let Some(token) = ipc_token(state) {
-        let mut headers = reqwest::header::HeaderMap::new();
         if let Ok(val) = reqwest::header::HeaderValue::from_str(&token) {
             headers.insert("X-EAC-Token", val);
         }
-        builder = builder.default_headers(headers);
     }
-    builder.build().unwrap_or_default()
+
+    // Forward the Azure AD access token so the Python backend can use it
+    // as the Authorization: Bearer header when calling APIM.
+    if let Some(azure) = state.azure_token.lock().unwrap().as_ref() {
+        if !azure.is_expired() {
+            if let Ok(val) = reqwest::header::HeaderValue::from_str(&azure.access_token) {
+                headers.insert("X-Azure-Token", val);
+            }
+        }
+    }
+
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap_or_default()
 }
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
@@ -1863,6 +1883,10 @@ pub fn run() {
             store_credential,
             load_credential,
             delete_credential,
+            auth::auth_check,
+            auth::auth_login,
+            auth::auth_logout,
+            auth::auth_get_token,
             get_orb_position,
             set_orb_position,
             focus_main_window,

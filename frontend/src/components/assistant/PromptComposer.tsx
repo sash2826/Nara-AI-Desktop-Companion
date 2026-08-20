@@ -1,8 +1,11 @@
 import { useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { RefreshCw, Square } from "lucide-react";
 import { PromptInput } from "./PromptInput";
 import { SendButton } from "./SendButton";
+import { AttachmentButton } from "./AttachmentButton";
 import { QuickActions } from "./QuickActions";
+import { useSettingsStore } from "@/store/settingsStore";
 import { cn } from "@/lib/utils";
 
 interface PromptComposerProps {
@@ -11,6 +14,10 @@ interface PromptComposerProps {
   isTyping: boolean;
   onChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
+  onClear: () => void;
+  hasMessages: boolean;
+  suggestions?: string[];
   className?: string;
 }
 
@@ -20,10 +27,15 @@ export function PromptComposer({
   isTyping,
   onChange,
   onSend,
+  onStop,
+  onClear,
+  hasMessages,
+  suggestions,
   className,
 }: PromptComposerProps) {
   const isBusy = isStreaming || isTyping;
   const canSend = value.trim().length > 0 && !isBusy;
+  const model = useSettingsStore((s) => s.settings.aiProvider.model);
 
   const handleQuickAction = useCallback(
     (prompt: string) => {
@@ -38,7 +50,7 @@ export function PromptComposer({
       role="region"
       aria-label="Message composer"
     >
-      {/* Quick action chips — hidden while busy */}
+      {/* Suggestion chips — hidden while busy */}
       <AnimatePresence>
         {!isBusy && (
           <motion.div
@@ -47,29 +59,102 @@ export function PromptComposer({
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.15 }}
           >
-            <QuickActions onSelect={handleQuickAction} disabled={isBusy} />
+            <QuickActions
+              onSelect={handleQuickAction}
+              disabled={isBusy}
+              suggestions={suggestions}
+            />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Input row — pill-shaped Volvo GPT style */}
-      <div className="px-4 py-3 border-t border-border">
-        <div className="flex items-end gap-2 rounded-full border border-border bg-muted/50 px-4 py-2 transition-colors focus-within:border-ring focus-within:bg-background">
+      {/* Input pill */}
+      <div className="px-4 pb-2 pt-1">
+        <div
+          className={cn(
+            "flex items-end gap-2 rounded-[1.75rem] border border-border bg-muted/40 px-2.5 py-1.5",
+            "transition-colors duration-fast focus-within:border-ring focus-within:bg-background"
+          )}
+        >
+          {/* Left side: attachment + clear */}
+          <div className="mb-0.5 flex items-center gap-1">
+            <AttachmentButton />
+
+            <AnimatePresence>
+              {hasMessages && !isBusy && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15 }}
+                  type="button"
+                  onClick={onClear}
+                  aria-label="Clear conversation"
+                  title="Clear conversation"
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full",
+                    "text-muted-foreground/60 transition-colors duration-fast",
+                    "hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <RefreshCw size={13} strokeWidth={1.8} />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+
           <PromptInput
             value={value}
             onChange={onChange}
             onSend={onSend}
             disabled={isBusy}
-            className="flex-1 border-none bg-transparent p-0 shadow-none focus-visible:ring-0"
+            bare
+            className="flex-1"
           />
-          <SendButton canSend={canSend} isStreaming={isStreaming} onSend={onSend} />
+
+          {/* Right side: stop (when busy) or send (when idle) */}
+          <div className="mb-0.5">
+            <AnimatePresence mode="wait">
+              {isBusy ? (
+                <motion.button
+                  key="stop"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.12 }}
+                  type="button"
+                  onClick={onStop}
+                  aria-label="Stop generation"
+                  title="Stop generation"
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full",
+                    "bg-foreground text-background transition-colors duration-fast",
+                    "hover:bg-foreground/80"
+                  )}
+                >
+                  <Square size={11} strokeWidth={0} fill="currentColor" />
+                </motion.button>
+              ) : (
+                <motion.div
+                  key="send"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.12 }}
+                >
+                  <SendButton canSend={canSend} isStreaming={false} onSend={onSend} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
-      {/* Keyboard hint */}
+      {/* Model name + disclaimer */}
       <p className="pb-2 text-center text-2xs text-muted-foreground/50">
-        <kbd className="font-mono">Enter</kbd> to send ·{" "}
-        <kbd className="font-mono">Shift+Enter</kbd> for new line
+        {model && <span className="font-medium text-muted-foreground/70">{model}</span>}
+        {model && " · "}
+        Nara can make mistakes — verify important information.
       </p>
     </div>
   );

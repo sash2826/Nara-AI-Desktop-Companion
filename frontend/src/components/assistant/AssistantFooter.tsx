@@ -7,6 +7,10 @@ interface AssistantFooterProps {
   isTyping: boolean;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
+  onClear: () => void;
+  hasMessages: boolean;
+  suggestions?: string[];
   className?: string;
 }
 
@@ -16,6 +20,10 @@ export function AssistantFooter({
   isTyping,
   onInputChange,
   onSend,
+  onStop,
+  onClear,
+  hasMessages,
+  suggestions,
   className,
 }: AssistantFooterProps) {
   return (
@@ -26,6 +34,10 @@ export function AssistantFooter({
         isTyping={isTyping}
         onChange={onInputChange}
         onSend={onSend}
+        onStop={onStop}
+        onClear={onClear}
+        hasMessages={hasMessages}
+        suggestions={suggestions}
       />
     </footer>
   );

@@ -1,17 +1,18 @@
 """Thin async wrapper around the Volvo GenAI Hub (OpenAI-compatible) API.
 
-Credentials come exclusively from environment variables:
-    EAC_APIM_ENDPOINT        Base URL, e.g. https://api.volvogenaihubqa.volvogroup.net
-    EAC_APIM_SUBSCRIPTION_KEY  Used as the ``api-key`` header value
+Auth priority (evaluated per request):
+  1. Azure AD bearer token — forwarded by Tauri via X-Azure-Token header
+     and stored in _azure_token_var by AzureTokenMiddleware in app.py.
+  2. APIM subscription key — EAC_APIM_SUBSCRIPTION_KEY env var (legacy / dev fallback).
 
-The model deployment ID is also configurable:
-    EAC_LLM_MODEL_ID         Default: gpt-5.4-mini_gb_2026-03-17
+The model deployment ID is configurable via EAC_LLM_MODEL_ID.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from contextvars import ContextVar
 
 import httpx
 
@@ -24,14 +25,31 @@ _RETRY_BACKOFF = [1.0, 2.0, 4.0]  # seconds between attempts
 
 _API_VERSION = "preview"
 
+# Set by AzureTokenMiddleware for the duration of each request.
+_azure_token_var: ContextVar[str] = ContextVar("azure_token", default="")
+
 
 def _base_url() -> str:
     endpoint = get_config().apim_endpoint
     return f"{endpoint.rstrip('/')}/azure-openai/v1"
 
 
-def _api_key() -> str:
-    return get_config().apim_subscription_key.get_secret_value()
+def _auth_headers() -> dict[str, str]:
+    """Return the correct auth header for the current request context."""
+    azure_token = _azure_token_var.get()
+    if azure_token:
+        return {"Authorization": f"Bearer {azure_token}"}
+
+    # Fallback: APIM subscription key (dev / legacy).
+    cfg = get_config()
+    if cfg.apim_subscription_key:
+        return {"api-key": cfg.apim_subscription_key.get_secret_value()}
+
+    logger.warning(
+        "No Azure AD token and no APIM subscription key configured — "
+        "APIM calls will likely fail with 401."
+    )
+    return {}
 
 
 def _model_id() -> str:
@@ -46,13 +64,12 @@ async def chat_complete(
     """Send a chat completion request and return the assistant message content.
 
     Raises:
-        EnvironmentError: If required environment variables are not set.
         httpx.HTTPStatusError: If the API returns a non-2xx status.
     """
     url = f"{_base_url()}/chat/completions?api-version={_API_VERSION}"
     headers = {
-        "api-key": _api_key(),
         "Content-Type": "application/json",
+        **_auth_headers(),
     }
     payload = {
         "model": _model_id(),
@@ -77,7 +94,10 @@ async def chat_complete(
                 delay = _RETRY_BACKOFF[attempt]
                 logger.warning(
                     "LLM API returned %s — retrying in %.0fs (attempt %d/%d)",
-                    response.status_code, delay, attempt + 1, _MAX_RETRIES,
+                    response.status_code,
+                    delay,
+                    attempt + 1,
+                    _MAX_RETRIES,
                 )
                 await asyncio.sleep(delay)
         else:

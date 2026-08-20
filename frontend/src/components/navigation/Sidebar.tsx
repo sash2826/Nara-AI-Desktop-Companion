@@ -1,15 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  Home,
-  MessageSquare,
-  LayoutDashboard,
-  Search,
-  Network,
-  Zap,
-  Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from "lucide-react";
+import { Home, MessageSquare, LayoutDashboard, Search, Network, Zap, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NavItem } from "./NavItem";
 import { NAV_ITEMS } from "./NAV_ITEMS";
@@ -30,7 +20,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar } = useLayout();
+  const { sidebarCollapsed } = useLayout();
   const { activeItem, setActiveItem } = useNavigationStore();
 
   const mainItems = NAV_ITEMS.filter((item) => item.id !== "settings");
@@ -47,26 +37,8 @@ export function Sidebar() {
       )}
       aria-label="Primary navigation"
     >
-      {/* Header — toggle only; branding lives in the TopBar */}
-      <div className="flex h-12 flex-shrink-0 items-center justify-center border-b border-sidebar-border px-3">
-        <button
-          onClick={toggleSidebar}
-          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-fast",
-            "text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          )}
-        >
-          {sidebarCollapsed ? (
-            <PanelLeftOpen size={15} strokeWidth={1.8} />
-          ) : (
-            <PanelLeftClose size={15} strokeWidth={1.8} />
-          )}
-        </button>
-      </div>
-
       {/* Main navigation */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2 scroll-y">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2 pt-3 scroll-y">
         {mainItems.map((item) => {
           const icon = ICON_MAP[item.iconName];
           if (!icon) return null;

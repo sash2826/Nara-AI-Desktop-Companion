@@ -94,7 +94,7 @@ export function GlassPrompt({ isOpen, onClose, children, className }: GlassPromp
           onClick={handleBackdropClick}
           aria-modal="true"
           role="dialog"
-          aria-label="Nara"
+          aria-label="AI Companion prompt"
         >
           {/* Subtle backdrop tint — does not obscure desktop content */}
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40" aria-hidden="true" />
@@ -108,10 +108,10 @@ export function GlassPrompt({ isOpen, onClose, children, className }: GlassPromp
             exit="exit"
             className={cn(
               "relative z-10 w-full max-w-2xl mx-4",
-              "rounded-2xl border border-white/20 dark:border-white/[0.08]",
-              "bg-white/85 dark:bg-[hsl(var(--color-volvo-bg-dark))]/90",
+              "rounded-2xl border border-white/20 dark:border-white/10",
+              "bg-white/80 dark:bg-neutral-900/80",
               "backdrop-blur-xl",
-              "shadow-2xl shadow-black/20 dark:shadow-black/60",
+              "shadow-2xl shadow-black/20 dark:shadow-black/50",
               "overflow-hidden",
               className
             )}

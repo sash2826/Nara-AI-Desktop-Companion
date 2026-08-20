@@ -21,7 +21,7 @@ export function PlaceholderPage({
         className
       )}
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
         <Icon size={24} className="text-muted-foreground" strokeWidth={1.5} />
       </div>
       <div className="max-w-xs space-y-1">

@@ -11,7 +11,8 @@ Usage:
     from enterprise_ai_companion.infrastructure.config import get_config
 
     config = get_config()
-    key = config.apim_subscription_key.get_secret_value()
+    # Auth is now Azure AD bearer token (forwarded via X-Azure-Token header).
+    # apim_subscription_key is optional — kept for dev / legacy fallback.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ class AppConfig(BaseSettings):
 
     # ── LLM / APIM ──────────────────────────────────────────────────────────
     apim_endpoint: str = Field(..., alias="EAC_APIM_ENDPOINT")
-    apim_subscription_key: SecretStr = Field(..., alias="EAC_APIM_SUBSCRIPTION_KEY")
+    # Subscription key is optional when Azure AD bearer tokens are used instead.
+    apim_subscription_key: SecretStr | None = Field(None, alias="EAC_APIM_SUBSCRIPTION_KEY")
     llm_model_id: str = Field("gpt-5.4-mini_gb_2026-03-17", alias="EAC_LLM_MODEL_ID")
 
     # ── Graph provider ───────────────────────────────────────────────────────

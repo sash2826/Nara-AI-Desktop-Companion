@@ -1,5 +1,5 @@
 /**
- * LLM provider configuration for Nara.
+ * LLM provider configuration for the Enterprise AI Companion.
  *
  * Provider selection is automatic:
  *

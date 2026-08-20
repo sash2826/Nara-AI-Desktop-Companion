@@ -10,13 +10,13 @@ import { WorkspaceContainer } from "./WorkspaceContainer";
  *
  * Structure:
  *   ┌─────────────────────────────────────────┐
- *   │ Sidebar │ TopBar                        │
- *   │         ├───────────────────────────────│
- *   │         │ WorkspaceContainer            │
+ *   │ TopBar (full width)                      │
+ *   ├─────────┬───────────────────────────────│
+ *   │ Sidebar │ WorkspaceContainer            │
  *   │         │   └─ MainContent (active page)│
  *   │         ├───────────────────────────────│
  *   │         │ StatusBar                     │
- *   └─────────────────────────────────────────┘
+ *   └─────────┴───────────────────────────────┘
  *
  * Sidebar animates its width; the rest of the shell fills the remaining space.
  */
@@ -26,20 +26,22 @@ export function AppShell() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      className="flex h-full w-full overflow-hidden bg-background"
+      className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
-      {/* Sidebar */}
-      <Sidebar />
+      {/* Full-width top bar */}
+      <TopBar />
 
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopBar />
+      {/* Sidebar + main column */}
+      <div className="flex min-w-0 flex-1 overflow-hidden">
+        <Sidebar />
 
-        <WorkspaceContainer>
-          <MainContent />
-        </WorkspaceContainer>
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <WorkspaceContainer>
+            <MainContent />
+          </WorkspaceContainer>
 
-        <StatusBar />
+          <StatusBar />
+        </div>
       </div>
     </motion.div>
   );

@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import { OrbWindow } from "./windows/orb/OrbWindow";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/source-serif-4";
 import "./styles/globals.css";
 
 // Determine which window we're running in before rendering.

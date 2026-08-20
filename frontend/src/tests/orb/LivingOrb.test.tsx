@@ -17,7 +17,7 @@ describe("LivingOrb", () => {
 
   it("has the expected accessible label", () => {
     renderOrb();
-    expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nara" })).toBeInTheDocument();
   });
 
   // ── OrbState CSS classes ───────────────────────────────────────────────────

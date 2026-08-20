@@ -8,6 +8,7 @@ interface PromptInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   disabled?: boolean;
+  bare?: boolean;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export function PromptInput({
   onChange,
   onSend,
   disabled = false,
+  bare = false,
   className,
 }: PromptInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -65,12 +67,16 @@ export function PromptInput({
         aria-describedby="char-count"
         aria-multiline="true"
         className={cn(
-          "w-full resize-none rounded-xl border border-border bg-background px-4 py-3 pr-12",
-          "text-sm text-foreground placeholder:text-muted-foreground",
+          "w-full resize-none text-sm text-foreground placeholder:text-muted-foreground",
           "transition-all duration-base",
-          "focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          "scrollbar-thin"
+          "scrollbar-thin",
+          bare
+            ? "border-0 bg-transparent px-2 py-2 focus:outline-none focus:ring-0"
+            : cn(
+                "rounded-xl border border-border bg-background px-4 py-3 pr-12",
+                "focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              )
         )}
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         whileFocus={{ scale: 1 }}

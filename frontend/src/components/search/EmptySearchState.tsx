@@ -11,7 +11,7 @@ export function EmptySearchState({ hasSearched, query, mode }: EmptySearchStateP
   if (!hasSearched) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
           <Search size={24} className="text-muted-foreground" strokeWidth={1.5} />
         </div>
         <div className="max-w-xs space-y-1">
@@ -27,7 +27,7 @@ export function EmptySearchState({ hasSearched, query, mode }: EmptySearchStateP
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
         <SearchX size={24} className="text-muted-foreground" strokeWidth={1.5} />
       </div>
       <div className="max-w-xs space-y-1">

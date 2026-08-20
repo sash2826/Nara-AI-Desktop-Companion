@@ -20,7 +20,7 @@ export function SendButton({ canSend, isStreaming, onSend, onStop, className }: 
         title="Stop generating"
         whileTap={{ scale: 0.92 }}
         className={cn(
-          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg",
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
           "bg-foreground text-background transition-colors duration-fast hover:opacity-80",
           className
         )}
@@ -39,7 +39,7 @@ export function SendButton({ canSend, isStreaming, onSend, onStop, className }: 
       title="Send message"
       whileTap={canSend ? { scale: 0.92 } : {}}
       className={cn(
-        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors duration-fast",
+        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors duration-fast",
         canSend
           ? "bg-primary text-primary-foreground hover:opacity-90"
           : "bg-muted text-muted-foreground cursor-not-allowed",

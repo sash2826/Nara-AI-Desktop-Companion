@@ -287,6 +287,28 @@ class TokenVerificationMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class AzureTokenMiddleware(BaseHTTPMiddleware):
+    """Extract the Azure AD access token from X-Azure-Token and store it in a
+    ContextVar so deep service layers (e.g. llm_client) can forward it to APIM
+    without requiring the request object to be threaded through every call.
+
+    JWT signature/claims validation is deferred until the App Registration exists
+    and the JWKS endpoint is known. The IPC channel already ensures only the local
+    Tauri app can reach this backend.
+    """
+
+    async def dispatch(
+        self, request: StarletteRequest, call_next  # type: ignore[override]
+    ):
+        from enterprise_ai_companion.capabilities.ai import llm_client as _llm
+        token = request.headers.get("X-Azure-Token")
+        token_ctx = _llm._azure_token_var.set(token or "")
+        try:
+            return await call_next(request)
+        finally:
+            _llm._azure_token_var.reset(token_ctx)
+
+
 app = FastAPI(
     title="Enterprise AI Companion",
     version="0.1.0",
@@ -294,6 +316,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(AzureTokenMiddleware)
 app.add_middleware(TokenVerificationMiddleware)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 

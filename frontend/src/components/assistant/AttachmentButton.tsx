@@ -13,7 +13,7 @@ export function AttachmentButton({ className }: AttachmentButtonProps) {
       title="Attach file (coming soon)"
       disabled
       className={cn(
-        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors duration-fast",
+        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors duration-fast",
         "text-muted-foreground/50 cursor-not-allowed",
         className
       )}

@@ -65,8 +65,8 @@ export function PluginSettings() {
         <h3 className="text-sm font-semibold text-foreground">Plugins</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Installed plugins extend indexing, text processing, and search. Drop a plugin folder into{" "}
-          <code className="font-mono">%APPDATA%\Nara\plugins\</code> and restart the application to
-          register it.
+          <code className="font-mono">%APPDATA%\Enterprise AI Companion\plugins\</code> and restart
+          the application to register it.
         </p>
       </div>
 
@@ -88,8 +88,9 @@ export function PluginSettings() {
           <div>
             <p className="text-sm font-medium text-foreground">No plugins installed</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Drop a plugin folder into <code className="font-mono">%APPDATA%\Nara\plugins\</code>{" "}
-              and restart.
+              Drop a plugin folder into{" "}
+              <code className="font-mono">%APPDATA%\Enterprise AI Companion\plugins\</code> and
+              restart.
             </p>
           </div>
         </div>

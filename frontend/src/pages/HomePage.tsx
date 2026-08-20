@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/hooks/useDashboard";
 import { StatTile } from "@/components/home/StatTile";
 import { RecentFilesList } from "@/components/home/RecentFilesList";
-import { SuggestedQueries } from "@/components/home/SuggestedQueries";
 
 function StatsSkeleton() {
   return (
@@ -24,15 +23,14 @@ function StatsSkeleton() {
 }
 
 export function HomePage() {
-  const { stats, suggestions, isLoadingStats, isLoadingSuggestions, statsError, refresh } =
-    useDashboard();
+  const { stats, isLoadingStats, statsError, refresh } = useDashboard();
 
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Home</h1>
+          <h1 className="text-lg font-semibold text-foreground">Workspace</h1>
           <p className="text-sm text-muted-foreground">Overview of your indexed knowledge base.</p>
         </div>
         <Button
@@ -70,28 +68,19 @@ export function HomePage() {
         </div>
       ) : null}
 
-      {/* Lower two-column section */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent files */}
-        <section>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Recently Indexed</h2>
-          {isLoadingStats ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-10 animate-pulse rounded-lg bg-muted/40" />
-              ))}
-            </div>
-          ) : (
-            <RecentFilesList files={stats?.recent_files ?? []} />
-          )}
-        </section>
-
-        {/* Suggested queries */}
-        <section>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Search Suggestions</h2>
-          <SuggestedQueries suggestions={suggestions} isLoading={isLoadingSuggestions} />
-        </section>
-      </div>
+      {/* Recently indexed files */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Recently Indexed</h2>
+        {isLoadingStats ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-muted/40" />
+            ))}
+          </div>
+        ) : (
+          <RecentFilesList files={stats?.recent_files ?? []} />
+        )}
+      </section>
     </div>
   );
 }

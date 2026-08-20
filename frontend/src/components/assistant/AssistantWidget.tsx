@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import { motion } from "framer-motion";
-import { AssistantHeader } from "./AssistantHeader";
 import { ConversationView } from "./ConversationView";
 import { AssistantFooter } from "./AssistantFooter";
 import { useConversation } from "@/hooks/useConversation";
+import { useDashboard } from "@/hooks/useDashboard";
 import { cn } from "@/lib/utils";
 
 interface AssistantWidgetProps {
@@ -22,6 +22,8 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
     sendMessage,
   } = useConversation();
 
+  const { suggestions } = useDashboard();
+
   const handleSend = useCallback(() => {
     void sendMessage(inputValue);
   }, [sendMessage, inputValue]);
@@ -35,14 +37,7 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
       role="main"
       aria-label="AI Assistant"
     >
-      <AssistantHeader
-        isTyping={isTyping}
-        isStreaming={isStreaming}
-        onCancelStream={cancelStream}
-        onClearConversation={clearMessages}
-      />
-
-      <ConversationView messages={messages} isTyping={isTyping} />
+      <ConversationView messages={messages} isTyping={isTyping} onQuickPrompt={setInputValue} />
 
       <AssistantFooter
         inputValue={inputValue}
@@ -50,6 +45,10 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
         isTyping={isTyping}
         onInputChange={setInputValue}
         onSend={handleSend}
+        onStop={cancelStream}
+        onClear={clearMessages}
+        hasMessages={messages.length > 0}
+        suggestions={suggestions}
       />
     </motion.div>
   );

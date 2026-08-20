@@ -42,16 +42,14 @@ describe("OrbLayer", () => {
 
   it("renders the Living Orb button", () => {
     renderOrbLayer();
-    expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nara" })).toBeInTheDocument();
   });
 
   // ── Initial state ─────────────────────────────────────────────────────────
 
   it("renders with orb-state-idle class initially", () => {
     renderOrbLayer();
-    expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toHaveClass(
-      "orb-state-idle"
-    );
+    expect(screen.getByRole("button", { name: "Nara" })).toHaveClass("orb-state-idle");
   });
 
   // ── OrbController registration ────────────────────────────────────────────
@@ -59,7 +57,7 @@ describe("OrbLayer", () => {
   it("registers OrbController with DesktopPresenceService on mount", async () => {
     renderOrbLayer();
     await act(async () => {});
-    expect(screen.getByRole("button", { name: "Enterprise AI Companion" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nara" })).toBeInTheDocument();
   });
 
   // ── State propagation via subscription ────────────────────────────────────
@@ -67,7 +65,7 @@ describe("OrbLayer", () => {
   it("updates orb-state class to hover when mouse enters", async () => {
     renderOrbLayer();
     await act(async () => {});
-    const button = screen.getByRole("button", { name: "Enterprise AI Companion" });
+    const button = screen.getByRole("button", { name: "Nara" });
 
     await act(async () => {
       fireEvent.mouseEnter(button);
@@ -79,7 +77,7 @@ describe("OrbLayer", () => {
   it("returns to orb-state-idle class when mouse leaves", async () => {
     renderOrbLayer();
     await act(async () => {});
-    const button = screen.getByRole("button", { name: "Enterprise AI Companion" });
+    const button = screen.getByRole("button", { name: "Nara" });
 
     await act(async () => {
       fireEvent.mouseEnter(button);
@@ -96,14 +94,14 @@ describe("OrbLayer", () => {
   it("does not throw when the orb is hovered", async () => {
     renderOrbLayer();
     await act(async () => {});
-    const button = screen.getByRole("button", { name: "Enterprise AI Companion" });
+    const button = screen.getByRole("button", { name: "Nara" });
     expect(() => fireEvent.mouseEnter(button)).not.toThrow();
   });
 
   it("does not throw when the orb loses hover", async () => {
     renderOrbLayer();
     await act(async () => {});
-    const button = screen.getByRole("button", { name: "Enterprise AI Companion" });
+    const button = screen.getByRole("button", { name: "Nara" });
     fireEvent.mouseEnter(button);
     expect(() => fireEvent.mouseLeave(button)).not.toThrow();
   });

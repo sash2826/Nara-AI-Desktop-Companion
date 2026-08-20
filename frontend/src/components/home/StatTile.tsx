@@ -16,10 +16,10 @@ const ACCENT_CLASSES = {
   success: "text-success",
 };
 
-const ICON_ACCENT_CLASSES = {
-  default: "text-muted-foreground",
-  warning: "text-warning",
-  success: "text-success",
+const ICON_BADGE_CLASSES = {
+  default: "bg-muted text-muted-foreground",
+  warning: "bg-[hsl(var(--warning)/0.15)] text-warning",
+  success: "bg-[hsl(var(--success)/0.15)] text-success",
 };
 
 function formatValue(value: number | string): string {
@@ -43,7 +43,14 @@ export function StatTile({
     >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <Icon size={15} strokeWidth={1.75} className={ICON_ACCENT_CLASSES[accent]} />
+        <span
+          className={cn(
+            "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full",
+            ICON_BADGE_CLASSES[accent]
+          )}
+        >
+          <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
+        </span>
       </div>
       <div className="flex items-baseline gap-1">
         <span className={cn("text-2xl font-semibold tabular-nums", ACCENT_CLASSES[accent])}>

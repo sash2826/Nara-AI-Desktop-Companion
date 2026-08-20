@@ -9,35 +9,35 @@
 :root {
   /* ─── Color Palette ─────────────────────────────────────────────────────── */
 
-  /* Neutral */
+  /* Neutral — cool Scandinavian steel-grey */
   --color-neutral-0: 0 0% 100%;
-  --color-neutral-50: 220 20% 97%;
-  --color-neutral-100: 220 15% 94%;
-  --color-neutral-150: 220 13% 90%;
-  --color-neutral-200: 220 12% 86%;
-  --color-neutral-300: 220 10% 75%;
-  --color-neutral-400: 220 8% 60%;
-  --color-neutral-500: 220 7% 46%;
-  --color-neutral-600: 220 9% 35%;
-  --color-neutral-700: 220 10% 26%;
-  --color-neutral-800: 220 13% 18%;
-  --color-neutral-850: 220 14% 13%;
-  --color-neutral-900: 222 16% 10%;
-  --color-neutral-950: 224 20% 6%;
-  --color-neutral-1000: 225 25% 3%;
+  --color-neutral-50: 214 20% 97%;
+  --color-neutral-100: 214 16% 94%;
+  --color-neutral-150: 214 14% 90%;
+  --color-neutral-200: 214 13% 85%;
+  --color-neutral-300: 214 11% 74%;
+  --color-neutral-400: 214 9% 59%;
+  --color-neutral-500: 214 8% 45%;
+  --color-neutral-600: 214 10% 34%;
+  --color-neutral-700: 214 12% 25%;
+  --color-neutral-800: 215 15% 17%;
+  --color-neutral-850: 216 16% 12%;
+  --color-neutral-900: 217 18% 9%;
+  --color-neutral-950: 218 22% 6%;
+  --color-neutral-1000: 220 26% 3%;
 
-  /* Primary — Blue-indigo brand hue */
-  --color-primary-50: 227 100% 97%;
-  --color-primary-100: 226 100% 93%;
-  --color-primary-200: 226 96% 86%;
-  --color-primary-300: 226 92% 76%;
-  --color-primary-400: 227 84% 66%;
-  --color-primary-500: 228 76% 57%;
-  --color-primary-600: 228 68% 49%;
-  --color-primary-700: 228 62% 41%;
-  --color-primary-800: 228 56% 33%;
-  --color-primary-900: 229 50% 26%;
-  --color-primary-950: 230 44% 17%;
+  /* Primary — Volvo denim blue brand hue */
+  --color-primary-50: 208 100% 97%;
+  --color-primary-100: 208 96% 92%;
+  --color-primary-200: 209 92% 83%;
+  --color-primary-300: 210 86% 71%;
+  --color-primary-400: 211 76% 57%;
+  --color-primary-500: 212 74% 47%;
+  --color-primary-600: 213 78% 39%;
+  --color-primary-700: 214 76% 32%;
+  --color-primary-800: 215 70% 26%;
+  --color-primary-900: 216 62% 21%;
+  --color-primary-950: 217 56% 14%;
 
   /* Success — Green */
   --color-success-50: 142 76% 96%;
@@ -68,9 +68,15 @@
   --color-info-700: 201 96% 32%;
 
   /* ─── Typography Scale ──────────────────────────────────────────────────── */
-  --font-sans: "Volvo Novum 3", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-display: "Volvo Broad Spread", "Volvo Novum 3", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  /* UI sans mirrors Claude's Styrene; chat prose mirrors Claude's Tiempos serif. */
+  --font-sans:
+    "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    "Helvetica Neue", Arial, sans-serif;
+  --font-serif:
+    "Tiempos Text", "Tiempos", "Source Serif 4 Variable", "Charter", "Georgia", ui-serif,
+    "Times New Roman", serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "JetBrains Mono", "Consolas", "Liberation Mono", monospace;
 
   --text-2xs: 0.625rem; /* 10px */
   --text-xs: 0.75rem; /* 12px */
@@ -156,35 +162,4 @@
   --z-toast: 80;
   --z-glass-prompt: 85;
   --z-top: 90;
-
-  /* ─── Volvo Brand Colors ────────────────────────────────────────────────── */
-  /* Volvo Blue — primary brand hue. #2D6FB5 ≈ HSL 211 60% 44%              */
-  --color-volvo-blue-50: 211 100% 96%;
-  --color-volvo-blue-100: 211 92% 89%;
-  --color-volvo-blue-200: 211 80% 78%;
-  --color-volvo-blue-300: 211 72% 65%;
-  --color-volvo-blue-400: 211 67% 55%;
-  --color-volvo-blue-500: 211 60% 44%;
-  --color-volvo-blue-600: 211 64% 37%;
-  --color-volvo-blue-700: 211 68% 29%;
-  --color-volvo-blue-800: 211 70% 22%;
-  --color-volvo-blue-900: 211 72% 15%;
-
-  /* Volvo body / card backgrounds */
-  --color-volvo-bg-light: 240 5% 94%; /* #EFEFEF */
-  --color-volvo-bg-dark: 0 0% 8%; /* #141414 */
-  --color-volvo-card-dark: 0 0% 11%; /* #1C1C1C */
-  --color-volvo-sidebar: 0 0% 10%; /* #1A1A1A — collapsed nav rail */
-
-  /* ─── Navigation Icon Colors ────────────────────────────────────────────── */
-  /* Per-capability accent hues for collapsed nav icon squares.               */
-  /* Theme-specific overrides for --nav-search live in themes.css.            */
-  --color-nav-home: 215 20% 32%;
-  --color-nav-chat: 210 58% 56%;
-  --color-nav-workspace: 171 36% 45%;
-  --color-nav-search-light: 27 79% 60%;
-  --color-nav-search-dark: 12 48% 52%;
-  --color-nav-knowledge: 238 30% 50%;
-  --color-nav-automation: 42 63% 55%;
-  --color-nav-settings: 220 9% 46%;
 }

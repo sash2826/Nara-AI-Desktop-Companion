@@ -62,7 +62,9 @@ export function RecentFilesList({ files }: RecentFilesListProps) {
   if (!files.length) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
-        <FileText size={20} className="text-muted-foreground" strokeWidth={1.5} />
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <FileText size={18} strokeWidth={1.5} aria-hidden="true" />
+        </span>
         <p className="text-xs text-muted-foreground">No files indexed yet.</p>
       </div>
     );
@@ -75,7 +77,9 @@ export function RecentFilesList({ files }: RecentFilesListProps) {
           key={file.id}
           className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50"
         >
-          <FileText size={14} className="flex-shrink-0 text-muted-foreground" strokeWidth={1.5} />
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <FileText size={14} strokeWidth={1.5} aria-hidden="true" />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-foreground" title={file.file_path}>
               {fileName(file.file_path)}

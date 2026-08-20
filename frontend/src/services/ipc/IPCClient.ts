@@ -577,6 +577,38 @@ async function deleteCredential(service: string, key: string): Promise<void> {
   return invoke<void>("delete_credential", { service, key });
 }
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Check whether a valid Azure AD session exists in the OS keychain.
+ * Populates AppState with the restored token so subsequent requests work.
+ */
+async function authCheck(): Promise<boolean> {
+  return invoke<boolean>("auth_check");
+}
+
+/**
+ * Start the Authorization Code + PKCE login flow.
+ * Opens the Entra ID consent page in the system browser and waits for the
+ * OAuth callback. Resolves after the token is stored in the keychain.
+ */
+async function authLogin(): Promise<void> {
+  return invoke<void>("auth_login");
+}
+
+/** Sign out and clear the stored token from the OS keychain. */
+async function authLogout(): Promise<void> {
+  return invoke<void>("auth_logout");
+}
+
+/**
+ * Return the current access token string, or null if not authenticated / expired.
+ * Call before each API request to include the X-Azure-Token header.
+ */
+async function authGetToken(): Promise<string | null> {
+  return invoke<string | null>("auth_get_token");
+}
+
 /**
  * Returns all registered plugins with their current enabled state.
  */
@@ -603,7 +635,7 @@ async function disablePlugin(pluginId: string): Promise<PluginRecord> {
 export interface PlacementCandidate {
   folder: string;
   score: number;
-  label: "Most Likely" | "Likely" | "Possible";
+  label: "Strong" | "Good" | "Possible";
 }
 
 export interface PendingRecommendation {
@@ -738,4 +770,8 @@ export const IPCClient = {
   runOrganisationAudit,
   getAuditStatus,
   orbQuery,
+  authCheck,
+  authLogin,
+  authLogout,
+  authGetToken,
 } as const;

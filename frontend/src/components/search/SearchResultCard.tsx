@@ -120,7 +120,9 @@ export function SearchResultCard({ result, rank, query, className }: SearchResul
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <FileText size={14} className="flex-shrink-0 text-muted-foreground" strokeWidth={1.5} />
+          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
+          </span>
           <span
             className="truncate text-sm font-medium text-foreground"
             title={result.document_path}

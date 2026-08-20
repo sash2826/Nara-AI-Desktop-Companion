@@ -1,173 +1,88 @@
-import { Eye, EyeOff, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ShieldCheck, ShieldOff, LogOut, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { IPCClient } from "@/services/ipc/IPCClient";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
-const KEYCHAIN_SERVICE = "eac";
-const KEYCHAIN_KEY = "apim-key";
-
-type KeychainStatus = "loading" | "stored" | "missing" | "error";
-
 export function SecuritySettings() {
-  const [status, setStatus] = useState<KeychainStatus>("loading");
-  const [draft, setDraft] = useState("");
-  const [showDraft, setShowDraft] = useState(false);
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(
-    null
-  );
-
-  useEffect(() => {
-    IPCClient.loadCredential(KEYCHAIN_SERVICE, KEYCHAIN_KEY)
-      .then((val) => setStatus(val ? "stored" : "missing"))
-      .catch(() => setStatus("error"));
-  }, []);
-
-  function clearFeedback() {
-    setFeedback(null);
-  }
-
-  async function handleSave() {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    clearFeedback();
-    try {
-      await IPCClient.storeCredential(KEYCHAIN_SERVICE, KEYCHAIN_KEY, trimmed);
-      setDraft("");
-      setStatus("stored");
-      setFeedback({ kind: "success", text: "Key saved to OS keychain." });
-    } catch (err) {
-      setFeedback({ kind: "error", text: String(err) });
-    }
-  }
-
-  async function handleDelete() {
-    clearFeedback();
-    try {
-      await IPCClient.deleteCredential(KEYCHAIN_SERVICE, KEYCHAIN_KEY);
-      setStatus("missing");
-      setFeedback({ kind: "success", text: "Key removed from OS keychain." });
-    } catch (err) {
-      setFeedback({ kind: "error", text: String(err) });
-    }
-  }
+  const { isAuthenticated, isLoading, userDisplayName, login, logout } = useAuth();
 
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-sm font-semibold text-foreground">Security</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Credentials are stored in the OS keychain (Windows Credential Manager). They are never
-          written to localStorage, log files, or the application bundle.
+          Authentication uses Volvo Group single sign-on (Azure AD). Your access token is stored in
+          Windows Credential Manager and refreshed automatically.
         </p>
       </div>
 
-      {/* APIM subscription key */}
+      {/* Azure AD session */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-foreground">APIM Subscription Key</p>
+            <p className="text-xs font-medium text-foreground">Volvo Account</p>
             <p className="text-xs text-muted-foreground">
-              Used as the <code className="font-mono">api-key</code> header for all LLM requests.
+              Authorises LLM and APIM access via Azure AD bearer token.
             </p>
           </div>
-          <KeychainBadge status={status} />
+          <AuthBadge isAuthenticated={isAuthenticated} isLoading={isLoading} />
         </div>
 
-        <div className="relative">
-          <Input
-            id="apim-key-input"
-            type={showDraft ? "text" : "password"}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleSave();
-            }}
-            placeholder={
-              status === "stored" ? "Enter new key to replace…" : "Enter subscription key…"
-            }
-            className="pr-9 font-mono text-xs"
-            aria-label="APIM subscription key"
-          />
-          <button
-            type="button"
-            onClick={() => setShowDraft((v) => !v)}
-            aria-label={showDraft ? "Hide key" : "Show key"}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            {showDraft ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={() => void handleSave()}
-            disabled={!draft.trim()}
-            className="gap-1.5"
-          >
-            <ShieldCheck size={13} />
-            Save to keychain
-          </Button>
-          {status === "stored" && (
+        {isAuthenticated ? (
+          <div className="flex items-center gap-3">
+            {userDisplayName && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User size={12} />
+                <span>{userDisplayName}</span>
+              </div>
+            )}
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => void handleDelete()}
-              className="gap-1.5 text-destructive hover:text-destructive"
+              onClick={() => void logout()}
+              className={cn("gap-1.5 text-muted-foreground hover:text-foreground")}
             >
-              <Trash2 size={13} />
-              Remove
+              <LogOut size={13} />
+              Sign out
             </Button>
-          )}
-        </div>
-
-        {feedback && (
-          <p
-            className={cn(
-              "text-xs",
-              feedback.kind === "success"
-                ? "text-green-600 dark:text-green-400"
-                : "text-destructive"
-            )}
-          >
-            {feedback.text}
-          </p>
+          </div>
+        ) : (
+          <Button size="sm" onClick={() => void login()} disabled={isLoading} className="gap-1.5">
+            {isLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+            {isLoading ? "Opening browser…" : "Sign in with Microsoft"}
+          </Button>
         )}
       </section>
     </div>
   );
 }
 
-function KeychainBadge({ status }: { status: KeychainStatus }) {
-  if (status === "loading") {
+function AuthBadge({
+  isAuthenticated,
+  isLoading,
+}: {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
         Checking…
       </span>
     );
   }
-  if (status === "stored") {
+  if (isAuthenticated) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
         <ShieldCheck size={11} />
-        Stored in OS keychain
-      </span>
-    );
-  }
-  if (status === "error") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-        <ShieldOff size={11} />
-        Keychain error
+        Signed in
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
       <ShieldOff size={11} />
-      Not configured
+      Not signed in
     </span>
   );
 }

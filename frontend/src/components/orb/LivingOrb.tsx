@@ -23,7 +23,7 @@ export interface LivingOrbProps {
 }
 
 /**
- * The Living Orb — the primary ambient interface of the Enterprise AI Companion.
+ * The Living Orb — the primary visual identity of the Enterprise AI Companion.
  *
  * Responsibilities:
  *   - Render the orb at the given (x, y) position
@@ -84,7 +84,7 @@ export function LivingOrb({
     <OrbContainer x={x} y={y} className={className}>
       <button
         type="button"
-        aria-label="Enterprise AI Companion"
+        aria-label="Nara"
         data-orb-state={orbState}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}

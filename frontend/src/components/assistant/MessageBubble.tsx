@@ -5,7 +5,6 @@ import { Square, FileText, Cloud } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
-import { AssistantAvatar } from "./AssistantAvatar";
 import { CopyButton } from "@/components/common/CopyButton";
 import { isAbsolutePath } from "./filePathUtils";
 import { FilePathChip } from "./FilePathChip";
@@ -308,36 +307,23 @@ function AssistantBubble({ message }: { message: Message }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      className="flex items-start gap-2.5 px-4 py-1"
+      className="group px-4 py-3"
     >
-      <AssistantAvatar size="sm" className="mt-1" />
-
-      <div className="group flex min-w-0 flex-1 flex-col gap-1">
-        <div
-          className={cn(
-            "min-w-0 rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5",
-            "prose prose-sm max-w-none"
-          )}
-        >
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className={cn("min-w-0 prose prose-sm max-w-none")}>
           {message.content ? (
             <>
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {message.content}
               </ReactMarkdown>
-              {/* Live token counter during streaming */}
               {isStreaming && (
-                <span className="ml-1 inline-flex items-center gap-1 align-middle">
+                <span className="ml-0.5 inline-flex items-center align-middle">
                   <motion.span
-                    className="inline-block h-3.5 w-0.5 rounded-full bg-foreground"
+                    className="inline-block h-4 w-0.5 rounded-full bg-foreground"
                     animate={{ opacity: [1, 0] }}
-                    transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
+                    transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut" }}
                     aria-hidden="true"
                   />
-                  {(message.tokenCount ?? 0) > 0 && (
-                    <span className="text-2xs text-muted-foreground" aria-live="polite">
-                      {message.tokenCount} tokens
-                    </span>
-                  )}
                 </span>
               )}
               {isCancelled && (
@@ -347,9 +333,7 @@ function AssistantBubble({ message }: { message: Message }) {
                 </span>
               )}
             </>
-          ) : (
-            <span className="text-sm text-muted-foreground">…</span>
-          )}
+          ) : null}
         </div>
 
         {/* Related documents — numbered list matching inline [N] badges */}

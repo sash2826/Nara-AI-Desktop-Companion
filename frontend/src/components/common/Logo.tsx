@@ -6,24 +6,21 @@ interface LogoProps {
 }
 
 export function Logo({ collapsed = false, className }: LogoProps) {
-  if (collapsed) {
-    return (
-      <div className={cn("flex items-center justify-center select-none", className)}>
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-accent">
-          <span className="font-display text-xs font-bold tracking-widest text-sidebar-foreground">
-            V
+  return (
+    <div className={cn("flex items-center gap-2 select-none", className)}>
+      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary">
+        <span className="text-sm font-bold text-primary-foreground">N</span>
+      </div>
+      {!collapsed && (
+        <div className="flex min-w-0 flex-col leading-none">
+          <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+            Nara
+          </span>
+          <span className="mt-0.5 truncate text-2xs text-muted-foreground">
+            Your workspace, within reach.
           </span>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("flex flex-col gap-0 select-none", className)}>
-      <span className="font-display text-sm font-bold tracking-widest text-sidebar-foreground uppercase leading-tight">
-        VOLVO
-      </span>
-      <span className="text-2xs tracking-wide text-sidebar-foreground/50 leading-tight">Nara</span>
+      )}
     </div>
   );
 }

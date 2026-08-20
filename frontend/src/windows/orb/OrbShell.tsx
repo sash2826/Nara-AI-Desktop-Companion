@@ -216,7 +216,7 @@ export function OrbShell() {
         {/* The draggable orb button */}
         <button
           type="button"
-          aria-label="Enterprise AI Companion"
+          aria-label="Nara"
           data-orb-state={animationState}
           onMouseDown={handleMouseDown}
           onClick={handleClick}
