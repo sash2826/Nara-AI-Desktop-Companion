@@ -70,6 +70,15 @@ const config: Config = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        nav: {
+          home: "hsl(var(--color-nav-home))",
+          chat: "hsl(var(--color-nav-chat))",
+          workspace: "hsl(var(--color-nav-workspace))",
+          search: "hsl(var(--nav-search))",
+          knowledge: "hsl(var(--color-nav-knowledge))",
+          automation: "hsl(var(--color-nav-automation))",
+          settings: "hsl(var(--color-nav-settings))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -79,6 +88,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
       },
       fontSize: {

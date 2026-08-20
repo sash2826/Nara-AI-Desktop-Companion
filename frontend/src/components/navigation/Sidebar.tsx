@@ -11,7 +11,6 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Logo } from "@/components/common/Logo";
 import { NavItem } from "./NavItem";
 import { NAV_ITEMS } from "./NAV_ITEMS";
 import { useLayout } from "@/hooks/useLayout";
@@ -48,24 +47,22 @@ export function Sidebar() {
       )}
       aria-label="Primary navigation"
     >
-      {/* Header */}
-      <div
-        className={cn(
-          "flex h-12 flex-shrink-0 items-center border-b border-sidebar-border px-3",
-          sidebarCollapsed ? "justify-center" : "justify-between"
-        )}
-      >
-        <Logo collapsed={sidebarCollapsed} />
-
-        {!sidebarCollapsed && (
-          <button
-            onClick={toggleSidebar}
-            aria-label="Collapse sidebar"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
+      {/* Header — toggle only; branding lives in the TopBar */}
+      <div className="flex h-12 flex-shrink-0 items-center justify-center border-b border-sidebar-border px-3">
+        <button
+          onClick={toggleSidebar}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-fast",
+            "text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen size={15} strokeWidth={1.8} />
+          ) : (
             <PanelLeftClose size={15} strokeWidth={1.8} />
-          </button>
-        )}
+          )}
+        </button>
       </div>
 
       {/* Main navigation */}
@@ -87,7 +84,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer — settings + collapse toggle */}
+      {/* Footer — settings */}
       <div className="flex flex-shrink-0 flex-col gap-0.5 border-t border-sidebar-border p-2">
         {settingsItem && ICON_MAP[settingsItem.iconName] && (
           <NavItem
@@ -98,16 +95,6 @@ export function Sidebar() {
             isCollapsed={sidebarCollapsed}
             onClick={(id: NavItemId) => setActiveItem(id)}
           />
-        )}
-
-        {sidebarCollapsed && (
-          <button
-            onClick={toggleSidebar}
-            aria-label="Expand sidebar"
-            className="flex h-8 w-full items-center justify-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <PanelLeftOpen size={15} strokeWidth={1.8} />
-          </button>
         )}
       </div>
     </motion.aside>

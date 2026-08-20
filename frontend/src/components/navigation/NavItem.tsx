@@ -12,7 +12,21 @@ interface NavItemProps {
   onClick: (id: NavItemId) => void;
 }
 
+// Per-capability icon square colours — hardcoded to avoid CSS var resolution
+// failures when inline styles are computed before stylesheet hydration.
+const NAV_ICON_BG: Record<string, string> = {
+  home: "hsl(215 20% 32%)",
+  chat: "hsl(210 58% 56%)",
+  workspace: "hsl(171 36% 45%)",
+  search: "hsl(27 79% 60%)",
+  "knowledge-graph": "hsl(238 30% 50%)",
+  automation: "hsl(42 63% 55%)",
+  settings: "hsl(220 9% 46%)",
+};
+
 export function NavItem({ id, label, icon: Icon, isActive, isCollapsed, onClick }: NavItemProps) {
+  const iconBg = NAV_ICON_BG[id] ?? "hsl(var(--color-nav-settings))";
+
   return (
     <button
       onClick={() => onClick(id)}
@@ -20,30 +34,23 @@ export function NavItem({ id, label, icon: Icon, isActive, isCollapsed, onClick 
       aria-label={isCollapsed ? label : undefined}
       title={isCollapsed ? label : undefined}
       className={cn(
-        "group relative flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors duration-fast",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-        isActive
-          ? "bg-accent text-accent-foreground"
-          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        "group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors duration-fast",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isCollapsed ? "justify-center" : "justify-start"
       )}
     >
-      {isActive && (
-        <motion.div
-          layoutId="nav-active-indicator"
-          className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
-          transition={{ type: "spring", stiffness: 400, damping: 35 }}
-        />
-      )}
-
-      <Icon
-        size={17}
-        strokeWidth={isActive ? 2.2 : 1.8}
+      {/* Capability-coloured icon square */}
+      <div
+        style={{ backgroundColor: iconBg }}
         className={cn(
-          "flex-shrink-0 transition-colors duration-fast",
-          isActive ? "text-primary" : "text-sidebar-foreground"
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-fast",
+          isActive
+            ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black/40"
+            : "opacity-70 group-hover:opacity-100"
         )}
-        aria-hidden="true"
-      />
+      >
+        <Icon size={16} strokeWidth={2} className="text-white" aria-hidden="true" />
+      </div>
 
       <AnimatePresence initial={false}>
         {!isCollapsed && (
@@ -53,7 +60,10 @@ export function NavItem({ id, label, icon: Icon, isActive, isCollapsed, onClick 
             animate={{ opacity: 1, width: "auto" }}
             exit={{ opacity: 0, width: 0 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="truncate font-medium"
+            className={cn(
+              "truncate font-medium",
+              isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/60"
+            )}
           >
             {label}
           </motion.span>

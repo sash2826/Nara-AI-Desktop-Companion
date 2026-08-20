@@ -32,7 +32,7 @@ const WELCOME_MESSAGE: Message = {
   id: "msg-welcome",
   role: "assistant",
   content:
-    "Hello! I'm your **Enterprise AI Companion**. I'm here to help you understand, organise, and retrieve your digital knowledge.\n\nYou can ask me to summarise documents, search your workspace, explain concepts, or generate notes. How can I help you today?",
+    "Hello! I'm **Nara**, your workplace assistant. I'm here to help you understand, organise, and retrieve your digital knowledge.\n\nYou can ask me to summarise documents, search your workspace, explain concepts, or generate notes. How can I help you today?",
   timestamp: new Date(),
   status: "complete",
 };

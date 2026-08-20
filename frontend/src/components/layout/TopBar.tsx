@@ -1,16 +1,14 @@
 import { Search } from "lucide-react";
-import { Logo } from "@/components/common/Logo";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { useNavigationStore } from "@/store/navigationStore";
 import { cn } from "@/lib/utils";
 import { TOP_BAR_HEIGHT } from "@/layouts/constants";
 
 interface TopBarProps {
-  workspaceTitle?: string;
   className?: string;
 }
 
-export function TopBar({ workspaceTitle = "Workspace", className }: TopBarProps) {
+export function TopBar({ className }: TopBarProps) {
   const setActiveItem = useNavigationStore((s) => s.setActiveItem);
 
   return (
@@ -22,22 +20,25 @@ export function TopBar({ workspaceTitle = "Workspace", className }: TopBarProps)
       )}
       aria-label="Top bar"
     >
-      {/* Logo — visible only when sidebar is hidden on very small viewports */}
-      <div className="hidden items-center lg:hidden">
-        <Logo />
+      {/* Nara brand — VOLVO wordmark + tagline */}
+      <div className="flex flex-col select-none leading-none">
+        <span className="font-display text-sm font-bold tracking-widest text-foreground uppercase">
+          VOLVO
+        </span>
+        <span className="text-2xs tracking-wide text-muted-foreground">
+          Your workspace, within reach.
+        </span>
       </div>
 
-      {/* Workspace title */}
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="truncate text-sm font-semibold text-foreground">{workspaceTitle}</span>
-      </div>
+      {/* Spacer */}
+      <div className="flex-1" />
 
       {/* Search button — navigates to the Search page */}
       <button
         aria-label="Open search"
         onClick={() => setActiveItem("search")}
         className={cn(
-          "flex h-8 w-56 items-center gap-2 rounded-lg border border-border bg-muted px-3",
+          "flex h-8 w-56 items-center gap-2 rounded-full border border-border bg-muted px-3",
           "text-sm text-muted-foreground transition-colors duration-fast",
           "hover:border-ring hover:bg-background hover:text-foreground"
         )}

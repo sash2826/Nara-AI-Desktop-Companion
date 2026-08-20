@@ -52,17 +52,18 @@ export function PromptComposer({
         )}
       </AnimatePresence>
 
-      {/* Input row */}
-      <div className="flex items-end gap-2 border-t border-border px-4 py-3">
-        <PromptInput
-          value={value}
-          onChange={onChange}
-          onSend={onSend}
-          disabled={isBusy}
-          className="flex-1"
-        />
-
-        <SendButton canSend={canSend} isStreaming={isStreaming} onSend={onSend} />
+      {/* Input row — pill-shaped Volvo GPT style */}
+      <div className="px-4 py-3 border-t border-border">
+        <div className="flex items-end gap-2 rounded-full border border-border bg-muted/50 px-4 py-2 transition-colors focus-within:border-ring focus-within:bg-background">
+          <PromptInput
+            value={value}
+            onChange={onChange}
+            onSend={onSend}
+            disabled={isBusy}
+            className="flex-1 border-none bg-transparent p-0 shadow-none focus-visible:ring-0"
+          />
+          <SendButton canSend={canSend} isStreaming={isStreaming} onSend={onSend} />
+        </div>
       </div>
 
       {/* Keyboard hint */}

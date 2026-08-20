@@ -603,7 +603,7 @@ async function disablePlugin(pluginId: string): Promise<PluginRecord> {
 export interface PlacementCandidate {
   folder: string;
   score: number;
-  label: "Strong" | "Good" | "Possible";
+  label: "Most Likely" | "Likely" | "Possible";
 }
 
 export interface PendingRecommendation {

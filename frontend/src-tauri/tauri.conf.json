@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Enterprise AI Companion",
+  "productName": "Nara",
   "version": "0.1.0",
   "identifier": "com.volvogroup.enterprise-ai-companion",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Enterprise AI Companion",
+        "title": "Nara",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -36,8 +36,8 @@
     "publisher": "Volvo Group",
     "copyright": "Copyright © 2026 Volvo Group. All rights reserved.",
     "category": "Productivity",
-    "shortDescription": "Enterprise AI knowledge assistant",
-    "longDescription": "Enterprise AI Companion — a local-first AI platform that helps you organise, understand, retrieve, and interact with your digital knowledge.",
+    "shortDescription": "Your workspace, within reach.",
+    "longDescription": "Nara — a local-first AI platform by Volvo Group that helps you organise, understand, retrieve, and interact with your digital knowledge.",
     "windows": {
       "nsis": {
         "languages": ["English"],

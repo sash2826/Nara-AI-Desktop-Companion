@@ -8,6 +8,74 @@
  *  4. Tailwind layers
  */
 
+/* ─── Volvo Typefaces ─────────────────────────────────────────────────────── */
+/* Volvo Novum 3 is installed system-wide on all Volvo enterprise machines.    */
+/* local() references match the PostScript name embedded in each .otf file.   */
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-Light");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-LightItalic");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-SemiLight");
+  font-weight: 350;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-SemiLightItalic");
+  font-weight: 350;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-Regular");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-Italic");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-Bold");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Volvo Novum 3";
+  src: local("VolvoNovum3-BoldItalic");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+/* Volvo Broad Spread — display typeface reserved for hero wordmarks */
+@font-face {
+  font-family: "Volvo Broad Spread";
+  src: local("VolvoBroadSpread");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @import "./tokens.css";
 @import "./themes.css";
 @import "./typography.css";

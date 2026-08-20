@@ -32,7 +32,7 @@ export function HomePage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Workspace</h1>
+          <h1 className="text-lg font-semibold text-foreground">Home</h1>
           <p className="text-sm text-muted-foreground">Overview of your indexed knowledge base.</p>
         </div>
         <Button
