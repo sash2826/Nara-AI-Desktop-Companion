@@ -50,112 +50,114 @@ export function PromptComposer({
       role="region"
       aria-label="Message composer"
     >
-      {/* Suggestion chips — hidden while busy */}
-      <AnimatePresence>
-        {!isBusy && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <QuickActions
-              onSelect={handleQuickAction}
-              disabled={isBusy}
-              suggestions={suggestions}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Input pill */}
-      <div className="px-4 pb-2 pt-1">
-        <div
-          className={cn(
-            "flex items-end gap-2 rounded-[1.75rem] border border-border bg-muted/40 px-2.5 py-1.5",
-            "transition-colors duration-fast focus-within:border-ring focus-within:bg-background"
+      <div className="mx-auto w-full max-w-3xl">
+        {/* Suggestion chips — hidden while busy */}
+        <AnimatePresence>
+          {!isBusy && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <QuickActions
+                onSelect={handleQuickAction}
+                disabled={isBusy}
+                suggestions={suggestions}
+              />
+            </motion.div>
           )}
-        >
-          {/* Left side: attachment + clear */}
-          <div className="mb-0.5 flex items-center gap-1">
-            <AttachmentButton />
+        </AnimatePresence>
 
-            <AnimatePresence>
-              {hasMessages && !isBusy && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.15 }}
-                  type="button"
-                  onClick={onClear}
-                  aria-label="Clear conversation"
-                  title="Clear conversation"
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full",
-                    "text-muted-foreground/60 transition-colors duration-fast",
-                    "hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <RefreshCw size={13} strokeWidth={1.8} />
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
+        {/* Input pill */}
+        <div className="px-4 pb-2 pt-1">
+          <div
+            className={cn(
+              "flex items-end gap-2 rounded-[1.75rem] border border-border bg-muted/40 px-2.5 py-1.5",
+              "transition-colors duration-fast focus-within:border-ring focus-within:bg-background"
+            )}
+          >
+            {/* Left side: attachment + clear */}
+            <div className="mb-0.5 flex items-center gap-1">
+              <AttachmentButton />
 
-          <PromptInput
-            value={value}
-            onChange={onChange}
-            onSend={onSend}
-            disabled={isBusy}
-            bare
-            className="flex-1"
-          />
+              <AnimatePresence>
+                {hasMessages && !isBusy && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.15 }}
+                    type="button"
+                    onClick={onClear}
+                    aria-label="Clear conversation"
+                    title="Clear conversation"
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full",
+                      "text-muted-foreground/60 transition-colors duration-fast",
+                      "hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <RefreshCw size={13} strokeWidth={1.8} />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
 
-          {/* Right side: stop (when busy) or send (when idle) */}
-          <div className="mb-0.5">
-            <AnimatePresence mode="wait">
-              {isBusy ? (
-                <motion.button
-                  key="stop"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.12 }}
-                  type="button"
-                  onClick={onStop}
-                  aria-label="Stop generation"
-                  title="Stop generation"
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full",
-                    "bg-foreground text-background transition-colors duration-fast",
-                    "hover:bg-foreground/80"
-                  )}
-                >
-                  <Square size={11} strokeWidth={0} fill="currentColor" />
-                </motion.button>
-              ) : (
-                <motion.div
-                  key="send"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.12 }}
-                >
-                  <SendButton canSend={canSend} isStreaming={false} onSend={onSend} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <PromptInput
+              value={value}
+              onChange={onChange}
+              onSend={onSend}
+              disabled={isBusy}
+              bare
+              className="flex-1"
+            />
+
+            {/* Right side: stop (when busy) or send (when idle) */}
+            <div className="mb-0.5">
+              <AnimatePresence mode="wait">
+                {isBusy ? (
+                  <motion.button
+                    key="stop"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.12 }}
+                    type="button"
+                    onClick={onStop}
+                    aria-label="Stop generation"
+                    title="Stop generation"
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full",
+                      "bg-foreground text-background transition-colors duration-fast",
+                      "hover:bg-foreground/80"
+                    )}
+                  >
+                    <Square size={11} strokeWidth={0} fill="currentColor" />
+                  </motion.button>
+                ) : (
+                  <motion.div
+                    key="send"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.12 }}
+                  >
+                    <SendButton canSend={canSend} isStreaming={false} onSend={onSend} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Model name + disclaimer */}
-      <p className="pb-2 text-center text-2xs text-muted-foreground/50">
-        {model && <span className="font-medium text-muted-foreground/70">{model}</span>}
-        {model && " · "}
-        Nara can make mistakes — verify important information.
-      </p>
+        {/* Model name + disclaimer */}
+        <p className="pb-2 text-center text-2xs text-muted-foreground/50">
+          {model && <span className="font-medium text-muted-foreground/70">{model}</span>}
+          {model && " · "}
+          Nara can make mistakes — verify important information.
+        </p>
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useGreeting } from "@/hooks/useGreeting";
 import { StatTile } from "@/components/home/StatTile";
 import { RecentFilesList } from "@/components/home/RecentFilesList";
 
@@ -24,13 +25,14 @@ function StatsSkeleton() {
 
 export function HomePage() {
   const { stats, isLoadingStats, statsError, refresh } = useDashboard();
+  const greeting = useGreeting();
 
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Workspace</h1>
+          <h1 className="text-lg font-semibold text-foreground">{greeting}</h1>
           <p className="text-sm text-muted-foreground">Overview of your indexed knowledge base.</p>
         </div>
         <Button

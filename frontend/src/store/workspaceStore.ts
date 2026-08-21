@@ -33,7 +33,10 @@ interface WorkspaceStore {
   sort: DocumentSort;
 
   // Active tab
-  activeTab: "folders" | "documents" | "indexing" | "errors" | "organise";
+  activeTab: "explorer" | "indexing" | "errors" | "organise";
+
+  // Explorer folder scope (null = all files; supports both watched roots and derived subfolders)
+  selectedFolderPath: string | null;
 
   // Error badge
   errorCount: number;
@@ -61,7 +64,10 @@ interface WorkspaceStore {
   clearDocumentSelection: () => void;
 
   // Tab
-  setActiveTab: (tab: "folders" | "documents" | "indexing" | "errors" | "organise") => void;
+  setActiveTab: (tab: "explorer" | "indexing" | "errors" | "organise") => void;
+
+  // Explorer folder scope
+  setSelectedFolder: (folderPath: string | null) => void;
 
   // Error badge
   setErrorCount: (count: number) => void;
@@ -79,7 +85,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   filter: DEFAULT_FILTER,
   sort: DEFAULT_SORT,
 
-  activeTab: "folders",
+  activeTab: "explorer",
+  selectedFolderPath: null,
   errorCount: 0,
   selectedDocumentIds: new Set<string>(),
 
@@ -109,5 +116,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   clearDocumentSelection: () => set({ selectedDocumentIds: new Set() }),
 
   setActiveTab: (activeTab) => set({ activeTab }),
+  setSelectedFolder: (selectedFolderPath) => set({ selectedFolderPath }),
   setErrorCount: (errorCount) => set({ errorCount }),
 }));

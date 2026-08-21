@@ -37,15 +37,17 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
       aria-live="polite"
       aria-relevant="additions"
     >
-      <AnimatePresence initial={false}>
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
+      <div className="mx-auto w-full max-w-3xl">
+        <AnimatePresence initial={false}>
+          {messages.map((message) => (
+            <MessageBubble key={message.id} message={message} />
+          ))}
 
-        {isTyping && <TypingIndicator key="typing" />}
-      </AnimatePresence>
+          {isTyping && <TypingIndicator key="typing" />}
+        </AnimatePresence>
 
-      <div ref={bottomRef} aria-hidden="true" />
+        <div ref={bottomRef} aria-hidden="true" />
+      </div>
     </div>
   );
 }

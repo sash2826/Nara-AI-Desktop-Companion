@@ -17,6 +17,8 @@ export function QuickActions({
 }: QuickActionsProps) {
   if (!suggestions || suggestions.length === 0) return null;
 
+  const topSuggestions = suggestions.slice(0, 3);
+
   return (
     <div className={cn("flex flex-col gap-2 px-4 py-2", className)}>
       {/* Heading */}
@@ -27,11 +29,14 @@ export function QuickActions({
 
       {/* Suggestion chips */}
       <div role="group" aria-label="Suggested questions" className="flex flex-wrap gap-1.5">
-        {suggestions.map((suggestion, i) => (
+        {topSuggestions.map((suggestion, i) => (
           <motion.button
             key={suggestion}
             type="button"
-            onClick={() => onSelect(suggestion)}
+            onClick={(e) => {
+              onSelect(suggestion);
+              e.currentTarget.blur();
+            }}
             disabled={disabled}
             aria-label={`Suggested: ${suggestion}`}
             initial={{ opacity: 0, y: 4 }}
@@ -40,8 +45,8 @@ export function QuickActions({
             whileHover={!disabled ? { scale: 1.02 } : {}}
             whileTap={!disabled ? { scale: 0.97 } : {}}
             className={cn(
-              "rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-card-foreground",
-              "transition-colors duration-fast",
+              "rounded-full border border-border bg-[hsl(var(--color-neutral-0))] shadow-elevation-1 px-3 py-1.5 text-xs font-medium text-card-foreground",
+              "transition-colors duration-fast dark:bg-card dark:shadow-none",
               disabled
                 ? "cursor-not-allowed opacity-50"
                 : "hover:border-primary/40 hover:bg-accent hover:text-accent-foreground"

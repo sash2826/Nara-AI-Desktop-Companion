@@ -170,6 +170,7 @@ export interface WatchedFolder {
   path: string;
   auto_index: boolean;
   added_at: string;
+  is_protected: boolean;
 }
 
 export interface WatcherStatus {

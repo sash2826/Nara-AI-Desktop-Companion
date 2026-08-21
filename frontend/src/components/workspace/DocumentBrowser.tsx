@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, FileSearch, Trash2, Check, Minus } from "lucide-react";
+import { Loader2, FileSearch, Trash2, Check, Minus, X } from "lucide-react";
 import { DocumentFilters } from "./DocumentFilters";
 import { DocumentRow } from "./DocumentRow";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { IPCClient } from "@/services/ipc/IPCClient";
 import type { IndexedDocument } from "@/types/workspace";
+
+function folderName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
 
 function applyFiltersAndSort(
   docs: IndexedDocument[],
@@ -49,6 +53,8 @@ export function DocumentBrowser() {
     documentsError,
     filter,
     sort,
+    selectedFolderPath,
+    setSelectedFolder,
     setFilter,
     setSort,
     resetFilter,
@@ -137,10 +143,18 @@ export function DocumentBrowser() {
     void loadDocuments();
   }, [loadDocuments]);
 
-  const filtered = useMemo(
-    () => applyFiltersAndSort(documents, filter.search, filter.extension, sort.key, sort.direction),
-    [documents, filter, sort]
-  );
+  const filtered = useMemo(() => {
+    const scoped = selectedFolderPath
+      ? documents.filter((d) => d.file_path.startsWith(selectedFolderPath))
+      : documents;
+    return applyFiltersAndSort(scoped, filter.search, filter.extension, sort.key, sort.direction);
+  }, [documents, selectedFolderPath, filter, sort]);
+
+  const scopedTotal = useMemo(() => {
+    return selectedFolderPath
+      ? documents.filter((d) => d.file_path.startsWith(selectedFolderPath)).length
+      : documents.length;
+  }, [documents, selectedFolderPath]);
 
   const filteredIds = useMemo(() => filtered.map((d) => d.id), [filtered]);
   const selectedCount = selectedDocumentIds.size;
@@ -173,6 +187,20 @@ export function DocumentBrowser() {
           All files that have been indexed and are available for search.
         </p>
       </div>
+
+      {selectedFolderPath && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>Scoped to</span>
+          <span className="font-medium text-foreground">{folderName(selectedFolderPath)}</span>
+          <button
+            onClick={() => setSelectedFolder(null)}
+            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X size={11} strokeWidth={1.5} />
+            Clear
+          </button>
+        </div>
+      )}
 
       {documentsError && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -212,7 +240,7 @@ export function DocumentBrowser() {
         onFilterChange={setFilter}
         onSortChange={setSort}
         onReset={resetFilter}
-        totalCount={documents.length}
+        totalCount={scopedTotal}
         filteredCount={filtered.length}
       />
 

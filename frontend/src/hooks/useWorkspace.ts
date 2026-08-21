@@ -17,6 +17,8 @@ export function useWorkspace() {
   const sort = useWorkspaceStore((s) => s.sort);
   const activeTab = useWorkspaceStore((s) => s.activeTab);
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
+  const selectedFolderPath = useWorkspaceStore((s) => s.selectedFolderPath);
+  const setSelectedFolder = useWorkspaceStore((s) => s.setSelectedFolder);
   const setFilter = useWorkspaceStore((s) => s.setFilter);
   const setSort = useWorkspaceStore((s) => s.setSort);
   const resetFilter = useWorkspaceStore((s) => s.resetFilter);
@@ -98,6 +100,8 @@ export function useWorkspace() {
     sort,
     activeTab,
     setActiveTab,
+    selectedFolderPath,
+    setSelectedFolder,
     setFilter,
     setSort,
     resetFilter,

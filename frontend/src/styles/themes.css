@@ -9,12 +9,12 @@
 /* ─── Light Theme ─────────────────────────────────────────────────────────── */
 :root,
 .theme-light {
-  /* Core surfaces — warm white */
-  --background: 40 33% 98%;
+  /* Core surfaces — warm cream (#FBF8F1) */
+  --background: 43 55% 96%;
   --foreground: var(--color-neutral-900);
 
   /* Card */
-  --card: 40 40% 99%;
+  --card: 43 50% 97%;
   --card-foreground: var(--color-neutral-900);
 
   /* Popover / dropdown */
@@ -26,8 +26,8 @@
   --surface-elevated: 40 40% 99%;
   --surface-overlay: 40 33% 98%;
 
-  /* Primary action */
-  --primary: var(--color-primary-600);
+  /* Primary action — Volvo Sea navy */
+  --primary: var(--color-primary-800);
   --primary-foreground: var(--color-neutral-0);
 
   /* Secondary action */
@@ -57,7 +57,7 @@
   /* Borders & inputs */
   --border: 38 14% 74%;
   --input: 38 14% 74%;
-  --ring: var(--color-primary-500);
+  --ring: var(--color-primary-600);
 
   /* Sidebar */
   --sidebar: 40 30% 97%;
@@ -80,7 +80,7 @@
     0 4px 8px hsl(var(--shadow-color) / 0.08), 0 8px 24px hsl(var(--shadow-color) / 0.14);
 
   /* Focus ring */
-  --focus-ring-color: hsl(var(--color-primary-500) / 0.5);
+  --focus-ring-color: hsl(var(--color-primary-600) / 0.5);
   --focus-ring-width: 3px;
 
   /* Scrollbar */
@@ -108,9 +108,9 @@
   --surface-elevated: 36 6% 19%;
   --surface-overlay: 36 6% 17%;
 
-  /* Primary action — Claude coral */
-  --primary: 17 60% 60%;
-  --primary-foreground: 30 12% 12%;
+  /* Primary action — Volvo Sea navy */
+  --primary: var(--color-primary-400);
+  --primary-foreground: var(--color-neutral-950);
 
   /* Secondary action */
   --secondary: 36 5% 22%;
@@ -121,8 +121,8 @@
   --muted-foreground: 40 8% 62%;
 
   /* Accent */
-  --accent: 36 6% 22%;
-  --accent-foreground: 45 22% 89%;
+  --accent: var(--color-primary-900);
+  --accent-foreground: var(--color-primary-200);
 
   /* Destructive */
   --destructive: var(--color-destructive-500);
@@ -139,7 +139,7 @@
   /* Borders & inputs */
   --border: 36 6% 24%;
   --input: 36 6% 24%;
-  --ring: 17 55% 58%;
+  --ring: var(--color-primary-400);
 
   /* Sidebar */
   --sidebar: 40 6% 11%;
@@ -162,7 +162,7 @@
     0 4px 8px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.6);
 
   /* Focus ring */
-  --focus-ring-color: hsl(17 55% 58% / 0.5);
+  --focus-ring-color: hsl(var(--color-primary-400) / 0.5);
 
   /* Scrollbar */
   --scrollbar-thumb: hsl(36 6% 34%);
@@ -182,14 +182,14 @@
     --surface: 36 6% 15%;
     --surface-elevated: 36 6% 19%;
     --surface-overlay: 36 6% 17%;
-    --primary: 17 60% 60%;
-    --primary-foreground: 30 12% 12%;
+    --primary: var(--color-primary-400);
+    --primary-foreground: var(--color-neutral-950);
     --secondary: 36 5% 22%;
     --secondary-foreground: 45 20% 88%;
     --muted: 36 5% 22%;
     --muted-foreground: 40 8% 62%;
-    --accent: 36 6% 22%;
-    --accent-foreground: 45 22% 89%;
+    --accent: var(--color-primary-900);
+    --accent-foreground: var(--color-primary-200);
     --destructive: var(--color-destructive-500);
     --destructive-foreground: var(--color-neutral-0);
     --success: var(--color-success-500);
@@ -200,7 +200,7 @@
     --info-foreground: var(--color-neutral-0);
     --border: 36 6% 24%;
     --input: 36 6% 24%;
-    --ring: 17 55% 58%;
+    --ring: var(--color-primary-400);
     --sidebar: 40 6% 11%;
     --sidebar-foreground: 40 10% 78%;
     --sidebar-border: 36 6% 20%;
@@ -214,7 +214,7 @@
       0 2px 4px hsl(var(--shadow-color) / 0.35), 0 4px 12px hsl(var(--shadow-color) / 0.55);
     --shadow-elevation-4:
       0 4px 8px hsl(var(--shadow-color) / 0.4), 0 8px 24px hsl(var(--shadow-color) / 0.6);
-    --focus-ring-color: hsl(17 55% 58% / 0.5);
+    --focus-ring-color: hsl(var(--color-primary-400) / 0.5);
     --scrollbar-thumb: hsl(36 6% 34%);
   }
 }

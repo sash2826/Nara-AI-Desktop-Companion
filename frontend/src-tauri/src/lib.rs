@@ -242,6 +242,7 @@ pub struct WatchedFolderResponse {
     pub path: String,
     pub auto_index: bool,
     pub added_at: String,
+    pub is_protected: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

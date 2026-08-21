@@ -26,18 +26,18 @@
   --color-neutral-950: 218 22% 6%;
   --color-neutral-1000: 220 26% 3%;
 
-  /* Primary — Volvo denim blue brand hue */
-  --color-primary-50: 208 100% 97%;
-  --color-primary-100: 208 96% 92%;
-  --color-primary-200: 209 92% 83%;
-  --color-primary-300: 210 86% 71%;
-  --color-primary-400: 211 76% 57%;
-  --color-primary-500: 212 74% 47%;
-  --color-primary-600: 213 78% 39%;
-  --color-primary-700: 214 76% 32%;
-  --color-primary-800: 215 70% 26%;
-  --color-primary-900: 216 62% 21%;
-  --color-primary-950: 217 56% 14%;
+  /* Primary — Volvo "Sea" navy (HEX 1B365D / PMS 534C) */
+  --color-primary-50: 215 55% 96%;
+  --color-primary-100: 215 50% 90%;
+  --color-primary-200: 215 52% 80%;
+  --color-primary-300: 215 53% 68%;
+  --color-primary-400: 215 54% 55%;
+  --color-primary-500: 215 55% 42%;
+  --color-primary-600: 215 55% 32%;
+  --color-primary-700: 215 55% 27%;
+  --color-primary-800: 215 55% 24%;
+  --color-primary-900: 215 55% 18%;
+  --color-primary-950: 215 55% 12%;
 
   /* Success — Green */
   --color-success-50: 142 76% 96%;
@@ -60,12 +60,12 @@
   --color-destructive-600: 0 72% 51%;
   --color-destructive-700: 0 74% 42%;
 
-  /* Info — Cyan */
-  --color-info-50: 199 89% 97%;
-  --color-info-100: 198 86% 91%;
-  --color-info-500: 199 89% 48%;
-  --color-info-600: 200 98% 39%;
-  --color-info-700: 201 96% 32%;
+  /* Info — Volvo Teal (HEX 1E6659 / PMS 561C) */
+  --color-info-50: 169 55% 96%;
+  --color-info-100: 169 50% 90%;
+  --color-info-500: 169 55% 40%;
+  --color-info-600: 169 55% 32%;
+  --color-info-700: 169 55% 26%;
 
   /* ─── Typography Scale ──────────────────────────────────────────────────── */
   /* UI sans mirrors Claude's Styrene; chat prose mirrors Claude's Tiempos serif. */

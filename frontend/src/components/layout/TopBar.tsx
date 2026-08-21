@@ -1,6 +1,5 @@
 import { Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
-import { VolvoWordmark } from "@/components/common/VolvoWordmark";
 import { useLayout } from "@/hooks/useLayout";
 import { useNavigationStore } from "@/store/navigationStore";
 import { cn } from "@/lib/utils";
@@ -36,7 +35,12 @@ export function TopBar({ className }: TopBarProps) {
           <Menu size={18} strokeWidth={1.8} aria-hidden="true" />
         </button>
 
-        <VolvoWordmark height={14} />
+        <span
+          className="text-sm font-normal tracking-wide text-foreground select-none"
+          style={{ fontFamily: "'Volvo Novum', 'Inter', sans-serif" }}
+        >
+          Productivity Agent
+        </span>
       </div>
 
       {/* Right: search + theme + account */}
@@ -52,7 +56,7 @@ export function TopBar({ className }: TopBarProps) {
         >
           <Search size={13} strokeWidth={1.8} aria-hidden="true" />
           <span className="truncate">Search...</span>
-          <kbd className="ml-auto hidden text-2xs text-muted-foreground sm:block">⌘K</kbd>
+          <kbd className="ml-auto hidden text-2xs text-muted-foreground sm:block">Ctrl+K</kbd>
         </button>
 
         <ThemeToggle />

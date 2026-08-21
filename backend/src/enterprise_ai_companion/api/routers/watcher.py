@@ -12,7 +12,7 @@ from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullG
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
 from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
-from enterprise_ai_companion.capabilities.indexing.file_watcher import WatchedFolder
+from enterprise_ai_companion.capabilities.indexing.file_watcher import DOWNLOADS_PATH, WatchedFolder
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class WatchedFolderResponse(BaseModel):
     path: str
     auto_index: bool
     added_at: str
+    is_protected: bool
 
     @classmethod
     def from_domain(cls, folder: WatchedFolder) -> "WatchedFolderResponse":
@@ -36,6 +37,7 @@ class WatchedFolderResponse(BaseModel):
             path=folder.path,
             auto_index=folder.auto_index,
             added_at=folder.added_at,
+            is_protected=folder.path == DOWNLOADS_PATH,
         )
 
 
@@ -66,6 +68,12 @@ async def remove_watched_folder(folder_id: str, request: Request) -> None:
     folder = next((f for f in folders if f.id == folder_id), None)
     if folder is None:
         raise HTTPException(status_code=404, detail=f"Watched folder not found: {folder_id}")
+
+    if folder.path == DOWNLOADS_PATH:
+        raise HTTPException(
+            status_code=409,
+            detail="The Downloads folder cannot be removed — it powers automatic file organisation.",
+        )
 
     try:
         await watcher.remove_folder(folder_id)
