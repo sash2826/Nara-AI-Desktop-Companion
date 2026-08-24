@@ -36,13 +36,18 @@ export function OrbShell() {
   const [isHovered, setIsHovered] = useState(false);
 
   // ── Drag state ─────────────────────────────────────────────────────────────
+  // Cached orb window position — avoids an IPC round-trip on every mousedown.
+  const orbPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragStart = useRef<{
-    clientX: number;
-    clientY: number;
+    screenX: number;
+    screenY: number;
     windowX: number;
     windowY: number;
   } | null>(null);
   const isDragging = useRef(false);
+  const rafPending = useRef(false);
+  // Screen position recorded on mousedown — used to detect drag vs click.
+  const dragStartScreen = useRef<{ x: number; y: number } | null>(null);
   const lastClickTime = useRef(0);
 
   // ── Backend event listener for pending recommendation count ────────────────
@@ -75,46 +80,62 @@ export function OrbShell() {
     };
   }, [setPendingCount]);
 
-  // ── Drag handlers ──────────────────────────────────────────────────────────
+  // ── Seed orb position cache on mount ──────────────────────────────────────
+  useEffect(() => {
+    invoke<{ x: number; y: number }>("get_orb_position")
+      .then((pos) => {
+        orbPos.current = pos;
+      })
+      .catch(() => {});
+  }, []);
 
-  const handleMouseDown = useCallback(async (e: React.MouseEvent) => {
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+  // Position is cached so mousedown is instant (no IPC wait).
+  // Mousemove updates are throttled via rAF and fire-and-forget so there is no
+  // growing backlog of awaited IPC calls at 125 Hz.
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
-
-    // Record initial pointer + window position
-    let windowX = 0;
-    let windowY = 0;
-    try {
-      const pos = await invoke<{ x: number; y: number }>("get_orb_position");
-      windowX = pos.x;
-      windowY = pos.y;
-    } catch {
-      // best effort
-    }
-
-    dragStart.current = { clientX: e.clientX, clientY: e.clientY, windowX, windowY };
+    dragStartScreen.current = { x: e.screenX, y: e.screenY };
+    dragStart.current = {
+      screenX: e.screenX,
+      screenY: e.screenY,
+      windowX: orbPos.current.x,
+      windowY: orbPos.current.y,
+    };
     isDragging.current = false;
   }, []);
 
   useEffect(() => {
-    const onMouseMove = async (e: MouseEvent) => {
+    const onMouseMove = (e: MouseEvent) => {
       if (!dragStart.current) return;
 
-      const dx = e.clientX - dragStart.current.clientX;
-      const dy = e.clientY - dragStart.current.clientY;
+      // Use screenX/Y — absolute screen coords that don't shift as the window moves.
+      const dx = e.screenX - dragStart.current.screenX;
+      const dy = e.screenY - dragStart.current.screenY;
 
       if (!isDragging.current) {
         if (Math.abs(dx) < DRAG_THRESHOLD_PX && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
         isDragging.current = true;
       }
 
-      const newX = dragStart.current.windowX + dx;
-      const newY = dragStart.current.windowY + dy;
+      // Update local cache immediately so the next rAF sends the freshest position.
+      orbPos.current = {
+        x: dragStart.current.windowX + dx,
+        y: dragStart.current.windowY + dy,
+      };
 
-      try {
-        await invoke("set_orb_position", { x: newX, y: newY });
-      } catch {
-        // best effort
+      // Throttle IPC calls to one per animation frame — fire-and-forget.
+      if (!rafPending.current) {
+        rafPending.current = true;
+        requestAnimationFrame(() => {
+          rafPending.current = false;
+          invoke("set_orb_position", {
+            x: Math.round(orbPos.current.x),
+            y: Math.round(orbPos.current.y),
+          }).catch(() => {});
+        });
       }
     };
 
@@ -132,34 +153,42 @@ export function OrbShell() {
 
   // ── Click handlers ─────────────────────────────────────────────────────────
 
-  const handleClick = useCallback(() => {
-    // Ignore click if this was the end of a drag
-    if (isDragging.current) return;
+  const handleClick = useCallback(
+    (e?: React.MouseEvent) => {
+      // Ignore click if the cursor moved significantly (drag ended here)
+      if (dragStartScreen.current) {
+        const dx = Math.abs((e?.screenX ?? 0) - dragStartScreen.current.x);
+        const dy = Math.abs((e?.screenY ?? 0) - dragStartScreen.current.y);
+        dragStartScreen.current = null;
+        if (dx > DRAG_THRESHOLD_PX || dy > DRAG_THRESHOLD_PX) return;
+      }
 
-    const now = Date.now();
-    const timeSinceLastClick = now - lastClickTime.current;
-    lastClickTime.current = now;
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTime.current;
+      lastClickTime.current = now;
 
-    if (timeSinceLastClick < DOUBLE_CLICK_MS) {
-      // Double-click → focus main window
-      invoke("focus_main_window").catch(() => {});
-      setOverlayMode("none");
-      return;
-    }
+      if (timeSinceLastClick < DOUBLE_CLICK_MS) {
+        // Double-click → focus main window
+        invoke("focus_main_window").catch(() => {});
+        setOverlayMode("none");
+        return;
+      }
 
-    // Single click logic
-    if (overlayMode !== "none") {
-      // Toggle off
-      setOverlayMode("none");
-      return;
-    }
+      // Single click logic
+      if (overlayMode !== "none") {
+        // Toggle off
+        setOverlayMode("none");
+        return;
+      }
 
-    if (pendingCount > 0 && animationState === "notification") {
-      setOverlayMode("notifications");
-    } else {
-      setOverlayMode("query");
-    }
-  }, [animationState, overlayMode, pendingCount, setOverlayMode]);
+      if (pendingCount > 0 && animationState === "notification") {
+        setOverlayMode("notifications");
+      } else {
+        setOverlayMode("query");
+      }
+    },
+    [animationState, overlayMode, pendingCount, setOverlayMode]
+  );
 
   // ── Keyboard activation (accessibility) ───────────────────────────────────
 
