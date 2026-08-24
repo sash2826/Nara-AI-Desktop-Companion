@@ -69,7 +69,7 @@ export function GlassPromptBody({ className }: { className?: string }) {
   return (
     <div className={cn("flex flex-col max-h-[70vh]", className)}>
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3 shrink-0">
+      <div className="flex items-center gap-2 border-b border-border/50 px-5 py-3 shrink-0">
         <span className="text-xs font-medium text-muted-foreground tracking-wide uppercase select-none">
           AI Companion
         </span>
@@ -101,7 +101,7 @@ export function GlassPromptBody({ className }: { className?: string }) {
 
       {/* Footer hint */}
       <div className="flex items-center justify-end px-4 pb-3 shrink-0">
-        <span className="text-[11px] text-muted-foreground/50 select-none">
+        <span className="text-[11px] text-muted-foreground/80 select-none">
           <kbd className="font-mono">Ctrl+Shift+Space</kbd> to toggle &nbsp;·&nbsp;{" "}
           <kbd className="font-mono">Esc</kbd> to close
         </span>

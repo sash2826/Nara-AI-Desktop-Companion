@@ -46,6 +46,12 @@ class AppConfig(BaseSettings):
     # ── IPC security ─────────────────────────────────────────────────────────
     ipc_secret: str | None = Field(None, alias="EAC_IPC_SECRET")
 
+    # ── System index paths (hidden from document browser) ────────────────────
+    # Comma-separated absolute paths. Documents whose file_path starts with
+    # any of these prefixes are excluded from GET /documents by default.
+    # They remain fully indexed and searchable.
+    system_index_paths: str = Field("", alias="EAC_SYSTEM_INDEX_PATHS")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

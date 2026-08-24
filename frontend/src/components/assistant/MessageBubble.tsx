@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Square, FileText, Cloud } from "lucide-react";
+import { Square } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -26,8 +26,6 @@ function InlineCitationBadge({ index, citation }: { index: number; citation: Cit
   const segments = normalised.split("/").filter(Boolean);
   const filename = segments.at(-1) ?? citation.documentPath;
   const parentFolder = segments.at(-2) ?? null;
-  const isOneDrive = /\/OneDrive[^/]*/i.test(normalised);
-
   const handleOpen = useCallback(async () => {
     if (!IS_TAURI) return;
     try {
@@ -38,7 +36,7 @@ function InlineCitationBadge({ index, citation }: { index: number; citation: Cit
   }, [citation.documentPath]);
 
   return (
-    <span className="relative inline-flex align-baseline">
+    <sup className="relative mx-0.5 inline-flex align-super">
       <button
         onClick={handleOpen}
         disabled={!IS_TAURI}
@@ -47,14 +45,9 @@ function InlineCitationBadge({ index, citation }: { index: number; citation: Cit
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
         aria-label={`Source ${index}: ${filename}`}
-        className="mx-0.5 inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1 py-0.5 text-2xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:pointer-events-none"
+        className="font-sans text-2xs font-semibold text-primary transition-colors hover:text-primary/70 disabled:pointer-events-none"
       >
-        {isOneDrive ? (
-          <Cloud size={8} strokeWidth={1.5} className="flex-shrink-0" />
-        ) : (
-          <FileText size={8} strokeWidth={1.5} className="flex-shrink-0" />
-        )}
-        <span>{index}</span>
+        {index}
       </button>
 
       {hovered && (
@@ -64,7 +57,7 @@ function InlineCitationBadge({ index, citation }: { index: number; citation: Cit
           </p>
         </div>
       )}
-    </span>
+    </sup>
   );
 }
 
@@ -266,7 +259,7 @@ function UserBubble({ message }: { message: Message }) {
       className="flex justify-end px-4 py-1"
     >
       <div className="group flex max-w-[80%] flex-col items-end gap-1">
-        <div className="rounded-2xl rounded-br-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground">
+        <div className="rounded-2xl rounded-br-sm bg-[hsl(var(--color-primary-200))] px-3.5 py-2.5 text-sm text-[hsl(var(--color-primary-800))] dark:bg-primary dark:text-primary-foreground">
           <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
         </div>
         <div className="flex items-center gap-2 opacity-0 transition-opacity duration-fast group-hover:opacity-100">
@@ -290,17 +283,41 @@ function AssistantBubble({ message }: { message: Message }) {
     return map;
   }, [message.citations]);
 
-  // Deduplicate by file path for the "Related documents" list; keep first
-  // occurrence so the displayed index matches the lowest inline [N] reference.
+  // Collect every [N] index that actually appears in the response text.
+  const referencedIndices = useMemo(() => {
+    const indices = new Set<number>();
+    const re = /\[(\d+)\]/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(message.content ?? "")) !== null) {
+      indices.add(parseInt(m[1], 10));
+    }
+    return indices;
+  }, [message.content]);
+
+  // Deduplicate by file path, keeping only citations actually cited inline.
   const uniqueCitations = useMemo(() => {
     const seen = new Map<string, { index: number; citation: CitationMeta }>();
     (message.citations ?? []).forEach((c, i) => {
-      if (!seen.has(c.documentPath)) seen.set(c.documentPath, { index: i + 1, citation: c });
+      const idx = i + 1;
+      if (!referencedIndices.has(idx)) return;
+      if (!seen.has(c.documentPath)) seen.set(c.documentPath, { index: idx, citation: c });
     });
     return Array.from(seen.values());
-  }, [message.citations]);
+  }, [message.citations, referencedIndices]);
 
   const markdownComponents = useMemo(() => buildMarkdownComponents(citationMap), [citationMap]);
+
+  // Strip duplicate [N] tokens — keep only the first occurrence of each index
+  // so citation badges don't litter every sentence when the LLM over-cites.
+  const dedupedContent = useMemo(() => {
+    const seen = new Set<number>();
+    return (message.content ?? "").replace(/\[(\d+)\]/g, (match, num) => {
+      const n = parseInt(num, 10);
+      if (seen.has(n)) return "";
+      seen.add(n);
+      return match;
+    });
+  }, [message.content]);
 
   return (
     <motion.div
@@ -314,7 +331,7 @@ function AssistantBubble({ message }: { message: Message }) {
           {message.content ? (
             <>
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {message.content}
+                {dedupedContent}
               </ReactMarkdown>
               {isStreaming && (
                 <span className="ml-0.5 inline-flex items-center align-middle">

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Loader2, FileSearch, Trash2, Check, Minus, X } from "lucide-react";
 import { DocumentFilters } from "./DocumentFilters";
 import { DocumentRow } from "./DocumentRow";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { IPCClient } from "@/services/ipc/IPCClient";
 import type { IndexedDocument } from "@/types/workspace";
 
 function folderName(path: string): string {
@@ -41,11 +40,6 @@ function applyFiltersAndSort(
   return result;
 }
 
-interface PendingDelete {
-  ids: string[];
-  docs: IndexedDocument[];
-}
-
 export function DocumentBrowser() {
   const {
     documents,
@@ -61,61 +55,14 @@ export function DocumentBrowser() {
     loadDocuments,
   } = useWorkspace();
 
-  const setDocuments = useWorkspaceStore((s) => s.setDocuments);
   const selectedDocumentIds = useWorkspaceStore((s) => s.selectedDocumentIds);
   const toggleDocumentSelection = useWorkspaceStore((s) => s.toggleDocumentSelection);
   const selectAllDocuments = useWorkspaceStore((s) => s.selectAllDocuments);
   const clearDocumentSelection = useWorkspaceStore((s) => s.clearDocumentSelection);
-
-  // Undo-delete state
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
-  const [countdown, setCountdown] = useState(0);
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clearTimers = useCallback(() => {
-    if (deleteTimerRef.current !== null) {
-      clearTimeout(deleteTimerRef.current);
-      deleteTimerRef.current = null;
-    }
-    if (countdownIntervalRef.current !== null) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-  }, []);
-
-  // Cleanup timers on unmount
-  useEffect(() => clearTimers, [clearTimers]);
-
-  const startDelete = useCallback(
-    (ids: string[]) => {
-      if (ids.length === 0) return;
-
-      const docsToRemove = documents.filter((d) => ids.includes(d.id));
-      const remaining = documents.filter((d) => !ids.includes(d.id));
-
-      setDocuments(remaining);
-      clearDocumentSelection();
-      clearTimers();
-
-      setPendingDelete({ ids, docs: docsToRemove });
-      setCountdown(5);
-
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown((c) => Math.max(0, c - 1));
-      }, 1000);
-
-      deleteTimerRef.current = setTimeout(() => {
-        clearInterval(countdownIntervalRef.current!);
-        countdownIntervalRef.current = null;
-        deleteTimerRef.current = null;
-        setPendingDelete(null);
-        setCountdown(0);
-        void IPCClient.bulkDeleteDocuments(ids);
-      }, 5000);
-    },
-    [documents, setDocuments, clearDocumentSelection, clearTimers]
-  );
+  const pendingDelete = useWorkspaceStore((s) => s.pendingDelete);
+  const countdown = useWorkspaceStore((s) => s.deleteCountdown);
+  const startDelete = useWorkspaceStore((s) => s.startDelete);
+  const undoDelete = useWorkspaceStore((s) => s.undoDelete);
 
   const handleSingleDeleteRequested = useCallback(
     (documentId: string) => startDelete([documentId]),
@@ -126,18 +73,6 @@ export function DocumentBrowser() {
     if (selectedDocumentIds.size === 0) return;
     startDelete(Array.from(selectedDocumentIds));
   }, [selectedDocumentIds, startDelete]);
-
-  const handleUndo = useCallback(() => {
-    if (!pendingDelete) return;
-    clearTimers();
-    // Restore optimistically-removed docs — merge with current store snapshot
-    const currentDocs = useWorkspaceStore.getState().documents;
-    const existingIds = new Set(currentDocs.map((d) => d.id));
-    const toRestore = pendingDelete.docs.filter((d) => !existingIds.has(d.id));
-    setDocuments([...currentDocs, ...toRestore]);
-    setPendingDelete(null);
-    setCountdown(0);
-  }, [pendingDelete, clearTimers, setDocuments]);
 
   useEffect(() => {
     void loadDocuments();
@@ -222,7 +157,7 @@ export function DocumentBrowser() {
             {pendingDelete.docs.length !== 1 ? "s" : ""}… {countdown}s
           </span>
           <button
-            onClick={handleUndo}
+            onClick={undoDelete}
             className="rounded-md px-3 py-1 text-xs font-semibold hover:opacity-90"
             style={{
               background: "hsl(var(--warning))",

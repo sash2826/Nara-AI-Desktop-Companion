@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { IPCClient } from "@/services/ipc/IPCClient";
 import type {
   WatchedFolder,
   WatcherStatus,
@@ -6,6 +7,26 @@ import type {
   DocumentFilter,
   DocumentSort,
 } from "@/types/workspace";
+
+export interface PendingDelete {
+  ids: string[];
+  docs: IndexedDocument[];
+}
+
+// Module-level timers — not tied to any component lifecycle.
+let _deleteTimer: ReturnType<typeof setTimeout> | null = null;
+let _countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+function _clearDeleteTimers() {
+  if (_deleteTimer !== null) {
+    clearTimeout(_deleteTimer);
+    _deleteTimer = null;
+  }
+  if (_countdownInterval !== null) {
+    clearInterval(_countdownInterval);
+    _countdownInterval = null;
+  }
+}
 
 const DEFAULT_FILTER: DocumentFilter = {
   workspacePath: null,
@@ -63,6 +84,12 @@ interface WorkspaceStore {
   selectAllDocuments: (ids: string[]) => void;
   clearDocumentSelection: () => void;
 
+  // Pending delete (undo window)
+  pendingDelete: PendingDelete | null;
+  deleteCountdown: number;
+  startDelete: (ids: string[]) => void;
+  undoDelete: () => void;
+
   // Tab
   setActiveTab: (tab: "explorer" | "indexing" | "errors" | "organise") => void;
 
@@ -89,6 +116,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   selectedFolderPath: null,
   errorCount: 0,
   selectedDocumentIds: new Set<string>(),
+  pendingDelete: null,
+  deleteCountdown: 0,
 
   setFolders: (folders) => set({ folders }),
   addFolder: (folder) => set((state) => ({ folders: [...state.folders, folder] })),
@@ -118,4 +147,42 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
   setActiveTab: (activeTab) => set({ activeTab }),
   setSelectedFolder: (selectedFolderPath) => set({ selectedFolderPath }),
   setErrorCount: (errorCount) => set({ errorCount }),
+
+  startDelete: (ids) => {
+    const { documents } = useWorkspaceStore.getState();
+    if (ids.length === 0) return;
+    const docsToRemove = documents.filter((d) => ids.includes(d.id));
+    const remaining = documents.filter((d) => !ids.includes(d.id));
+    _clearDeleteTimers();
+
+    set({
+      documents: remaining,
+      selectedDocumentIds: new Set(),
+      pendingDelete: { ids, docs: docsToRemove },
+      deleteCountdown: 5,
+    });
+
+    _countdownInterval = setInterval(() => {
+      set((s) => {
+        const next = Math.max(0, s.deleteCountdown - 1);
+        return { deleteCountdown: next };
+      });
+    }, 1000);
+
+    _deleteTimer = setTimeout(() => {
+      _clearDeleteTimers();
+      set({ pendingDelete: null, deleteCountdown: 0 });
+      void IPCClient.bulkDeleteDocuments(ids);
+    }, 5000);
+  },
+
+  undoDelete: () => {
+    const { pendingDelete } = useWorkspaceStore.getState();
+    if (!pendingDelete) return;
+    _clearDeleteTimers();
+    const currentDocs = useWorkspaceStore.getState().documents;
+    const existingIds = new Set(currentDocs.map((d) => d.id));
+    const toRestore = pendingDelete.docs.filter((d) => !existingIds.has(d.id));
+    set({ documents: [...currentDocs, ...toRestore], pendingDelete: null, deleteCountdown: 0 });
+  },
 }));

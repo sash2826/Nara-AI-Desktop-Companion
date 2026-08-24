@@ -22,7 +22,7 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
     sendMessage,
   } = useConversation();
 
-  const { suggestions } = useDashboard();
+  const { suggestions, reshuffleSuggestions } = useDashboard();
 
   const handleSend = useCallback(() => {
     void sendMessage(inputValue);
@@ -49,6 +49,7 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
         onClear={clearMessages}
         hasMessages={messages.length > 0}
         suggestions={suggestions}
+        onReshuffle={reshuffleSuggestions}
       />
     </motion.div>
   );

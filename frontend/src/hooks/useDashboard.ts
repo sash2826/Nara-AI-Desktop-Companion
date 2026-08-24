@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { IPCClient, type DashboardStats } from "@/services/ipc/IPCClient";
 
 const SUGGESTIONS_CACHE_KEY = "eac-suggested-queries";
-const SUGGESTIONS_TTL_MS = 60 * 60 * 1000; // 1 hour
+const SUGGESTIONS_TTL_MS = 20 * 60 * 1000; // 20 minutes
+const POOL_SIZE = 12;
+const VISIBLE_COUNT = 3;
+const RESHUFFLE_BUST_THRESHOLD = 4; // fresh fetch after 4 local reshuffles
 
 interface CachedSuggestions {
   suggestions: string[];
@@ -30,9 +33,19 @@ function saveSuggestionsCache(suggestions: string[]): void {
   }
 }
 
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, Math.min(n, copy.length));
+}
+
 interface DashboardState {
   stats: DashboardStats | null;
-  suggestions: string[];
+  suggestionPool: string[];
+  suggestions: string[]; // visible slice — 3 randomly picked from pool
   isLoadingStats: boolean;
   isLoadingSuggestions: boolean;
   statsError: string | null;
@@ -41,11 +54,25 @@ interface DashboardState {
 export function useDashboard() {
   const [state, setState] = useState<DashboardState>({
     stats: null,
+    suggestionPool: [],
     suggestions: [],
     isLoadingStats: true,
     isLoadingSuggestions: false,
     statsError: null,
   });
+
+  const reshuffleCountRef = useRef(0);
+  const recentFilePathsRef = useRef<string[]>([]);
+
+  const applyPool = useCallback((pool: string[]) => {
+    setState((s) => ({
+      ...s,
+      suggestionPool: pool,
+      suggestions: pickRandom(pool, VISIBLE_COUNT),
+      isLoadingSuggestions: false,
+    }));
+    reshuffleCountRef.current = 0;
+  }, []);
 
   const loadStats = useCallback(async () => {
     setState((s) => ({ ...s, isLoadingStats: true, statsError: null }));
@@ -63,34 +90,55 @@ export function useDashboard() {
     }
   }, []);
 
-  const loadSuggestions = useCallback(async (recentFilePaths: string[], bust = false) => {
-    if (!recentFilePaths.length) return;
+  const loadSuggestions = useCallback(
+    async (recentFilePaths: string[], bust = false) => {
+      if (!recentFilePaths.length) return;
+      recentFilePathsRef.current = recentFilePaths;
 
-    // Use cache on initial load; skip it on manual refresh.
-    if (!bust) {
-      const cached = loadCachedSuggestions();
-      if (cached) {
-        setState((s) => ({ ...s, suggestions: cached }));
-        return;
+      if (!bust) {
+        const cached = loadCachedSuggestions();
+        if (cached) {
+          applyPool(cached);
+          return;
+        }
       }
-    }
 
-    setState((s) => ({ ...s, isLoadingSuggestions: true }));
-    try {
-      const suggestions = await IPCClient.getSuggestedQueries(recentFilePaths, 5);
-      saveSuggestionsCache(suggestions);
-      setState((s) => ({ ...s, suggestions, isLoadingSuggestions: false }));
-    } catch {
-      // Suggestions are non-critical — fail silently
-      setState((s) => ({ ...s, isLoadingSuggestions: false }));
+      setState((s) => ({ ...s, isLoadingSuggestions: true }));
+      try {
+        const pool = await IPCClient.getSuggestedQueries(recentFilePaths, POOL_SIZE);
+        saveSuggestionsCache(pool);
+        applyPool(pool);
+      } catch {
+        setState((s) => ({ ...s, isLoadingSuggestions: false }));
+      }
+    },
+    [applyPool]
+  );
+
+  const reshuffleSuggestions = useCallback(() => {
+    reshuffleCountRef.current += 1;
+
+    // Pick a new random 3 from the existing pool immediately
+    setState((s) => ({
+      ...s,
+      suggestions: pickRandom(s.suggestionPool, VISIBLE_COUNT),
+    }));
+
+    // After threshold reshuffles, bust cache and fetch a genuinely fresh pool
+    if (
+      reshuffleCountRef.current >= RESHUFFLE_BUST_THRESHOLD &&
+      recentFilePathsRef.current.length
+    ) {
+      reshuffleCountRef.current = 0;
+      localStorage.removeItem(SUGGESTIONS_CACHE_KEY);
+      loadSuggestions(recentFilePathsRef.current, true);
     }
-  }, []);
+  }, [loadSuggestions]);
 
   const refresh = useCallback(async () => {
     const stats = await loadStats();
     if (stats?.recent_files.length) {
       const paths = stats.recent_files.map((f) => f.file_path);
-      // Bust cache on manual refresh so new documents produce fresh suggestions.
       await loadSuggestions(paths, true);
     }
   }, [loadStats, loadSuggestions]);
@@ -111,5 +159,6 @@ export function useDashboard() {
     isLoadingSuggestions: state.isLoadingSuggestions,
     statsError: state.statsError,
     refresh,
+    reshuffleSuggestions,
   };
 }

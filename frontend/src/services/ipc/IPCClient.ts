@@ -75,10 +75,13 @@ export interface IndexWorkspaceResponse {
 export interface IndexingStatus {
   task_id: string;
   status: string;
+  stage: string; // "indexing" | "building_graph" | "linking_entities" | "completed"
   files_found: number;
   files_indexed: number;
   files_skipped: number;
   errors: string[];
+  graph_files_total: number;
+  graph_files_processed: number;
 }
 
 export interface SearchResultItem {

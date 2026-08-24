@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Loader2,
   Play,
@@ -8,98 +8,21 @@ import {
   Square,
   ChevronDown,
   ChevronRight,
+  Circle,
+  Network,
+  Link,
+  FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { IPCClient } from "@/services/ipc/IPCClient";
 import type { IndexingStatus } from "@/services/ipc/IPCClient";
-
-interface IndexingTaskState {
-  taskId: string;
-  workspacePath: string;
-  status: IndexingStatus | null;
-  polling: boolean;
-}
+import { useIndexingStore } from "@/store/indexingStore";
+import type { IndexingTaskState } from "@/store/indexingStore";
 
 export function IndexingStatusPanel() {
   const { folders } = useWorkspace();
-  const [tasks, setTasks] = useState<IndexingTaskState[]>([]);
   const [customPath, setCustomPath] = useState("");
-
-  // Interval handles stored in a ref so we can cancel them imperatively
-  // without causing re-renders or stale closures.
-  const intervalMapRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
-
-  const clearTaskInterval = useCallback((taskId: string) => {
-    const handle = intervalMapRef.current.get(taskId);
-    if (handle !== undefined) {
-      clearInterval(handle);
-      intervalMapRef.current.delete(taskId);
-    }
-  }, []);
-
-  const pollTask = useCallback(
-    (taskId: string) => {
-      const handle = setInterval(async () => {
-        try {
-          const status = await IPCClient.getIndexingStatus(taskId);
-          const isDone =
-            status.status !== "running" &&
-            status.status !== "queued" &&
-            status.status !== "cancelled";
-          const isCancelled = status.status === "cancelled";
-
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.taskId === taskId ? { ...t, status, polling: !isDone && !isCancelled } : t
-            )
-          );
-
-          if (isDone || isCancelled) {
-            clearTaskInterval(taskId);
-          }
-        } catch {
-          clearTaskInterval(taskId);
-          setTasks((prev) => prev.map((t) => (t.taskId === taskId ? { ...t, polling: false } : t)));
-        }
-      }, 2000);
-
-      intervalMapRef.current.set(taskId, handle);
-    },
-    [clearTaskInterval]
-  );
-
-  const startIndex = async (workspacePath: string) => {
-    try {
-      const response = await IPCClient.indexWorkspace(workspacePath);
-      const task: IndexingTaskState = {
-        taskId: response.task_id,
-        workspacePath,
-        status: null,
-        polling: true,
-      };
-      setTasks((prev) => [task, ...prev.slice(0, 9)]);
-      pollTask(response.task_id);
-    } catch (err) {
-      console.error("Failed to start indexing:", err);
-    }
-  };
-
-  const stopTask = async (taskId: string) => {
-    try {
-      await IPCClient.cancelIndexing(taskId);
-    } catch {
-      // Server-side cancel may still fail gracefully; stop polling regardless.
-    }
-    clearTaskInterval(taskId);
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.taskId === taskId
-          ? { ...t, polling: false, status: t.status ? { ...t.status, status: "cancelled" } : null }
-          : t
-      )
-    );
-  };
+  const { tasks, startIndex, stopTask } = useIndexingStore();
 
   return (
     <div className="space-y-4">
@@ -110,7 +33,6 @@ export function IndexingStatusPanel() {
         </p>
       </div>
 
-      {/* Quick index watched folders */}
       {folders.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Watched folders</p>
@@ -137,7 +59,6 @@ export function IndexingStatusPanel() {
         </div>
       )}
 
-      {/* Custom path */}
       <div className="space-y-1.5">
         <p className="text-xs font-medium text-muted-foreground">Custom path</p>
         <div className="flex gap-2">
@@ -172,7 +93,6 @@ export function IndexingStatusPanel() {
         </div>
       </div>
 
-      {/* Task history */}
       {tasks.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Recent tasks</p>
@@ -194,6 +114,41 @@ export function IndexingStatusPanel() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Stage helpers
+// ---------------------------------------------------------------------------
+
+type StageId = "indexing" | "building_graph" | "linking_entities" | "completed";
+
+function resolveStage(status: IndexingStatus | null, polling: boolean): StageId {
+  if (!status) return "indexing";
+  const s = status.stage as StageId | undefined;
+  if (s === "building_graph" || s === "linking_entities") return s;
+  if (
+    status.status === "completed" ||
+    status.status === "completed_with_errors" ||
+    (!polling && status.status !== "running" && status.status !== "queued")
+  )
+    return "completed";
+  return "indexing";
+}
+
+type PassState = "pending" | "active" | "done";
+
+function passState(stageId: StageId, pass: 1 | 2 | 3): PassState {
+  const order: StageId[] = ["indexing", "building_graph", "linking_entities", "completed"];
+  const current = order.indexOf(stageId);
+  const passTrigger: StageId[] = ["indexing", "building_graph", "linking_entities"];
+  const passIndex = order.indexOf(passTrigger[pass - 1]);
+  if (current < passIndex) return "pending";
+  if (current === passIndex) return "active";
+  return "done";
+}
+
+// ---------------------------------------------------------------------------
+// Task card
+// ---------------------------------------------------------------------------
+
 interface IndexingTaskCardProps {
   task: IndexingTaskState;
   onStop: (taskId: string) => void;
@@ -213,8 +168,13 @@ function IndexingTaskCard({ task, onStop }: IndexingTaskCardProps) {
   const skipped = task.status?.files_skipped ?? 0;
   const errorCount = task.status?.errors?.length ?? 0;
 
+  const currentStage = resolveStage(task.status, task.polling);
+  const graphTotal = task.status?.graph_files_total ?? 0;
+  const graphProcessed = task.status?.graph_files_processed ?? 0;
+
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2.5 space-y-1.5">
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5 space-y-2">
+      {/* Header row */}
       <div className="flex items-center gap-2">
         {isRunning ? (
           <Loader2 size={13} className="flex-shrink-0 animate-spin text-primary" />
@@ -231,7 +191,6 @@ function IndexingTaskCard({ task, onStop }: IndexingTaskCardProps) {
           {task.workspacePath}
         </p>
 
-        {/* Stop button — only visible while running or queued */}
         {isRunning && (
           <button
             onClick={() => onStop(task.taskId)}
@@ -256,49 +215,72 @@ function IndexingTaskCard({ task, onStop }: IndexingTaskCardProps) {
                 ? "bg-success/10 text-success"
                 : hasErrors
                   ? "bg-warning/10 text-warning"
-                  : isCancelled
-                    ? "bg-muted text-muted-foreground"
-                    : "bg-muted text-muted-foreground"
+                  : "bg-muted text-muted-foreground"
           )}
         >
           {statusValue}
         </span>
       </div>
 
-      {task.status && (
-        <div className="flex gap-3 text-2xs text-muted-foreground">
-          <span>{found} found</span>
-          <span>{indexed} indexed</span>
-          <span>{skipped} skipped</span>
-          {hasErrors && (
-            <button
-              onClick={() => setErrorsExpanded((v) => !v)}
-              className="flex items-center gap-0.5 text-warning hover:underline"
-            >
-              {errorsExpanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-              {errorCount} {errorCount === 1 ? "error" : "errors"}
-            </button>
-          )}
-        </div>
-      )}
-
-      {found > 0 && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              isCancelled ? "bg-muted-foreground" : isRunning ? "bg-primary" : "bg-success"
-            )}
-            style={{
-              width: `${found > 0 ? Math.round(((indexed + skipped) / found) * 100) : 0}%`,
-            }}
+      {/* Three-stage progress */}
+      {(isRunning || isComplete || isCancelled) && (
+        <div className="space-y-1.5">
+          <PassRow
+            pass={1}
+            icon={FileSearch}
+            label="Extracting & indexing files"
+            state={isCancelled ? "done" : passState(currentStage, 1)}
+            progress={found > 0 ? (indexed + skipped) / found : null}
+            detail={
+              task.status
+                ? `${indexed} indexed · ${skipped} skipped${found ? ` / ${found} found` : ""}`
+                : null
+            }
+          />
+          <PassRow
+            pass={2}
+            icon={Network}
+            label="Building knowledge graph"
+            state={isCancelled ? "pending" : passState(currentStage, 2)}
+            progress={
+              graphTotal > 0
+                ? graphProcessed / graphTotal
+                : currentStage === "building_graph"
+                  ? null // indeterminate
+                  : 0
+            }
+            detail={
+              graphTotal > 0
+                ? `${graphProcessed} / ${graphTotal} documents`
+                : currentStage === "building_graph"
+                  ? "Processing…"
+                  : null
+            }
+          />
+          <PassRow
+            pass={3}
+            icon={Link}
+            label="Linking entities"
+            state={isCancelled ? "pending" : passState(currentStage, 3)}
+            progress={null}
+            detail={null}
           />
         </div>
       )}
 
-      {/* Inline error list — collapsible */}
+      {/* Error list */}
+      {task.status && hasErrors && (
+        <button
+          onClick={() => setErrorsExpanded((v) => !v)}
+          className="flex items-center gap-0.5 text-2xs text-warning hover:underline"
+        >
+          {errorsExpanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
+          {errorCount} {errorCount === 1 ? "error" : "errors"}
+        </button>
+      )}
+
       {errorsExpanded && task.status?.errors && task.status.errors.length > 0 && (
-        <div className="mt-1.5 space-y-1 rounded-md border border-warning/20 bg-warning/5 p-2">
+        <div className="space-y-1 rounded-md border border-warning/20 bg-warning/5 p-2">
           {task.status.errors.slice(0, 20).map((err, i) => (
             <p key={i} className="break-all font-mono text-2xs text-warning leading-relaxed">
               {err}
@@ -306,11 +288,95 @@ function IndexingTaskCard({ task, onStop }: IndexingTaskCardProps) {
           ))}
           {task.status.errors.length > 20 && (
             <p className="text-2xs text-muted-foreground">
-              …and {task.status.errors.length - 20} more (see Errors tab)
+              …and {task.status.errors.length - 20} more
             </p>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-pass row
+// ---------------------------------------------------------------------------
+
+interface PassRowProps {
+  pass: 1 | 2 | 3;
+  icon: React.ElementType;
+  label: string;
+  state: PassState;
+  progress: number | null; // 0–1, or null = indeterminate
+  detail: string | null;
+}
+
+function PassRow({ icon: Icon, label, state, progress, detail }: PassRowProps) {
+  const isActive = state === "active";
+  const isDone = state === "done";
+  const isPending = state === "pending";
+  const isIndeterminate = isActive && progress === null;
+
+  // Fill % for the determinate bar: 100 when done, actual progress when active, 0 when pending.
+  const fillPct = isDone ? 100 : isActive && progress !== null ? Math.round(progress * 100) : 0;
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-1 rounded-md px-2 py-1.5 transition-colors",
+        isActive && "bg-primary/5 border border-primary/15",
+        isDone && "opacity-60",
+        isPending && "opacity-30"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {isDone ? (
+          <CheckCircle size={11} className="flex-shrink-0 text-success" strokeWidth={1.75} />
+        ) : isActive ? (
+          <Loader2 size={11} className="flex-shrink-0 animate-spin text-primary" />
+        ) : (
+          <Circle size={11} className="flex-shrink-0 text-muted-foreground/40" strokeWidth={1.5} />
+        )}
+        <Icon
+          size={11}
+          className={cn(
+            "flex-shrink-0",
+            isActive ? "text-primary" : isDone ? "text-success" : "text-muted-foreground/40"
+          )}
+          strokeWidth={1.5}
+        />
+        <span
+          className={cn(
+            "text-2xs font-medium",
+            isActive
+              ? "text-foreground"
+              : isDone
+                ? "text-muted-foreground"
+                : "text-muted-foreground/40"
+          )}
+        >
+          {label}
+        </span>
+        {detail && isActive && (
+          <span className="ml-auto text-2xs text-muted-foreground/70 tabular-nums">{detail}</span>
+        )}
+      </div>
+
+      {/* Progress track — always visible so each pass has its own distinct bar */}
+      <div className="pl-[23px]">
+        <div className="h-0.5 w-full overflow-hidden rounded-full bg-muted">
+          {isIndeterminate ? (
+            <div className="h-full w-1/3 rounded-full bg-primary animate-pulse" />
+          ) : (
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-300",
+                isDone ? "bg-success" : "bg-primary"
+              )}
+              style={{ width: `${fillPct}%` }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,14 @@
-import { Sparkles, Search, Loader2 } from "lucide-react";
+import { Sparkles, Search, Loader2, RefreshCw } from "lucide-react";
 import { useNavigationStore } from "@/store/navigationStore";
 import { useSearchStore } from "@/store/searchStore";
 
 interface SuggestedQueriesProps {
   suggestions: string[];
   isLoading: boolean;
+  onReshuffle?: () => void;
 }
 
-export function SuggestedQueries({ suggestions, isLoading }: SuggestedQueriesProps) {
+export function SuggestedQueries({ suggestions, isLoading, onReshuffle }: SuggestedQueriesProps) {
   const { setActiveItem } = useNavigationStore();
   const { setQuery } = useSearchStore();
 
@@ -18,9 +19,21 @@ export function SuggestedQueries({ suggestions, isLoading }: SuggestedQueriesPro
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-1.5">
-        <Sparkles size={13} className="text-muted-foreground" strokeWidth={1.75} />
-        <span className="text-xs font-medium text-muted-foreground">Suggested searches</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Sparkles size={13} className="text-muted-foreground" strokeWidth={1.75} />
+          <span className="text-xs font-medium text-muted-foreground">Suggested searches</span>
+        </div>
+        {onReshuffle && suggestions.length > 0 && !isLoading && (
+          <button
+            type="button"
+            onClick={onReshuffle}
+            aria-label="Show different suggestions"
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-2xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-muted-foreground"
+          >
+            <RefreshCw size={10} strokeWidth={1.75} />
+          </button>
+        )}
       </div>
 
       {isLoading ? (

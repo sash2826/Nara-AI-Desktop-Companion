@@ -11,6 +11,7 @@ from enterprise_ai_companion.capabilities.graph.knowledge_graph_service import K
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
 from enterprise_ai_companion.capabilities.indexing.chunk_repository import ChunkRepository
 from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
+from enterprise_ai_companion.infrastructure.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +27,30 @@ class DocumentResponse(BaseModel):
     indexed_at: str
 
 
+def _system_path_prefixes() -> list[str]:
+    """Return normalised system-path prefixes from config (lower-cased for case-insensitive match)."""
+    raw = get_config().system_index_paths
+    return [p.strip().lower().rstrip("/\\") for p in raw.split(",") if p.strip()]
+
+
+def _is_system_document(file_path: str, prefixes: list[str]) -> bool:
+    normalised = file_path.lower().replace("\\", "/")
+    return any(normalised.startswith(p.replace("\\", "/")) for p in prefixes)
+
+
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     request: Request,
     workspace_path: str | None = Query(default=None),
+    include_system: bool = Query(default=False),
     limit: int = Query(default=500, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> list[DocumentResponse]:
-    """Return indexed documents, optionally filtered by workspace path."""
+    """Return indexed documents, optionally filtered by workspace path.
+
+    System documents (paths listed in EAC_SYSTEM_INDEX_PATHS) are excluded by
+    default. Pass include_system=true to include them.
+    """
     repo = DocumentRepository(request.app.state.db)
 
     if workspace_path:
@@ -41,6 +58,11 @@ async def list_documents(
         docs = docs[offset : offset + limit]
     else:
         docs = await repo.list_all(limit=limit, offset=offset)
+
+    if not include_system:
+        prefixes = _system_path_prefixes()
+        if prefixes:
+            docs = [d for d in docs if not _is_system_document(d.file_path, prefixes)]
 
     return [
         DocumentResponse(

@@ -18,6 +18,7 @@ interface PromptComposerProps {
   onClear: () => void;
   hasMessages: boolean;
   suggestions?: string[];
+  onReshuffle?: () => void;
   className?: string;
 }
 
@@ -31,6 +32,7 @@ export function PromptComposer({
   onClear,
   hasMessages,
   suggestions,
+  onReshuffle,
   className,
 }: PromptComposerProps) {
   const isBusy = isStreaming || isTyping;
@@ -64,6 +66,7 @@ export function PromptComposer({
                 onSelect={handleQuickAction}
                 disabled={isBusy}
                 suggestions={suggestions}
+                onReshuffle={onReshuffle}
               />
             </motion.div>
           )}

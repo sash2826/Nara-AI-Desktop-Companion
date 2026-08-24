@@ -108,11 +108,11 @@ export function GlassPrompt({ isOpen, onClose, children, className }: GlassPromp
             exit="exit"
             className={cn(
               "relative z-10 w-full max-w-2xl mx-4",
-              "rounded-2xl border border-white/20 dark:border-white/10",
-              "bg-white/80 dark:bg-neutral-900/80",
-              "backdrop-blur-xl",
-              "shadow-2xl shadow-black/20 dark:shadow-black/50",
-              "overflow-hidden",
+              "rounded-2xl overflow-hidden",
+              "border border-white/30 dark:border-white/10",
+              "bg-white/90 dark:bg-neutral-900/90",
+              "backdrop-blur-xl backdrop-saturate-150",
+              "shadow-2xl shadow-black/25 dark:shadow-black/60",
               className
             )}
           >

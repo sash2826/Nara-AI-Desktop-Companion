@@ -11,6 +11,7 @@ interface AssistantFooterProps {
   onClear: () => void;
   hasMessages: boolean;
   suggestions?: string[];
+  onReshuffle?: () => void;
   className?: string;
 }
 
@@ -24,6 +25,7 @@ export function AssistantFooter({
   onClear,
   hasMessages,
   suggestions,
+  onReshuffle,
   className,
 }: AssistantFooterProps) {
   return (
@@ -38,6 +40,7 @@ export function AssistantFooter({
         onClear={onClear}
         hasMessages={hasMessages}
         suggestions={suggestions}
+        onReshuffle={onReshuffle}
       />
     </footer>
   );

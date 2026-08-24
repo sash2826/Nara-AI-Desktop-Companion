@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -6,6 +6,7 @@ interface QuickActionsProps {
   onSelect: (prompt: string) => void;
   disabled?: boolean;
   suggestions?: string[];
+  onReshuffle?: () => void;
   className?: string;
 }
 
@@ -13,6 +14,7 @@ export function QuickActions({
   onSelect,
   disabled = false,
   suggestions,
+  onReshuffle,
   className,
 }: QuickActionsProps) {
   if (!suggestions || suggestions.length === 0) return null;
@@ -22,9 +24,22 @@ export function QuickActions({
   return (
     <div className={cn("flex flex-col gap-2 px-4 py-2", className)}>
       {/* Heading */}
-      <div className="flex items-center gap-1.5">
-        <Sparkles size={12} className="text-muted-foreground" strokeWidth={1.75} />
-        <span className="text-xs font-medium text-muted-foreground">Suggested searches</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Sparkles size={12} className="text-muted-foreground" strokeWidth={1.75} />
+          <span className="text-xs font-medium text-muted-foreground">Suggested searches</span>
+        </div>
+        {onReshuffle && (
+          <button
+            type="button"
+            onClick={onReshuffle}
+            disabled={disabled}
+            aria-label="Show different suggestions"
+            className="flex items-center rounded-md px-1.5 py-1 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground disabled:pointer-events-none"
+          >
+            <RefreshCw size={10} strokeWidth={1.75} />
+          </button>
+        )}
       </div>
 
       {/* Suggestion chips */}

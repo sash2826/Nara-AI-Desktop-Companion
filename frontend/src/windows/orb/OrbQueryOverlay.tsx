@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ArrowUp } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useOrbWindowStore } from "./orbWindowStore";
 
@@ -169,17 +170,17 @@ export function OrbQueryOverlay() {
         right: 0,
         width: OVERLAY_WIDTH,
         zIndex: 100,
-        background: "hsl(0 0% 100% / 0.12)",
+        background: "hsl(var(--popover) / 0.94)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: "1px solid hsl(0 0% 100% / 0.20)",
+        border: "1px solid hsl(var(--border) / 0.7)",
         borderRadius: 16,
-        boxShadow: ["0 8px 32px hsl(0 0% 0% / 0.28)", "inset 0 1px 0 hsl(0 0% 100% / 0.15)"].join(
+        boxShadow: ["0 8px 32px hsl(0 0% 0% / 0.28)", "inset 0 1px 0 hsl(0 0% 100% / 0.08)"].join(
           ", "
         ),
         padding: "12px 14px",
-        color: "hsl(0 0% 95%)",
-        fontFamily: "system-ui, sans-serif",
+        color: "hsl(var(--popover-foreground))",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         fontSize: 13,
       }}
     >
@@ -194,7 +195,7 @@ export function OrbQueryOverlay() {
             style={{
               marginBottom: 8,
               fontSize: 12,
-              color: "hsl(0 0% 60%)",
+              color: "hsl(var(--muted-foreground))",
               fontStyle: "italic",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -207,7 +208,20 @@ export function OrbQueryOverlay() {
       </AnimatePresence>
 
       {/* Input row */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+          padding: "5px 6px 5px 10px",
+          background: "hsl(var(--muted) / 0.4)",
+          backdropFilter: "blur(12px) saturate(180%)",
+          WebkitBackdropFilter: "blur(12px) saturate(180%)",
+          border: "1px solid hsl(var(--border))",
+          borderRadius: "1.75rem",
+          boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.1), 0 2px 10px hsl(0 0% 0% / 0.12)",
+        }}
+      >
         <input
           ref={inputRef}
           value={query}
@@ -219,34 +233,41 @@ export function OrbQueryOverlay() {
           disabled={isSubmitting}
           style={{
             flex: 1,
-            background: "hsl(0 0% 100% / 0.08)",
-            border: "1px solid hsl(0 0% 100% / 0.15)",
-            borderRadius: 8,
-            padding: "6px 10px",
+            minWidth: 0,
+            background: "transparent",
+            border: "none",
+            padding: "7px 4px",
             color: "inherit",
             fontSize: "inherit",
             outline: "none",
           }}
         />
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!query.trim() || isSubmitting}
+          aria-label="Send query"
+          title="Send query"
           style={{
-            padding: "6px 12px",
-            borderRadius: 8,
+            width: 32,
+            height: 32,
+            display: "flex",
+            flexShrink: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            borderRadius: "50%",
             border: "none",
-            background:
+            background: !query.trim() || isSubmitting ? "hsl(var(--muted))" : "hsl(var(--primary))",
+            color:
               !query.trim() || isSubmitting
-                ? "hsl(0 0% 100% / 0.10)"
-                : "hsl(var(--color-primary-500))",
-            color: "hsl(0 0% 95%)",
+                ? "hsl(var(--muted-foreground))"
+                : "hsl(var(--primary-foreground))",
             cursor: !query.trim() || isSubmitting ? "default" : "pointer",
-            fontSize: 12,
-            fontWeight: 600,
             transition: "background 0.2s",
           }}
         >
-          Ask
+          <ArrowUp size={15} strokeWidth={2.2} aria-hidden="true" />
         </button>
       </div>
 
@@ -264,7 +285,7 @@ export function OrbQueryOverlay() {
             <div
               style={{
                 paddingTop: 6,
-                borderTop: "1px solid hsl(0 0% 100% / 0.10)",
+                borderTop: "1px solid hsl(var(--border))",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
@@ -287,7 +308,7 @@ export function OrbQueryOverlay() {
                       width: 4,
                       height: 4,
                       borderRadius: "50%",
-                      background: "hsl(210 80% 65%)",
+                      background: "hsl(var(--primary))",
                     }}
                   />
                 ))}
@@ -300,7 +321,7 @@ export function OrbQueryOverlay() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.25, ease: "easeOut" }}
-                  style={{ fontSize: 12, color: "hsl(210 80% 65%)", fontStyle: "italic" }}
+                  style={{ fontSize: 12, color: "hsl(var(--primary))", fontStyle: "italic" }}
                 >
                   {THINKING_PHRASES[queryState.thinkingPhase]}…
                 </motion.span>
@@ -325,9 +346,12 @@ export function OrbQueryOverlay() {
                 maxHeight: 120,
                 overflowY: "auto",
                 lineHeight: 1.55,
-                color: queryState.status === "error" ? "hsl(0 72% 75%)" : "hsl(0 0% 92%)",
+                color:
+                  queryState.status === "error"
+                    ? "hsl(var(--destructive))"
+                    : "hsl(var(--popover-foreground))",
                 padding: "6px 2px",
-                borderTop: "1px solid hsl(0 0% 100% / 0.10)",
+                borderTop: "1px solid hsl(var(--border))",
               }}
             >
               {queryState.status === "error"
@@ -344,7 +368,7 @@ export function OrbQueryOverlay() {
                   gap: 4,
                   marginTop: 8,
                   paddingTop: 6,
-                  borderTop: "1px solid hsl(0 0% 100% / 0.08)",
+                  borderTop: "1px solid hsl(var(--border))",
                 }}
               >
                 {queryState.sources.map((src) => (
@@ -358,9 +382,9 @@ export function OrbQueryOverlay() {
                       gap: 4,
                       padding: "3px 8px",
                       borderRadius: 6,
-                      border: "1px solid hsl(0 0% 100% / 0.15)",
-                      background: "hsl(0 0% 100% / 0.07)",
-                      color: "hsl(210 80% 70%)",
+                      border: "1px solid hsl(var(--border))",
+                      background: "hsl(var(--muted) / 0.6)",
+                      color: "hsl(var(--primary))",
                       fontSize: 11,
                       cursor: "pointer",
                       maxWidth: 160,
@@ -388,9 +412,9 @@ export function OrbQueryOverlay() {
                   style={{
                     padding: "4px 10px",
                     borderRadius: 7,
-                    border: "1px solid hsl(0 0% 100% / 0.18)",
-                    background: "hsl(0 0% 100% / 0.08)",
-                    color: "hsl(0 0% 92%)",
+                    border: "1px solid hsl(var(--border))",
+                    background: "hsl(var(--muted) / 0.6)",
+                    color: "hsl(var(--popover-foreground))",
                     fontSize: 12,
                     cursor: "pointer",
                   }}
@@ -404,8 +428,8 @@ export function OrbQueryOverlay() {
                   padding: "4px 10px",
                   borderRadius: 7,
                   border: "none",
-                  background: "hsl(0 0% 100% / 0.12)",
-                  color: "hsl(0 0% 80%)",
+                  background: "hsl(var(--muted) / 0.8)",
+                  color: "hsl(var(--muted-foreground))",
                   fontSize: 12,
                   cursor: "pointer",
                 }}

@@ -18,6 +18,7 @@ const STATIC_TABS = [
 export function WorkspacePage() {
   const { activeTab, setActiveTab } = useWorkspace();
   const errorCount = useWorkspaceStore((s) => s.errorCount);
+  const setErrorCount = useWorkspaceStore((s) => s.setErrorCount);
 
   return (
     <div className="flex h-full flex-col">
@@ -41,7 +42,10 @@ export function WorkspacePage() {
 
         {/* Errors tab — rendered separately so we can attach the badge */}
         <button
-          onClick={() => setActiveTab("errors")}
+          onClick={() => {
+            setActiveTab("errors");
+            setErrorCount(0);
+          }}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-t-md border-b-2 px-3 pb-2.5 pt-1 text-xs font-medium transition-colors",
             activeTab === "errors"

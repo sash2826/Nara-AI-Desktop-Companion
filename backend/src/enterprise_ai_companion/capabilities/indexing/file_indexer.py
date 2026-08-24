@@ -140,6 +140,7 @@ class IndexingResult:
     files_indexed: int = 0
     files_skipped: int = 0
     errors: list[str] = field(default_factory=list)
+    graph_task: "asyncio.Task[None] | None" = field(default=None, repr=False)
 
     @property
     def status(self) -> str:
@@ -243,19 +244,23 @@ class FileIndexer:
         self,
         workspace_path: str,
         progress_cb: Callable[[IndexingResult], None] | None = None,
+        graph_progress_cb: "Callable[[int, int, str], None] | None" = None,
     ) -> IndexingResult:
         """Index all supported files under workspace_path. Returns a summary.
 
-        progress_cb is called after every file is processed so callers can track
-        live progress rather than waiting for the full run to finish.
+        progress_cb is called after every file in Pass 1.
+        graph_progress_cb(processed, total, stage) is called during Pass 2/3.
+        result.graph_task holds the background asyncio.Task for Pass 2+3 so
+        callers can await it separately while keeping search available immediately.
         """
         async with self._workspace_lock(workspace_path):
-            return await self._index_workspace_locked(workspace_path, progress_cb)
+            return await self._index_workspace_locked(workspace_path, progress_cb, graph_progress_cb)
 
     async def _index_workspace_locked(
         self,
         workspace_path: str,
         progress_cb: Callable[[IndexingResult], None] | None = None,
+        graph_progress_cb: "Callable[[int, int, str], None] | None" = None,
     ) -> IndexingResult:
         root = Path(workspace_path).resolve()
 
@@ -314,9 +319,10 @@ class FileIndexer:
         # search is available immediately after Pass 1 completes.
         if deferred_graph:
             logger.info("[PASS 2] Scheduling graph extraction for %d document(s)", len(deferred_graph))
-            task = asyncio.create_task(self._run_graph_pass(deferred_graph))
+            task = asyncio.create_task(self._run_graph_pass(deferred_graph, graph_progress_cb))
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
+            result.graph_task = task
 
         logger.info(
             "Indexing complete: %d found, %d indexed, %d skipped, %d errors",
@@ -484,7 +490,25 @@ class FileIndexer:
     ) -> bool:
         """Inner implementation — called only while the per-file lock is held."""
         loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(None, self._extract_text, file_path)
+        # ZIP-based formats (.docx/.xlsx/.pptx) can fail with BadZipFile or
+        # PackageNotFoundError when a cloud-sync (e.g. OneDrive) is still writing
+        # the file. Retry up to 3 times with short delays before giving up.
+        _ZIP_EXTS = {".docx", ".xlsx", ".pptx"}
+        _extract_attempts = 3 if file_path.suffix.lower() in _ZIP_EXTS else 1
+        for _attempt in range(_extract_attempts):
+            try:
+                text = await loop.run_in_executor(None, self._extract_text, file_path)
+                break
+            except Exception as exc:
+                _is_zip_err = "BadZipFile" in type(exc).__name__ or "PackageNotFound" in type(exc).__name__
+                if _is_zip_err and _attempt < _extract_attempts - 1:
+                    logger.warning(
+                        "Extraction failed for %s (attempt %d/%d, likely mid-sync): %s — retrying",
+                        file_path.name, _attempt + 1, _extract_attempts, exc,
+                    )
+                    await asyncio.sleep(2.0 ** _attempt)  # 1s, 2s
+                    continue
+                raise
 
         # Run text through enabled TextProcessorPlugins before hashing/chunking.
         if self._plugin_manager:
@@ -578,6 +602,7 @@ class FileIndexer:
     async def _run_graph_pass(
         self,
         builds: list[tuple[str, str, list[str], str]],
+        graph_progress_cb: "Callable[[int, int, str], None] | None" = None,
     ) -> None:
         """Pass 2: build knowledge graph for documents indexed in Pass 1.
 
@@ -585,13 +610,24 @@ class FileIndexer:
         the user can search immediately while graph extraction proceeds.
         Each build is best-effort — failures are logged and do not block
         the remaining documents.
+        graph_progress_cb(processed, total, stage) is called after each document
+        and at Pass 3 transition.
         """
+        total = len(builds)
+        processed = 0
+
+        if graph_progress_cb:
+            graph_progress_cb(processed, total, "building_graph")
+
         for doc_id, file_hash, chunk_texts, file_name in builds:
             await asyncio.sleep(0)  # yield between documents; allows cancellation
             try:
                 if self._graph_state_repo is not None:
                     state = await self._graph_state_repo.get_by_document(doc_id)
                     if state is not None and state.file_hash == file_hash:
+                        processed += 1
+                        if graph_progress_cb:
+                            graph_progress_cb(processed, total, "building_graph")
                         continue  # already built (e.g. unchanged re-index)
                 await self._graph_service.build_from_chunks(doc_id, chunk_texts)
                 if self._graph_state_repo is not None:
@@ -599,11 +635,17 @@ class FileIndexer:
                 logger.debug("[PASS 2] Graph built for %s", file_name)
             except Exception as exc:
                 logger.warning("[PASS 2] Graph build failed for %s: %s", file_name, exc)
+            processed += 1
+            if graph_progress_cb:
+                graph_progress_cb(processed, total, "building_graph")
+
         logger.info("[PASS 2] Graph extraction complete for %d document(s)", len(builds))
 
         # Pass 3 — cross-document entity linking. Runs once after all documents
         # in this batch are graphed so shared canonical names across the full
         # workspace are connected. No LLM calls; pure SQL.
+        if graph_progress_cb:
+            graph_progress_cb(processed, total, "linking_entities")
         try:
             new_edges = await self._graph_service.link_shared_entities()
             if new_edges:

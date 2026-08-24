@@ -14,8 +14,7 @@ interface CitationChipProps {
 /**
  * Displays a single retrieved source as a clickable chip.
  *
- * Hovering reveals a tooltip with the full file path, chunk index, and
- * retrieval score so the user can judge how relevant the source was.
+ * Hovering reveals a tooltip with the source location.
  * Clicking opens the file via Tauri's shell opener.
  */
 export function CitationChip({ citation, index }: CitationChipProps) {
@@ -28,8 +27,6 @@ export function CitationChip({ citation, index }: CitationChipProps) {
   const filename = segments.at(-1) ?? citation.documentPath;
   const parentFolder = segments.at(-2) ?? null;
   const isOneDrive = /\/OneDrive[^/]*/i.test(normalised);
-
-  const scorePercent = Math.round(citation.rrfScore * 100);
 
   const handleOpen = useCallback(async () => {
     if (!IS_TAURI) return;
@@ -79,7 +76,6 @@ export function CitationChip({ citation, index }: CitationChipProps) {
             aria-label="OneDrive"
           />
         )}
-        <span className="text-muted-foreground/60">[{index}]</span>
       </button>
 
       {/* Hover tooltip — pure CSS positioning, no library dependency */}
@@ -95,19 +91,13 @@ export function CitationChip({ citation, index }: CitationChipProps) {
           <p className="mb-1 break-all font-mono text-2xs text-foreground">
             {parentFolder ? `${parentFolder} / ${filename}` : filename}
           </p>
-          <div className="flex items-center gap-3 text-2xs text-muted-foreground">
+          <div className="flex items-center text-2xs text-muted-foreground">
             {isOneDrive && (
-              <>
-                <span className="flex items-center gap-1 text-blue-400">
-                  <Cloud size={9} strokeWidth={1.5} />
-                  OneDrive
-                </span>
-                <span>·</span>
-              </>
+              <span className="flex items-center gap-1 text-blue-400">
+                <Cloud size={9} strokeWidth={1.5} />
+                OneDrive
+              </span>
             )}
-            <span>Chunk {citation.chunkIndex}</span>
-            <span>·</span>
-            <span>Score {scorePercent}%</span>
           </div>
         </div>
       )}

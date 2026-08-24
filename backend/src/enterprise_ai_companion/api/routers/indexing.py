@@ -56,10 +56,13 @@ class StartIndexingResponse(BaseModel):
 class IndexingStatusResponse(BaseModel):
     task_id: str
     status: str
+    stage: str  # "indexing" | "building_graph" | "linking_entities" | "completed"
     files_found: int
     files_indexed: int
     files_skipped: int
     errors: list[str]
+    graph_files_total: int
+    graph_files_processed: int
 
 
 class IndexingErrorResponse(BaseModel):
@@ -95,17 +98,46 @@ async def _run_indexing(
         tasks[task_id]["files_skipped"] = result.files_skipped
         tasks[task_id]["errors"] = list(result.errors)
 
+    def _graph_progress(processed: int, total: int, stage: str) -> None:
+        if tasks[task_id]["status"] == "cancelled":
+            return
+        tasks[task_id]["stage"] = stage
+        tasks[task_id]["graph_files_processed"] = processed
+        tasks[task_id]["graph_files_total"] = total
+
     try:
-        result = await indexer.index_workspace(workspace_path, progress_cb=_progress)
+        result = await indexer.index_workspace(
+            workspace_path,
+            progress_cb=_progress,
+            graph_progress_cb=_graph_progress,
+        )
         # Only write final status if we weren't cancelled mid-run.
         if tasks[task_id]["status"] != "cancelled":
             tasks[task_id].update(
                 {
-                    "status": result.status,
                     "files_found": result.files_found,
                     "files_indexed": result.files_indexed,
                     "files_skipped": result.files_skipped,
                     "errors": result.errors,
+                }
+            )
+
+            # Await Pass 2 + 3 (graph extraction + entity linking). The task was
+            # already created inside index_workspace; awaiting it here keeps the
+            # router task alive so the status endpoint reflects real progress
+            # instead of showing "completed" while the graph is still building.
+            if result.graph_task is not None and not result.graph_task.done():
+                try:
+                    await result.graph_task
+                except asyncio.CancelledError:
+                    result.graph_task.cancel()
+                    raise
+
+        if tasks[task_id]["status"] != "cancelled":
+            tasks[task_id].update(
+                {
+                    "status": result.status,
+                    "stage": "completed",
                 }
             )
             if audit is not None:
@@ -159,11 +191,14 @@ async def start_indexing(body: StartIndexingRequest, request: Request) -> StartI
 
     tasks[task_id] = {
         "status": "queued",
+        "stage": "indexing",
         "workspace_path": body.workspace_path,
         "files_found": 0,
         "files_indexed": 0,
         "files_skipped": 0,
         "errors": [],
+        "graph_files_total": 0,
+        "graph_files_processed": 0,
         "_task": None,
     }
 
@@ -204,10 +239,13 @@ async def get_indexing_status(task_id: str, request: Request) -> IndexingStatusR
     return IndexingStatusResponse(
         task_id=task_id,
         status=task["status"],
+        stage=task.get("stage", "indexing"),
         files_found=task["files_found"],
         files_indexed=task["files_indexed"],
         files_skipped=task["files_skipped"],
         errors=task["errors"],
+        graph_files_total=task.get("graph_files_total", 0),
+        graph_files_processed=task.get("graph_files_processed", 0),
     )
 
 
