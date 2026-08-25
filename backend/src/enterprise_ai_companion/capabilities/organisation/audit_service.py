@@ -22,6 +22,14 @@ _MIN_TOP_SCORE = 0.22
 # with delta=0.249 that MUST be flagged.  0.248 sits between them with 5 ms
 # margin on each side.  Confirmed no new false positives at this setting.
 _MIN_SCORE_DELTA = 0.248
+# When a file is already in a project subfolder (not a root ancestor), the
+# normalised current_score is meaningful and scores ~0.25 even for weak matches.
+# A higher delta is needed to avoid flagging files that simply share generic
+# operational vocabulary (e.g. "Programme Operating Model") with the wrong folder.
+# Benchmark floating-file tests always have current_folder_is_ancestor=True
+# (files sit in the root, subfolders are the candidates), so they use
+# _MIN_SCORE_DELTA and are unaffected by this constant.
+_MIN_SCORE_DELTA_PLACED = 0.50
 _PAGE_SIZE = 100
 
 
@@ -133,20 +141,14 @@ class AuditService:
         # to match all descendants, inflating current_score and suppressing
         # valid recommendations. Treat it as 0.0 — any subfolder rec is an
         # improvement over an unorganised root.
-        current_folder_is_ancestor = any(
-            c.startswith(current_folder.rstrip(os.sep) + os.sep)
-            for c in candidate_paths
-        )
-        if current_folder_is_ancestor:
-            current_score = 0.0
-        else:
-            current_score = await self._placement_scorer.score_one(doc.id, current_folder, file_path=doc.file_path)
-
         # Exclude the file's own folder AND any ancestor directory from the
         # candidate list. A root folder like "test-drive" scores artificially
         # high because its entity set is the union of every subfolder — it is
         # not a meaningful destination and the file already lives inside it.
-        current_sep = current_folder.rstrip(os.sep) + os.sep
+        current_folder_is_ancestor = any(
+            c.startswith(current_folder.rstrip(os.sep) + os.sep)
+            for c in candidate_paths
+        )
         non_current_candidates = [
             f for f in candidate_paths
             if f != current_folder
@@ -155,12 +157,41 @@ class AuditService:
         if not non_current_candidates:
             return
 
+        # Score all candidates INCLUDING the current folder in a single score_all
+        # call so rerank normalisation applies to all folders on the same scale.
+        # score_one() returns a raw un-normalised rerank value (~0.001) while
+        # score_all() normalises to best-folder=1.0, making the delta comparison
+        # meaningless when they are mixed. Including current_folder here ensures
+        # current_score and candidate scores are directly comparable.
+        #
+        # Exception: if current_folder is an ancestor of a candidate (a root
+        # dir that contains subfolders), its entity set spans everything and
+        # would inflate current_score. Treat it as 0.0 so subfolder moves are
+        # recommended as usual.
+        if current_folder_is_ancestor:
+            current_score = 0.0
+            always_include_arg = None
+        else:
+            always_include_arg = current_folder
+
         # graph_gate=0.0: for existing indexed files the graph signal alone may
         # not overlap (generic vocabulary, indirect topics). Allow rerank to
         # provide the recommendation signal when graph overlap is zero.
-        scores = await self._placement_scorer.score_all(
-            doc.id, non_current_candidates, file_path=doc.file_path, graph_gate=0.0
+        #
+        # always_include=current_folder ensures the current folder's normalised
+        # score is returned even when it falls below _SCORE_MIN_THRESHOLD, so
+        # the delta comparison uses the same scale as the candidate scores.
+        all_scores = await self._placement_scorer.score_all(
+            doc.id, non_current_candidates, file_path=doc.file_path,
+            graph_gate=0.0, always_include=always_include_arg,
         )
+
+        if not current_folder_is_ancestor:
+            current_score = next(
+                (s["score"] for s in all_scores if s["folder"] == current_folder), 0.0
+            )
+
+        scores = [s for s in all_scores if s["folder"] != current_folder]
         if not scores:
             return
 
@@ -179,7 +210,14 @@ class AuditService:
         top = non_current[0]
         if top["score"] < _MIN_TOP_SCORE:
             return
-        if (top["score"] - current_score) < _MIN_SCORE_DELTA:
+        # Use a higher delta threshold when the file is already in a project
+        # subfolder (non-ancestor case). The normalised current_score is
+        # meaningful there (~0.25 even for weak folder-document affinity), so a
+        # larger delta is needed to distinguish genuine misplacements from
+        # cross-cutting vocabulary false positives. Benchmark floating-file tests
+        # always have current_folder_is_ancestor=True so they are unaffected.
+        min_delta = _MIN_SCORE_DELTA if current_folder_is_ancestor else _MIN_SCORE_DELTA_PLACED
+        if (top["score"] - current_score) < min_delta:
             return
 
         await self._rec_repo.create(doc.file_path, non_current[:3])

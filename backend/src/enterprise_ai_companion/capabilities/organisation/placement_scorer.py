@@ -193,8 +193,14 @@ class PlacementScorer:
         candidate_folder_paths: list[str],
         file_path: str = "",
         graph_gate: float = _GRAPH_GATE_THRESHOLD,
+        always_include: str | None = None,
     ) -> list[dict[str, Any]]:
         """Score every candidate folder and return up to 3 results sorted by score desc.
+
+        ``always_include`` — if given, that folder's normalised score is appended
+        to the returned list even when it falls below the minimum score threshold.
+        Used by the audit to obtain the current folder's score on the same
+        normalised scale as the candidates without a separate un-normalised call.
 
         Rerank scores are normalised within this call (best folder = 1.0) so
         the semantic signal is actually discriminative. Raw RRF values are
@@ -204,7 +210,21 @@ class PlacementScorer:
         Returns a list of dicts suitable for JSON serialisation:
         ``[{"folder": str, "score": float, "label": str}, ...]``
         """
-        if not candidate_folder_paths:
+        if not candidate_folder_paths and always_include is None:
+            return []
+
+        # If always_include is given and not already in the candidate list, append
+        # it so it participates in normalisation. Its score will be returned
+        # unconditionally at the end regardless of threshold.
+        scoring_paths = list(candidate_folder_paths)
+        always_include_injected = (
+            always_include is not None
+            and always_include not in scoring_paths
+        )
+        if always_include_injected:
+            scoring_paths.append(always_include)
+
+        if not scoring_paths:
             return []
 
         raw_canonicals = await self._graph_score_port.get_canonicals_for_document(
@@ -222,9 +242,10 @@ class PlacementScorer:
         raw_pairs: list[tuple[float, float]] = list(
             await asyncio.gather(*[
                 self._raw_scores(document_id, folder, new_file_canonicals)
-                for folder in candidate_folder_paths
+                for folder in scoring_paths
             ])
         )
+        candidate_folder_paths = scoring_paths
 
         # Normalise rerank so the folder with the strongest semantic match
         # scores 1.0. Only normalise when max raw rerank clears the noise
@@ -308,10 +329,29 @@ class PlacementScorer:
                 len(folder_scores),
             )
 
-        return [
+        result = [
             {"folder": fs.folder, "score": round(fs.score, 4), "label": fs.label}
             for fs in scored[:3]
         ]
+
+        # If always_include was requested and isn't already in the top-3 result,
+        # append its normalised score (which may be below the normal threshold).
+        # folder_scores contains every scored folder including the injected one.
+        if always_include is not None and not any(
+            r["folder"] == always_include for r in result
+        ):
+            always_fs = next(
+                (fs for fs in folder_scores if fs.folder == always_include),
+                None,
+            )
+            if always_fs is not None:
+                result.append({
+                    "folder": always_fs.folder,
+                    "score": round(always_fs.score, 4),
+                    "label": always_fs.label,
+                })
+
+        return result
 
     async def discover_candidate_folders(
         self,
