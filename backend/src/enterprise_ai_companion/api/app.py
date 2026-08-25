@@ -123,13 +123,13 @@ async def _purge_orphaned_folder_documents(state: object) -> None:
         logger.warning("Startup orphan folder purge failed: %s", exc)
 
 
-@asynccontextmanager
 async def _auto_audit_on_startup(audit_service: AuditService) -> None:
     """Run the organisation audit shortly after startup to surface recommendations without manual trigger."""
     await asyncio.sleep(15)
     await audit_service.run_audit()
 
 
+@asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Open all stores on startup; close them on shutdown."""
     app.state.db = await open_db()
