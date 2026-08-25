@@ -32,6 +32,15 @@ _MIN_SCORE_DELTA = 0.248
 _MIN_SCORE_DELTA_PLACED = 0.50
 _PAGE_SIZE = 100
 
+# Filename tokens that identify personal/domestic documents.  Files whose
+# stem contains any of these words (case-insensitive, split on _-. ) are
+# skipped by the audit — recommending personal documents to work project
+# folders is always wrong regardless of semantic similarity.
+_PERSONAL_FILENAME_TOKENS: frozenset[str] = frozenset({
+    "personal", "home", "garden", "family", "renovation",
+    "private", "hobby", "leisure",
+})
+
 
 @dataclass
 class AuditState:
@@ -127,6 +136,14 @@ class AuditService:
         self, doc, candidate_paths: list[str], pending_paths: set[str]
     ) -> None:
         if doc.file_path in pending_paths:
+            return
+
+        # Skip files whose name signals personal/domestic content — these
+        # should never be recommended to a work project folder.
+        stem_tokens = frozenset(
+            Path(doc.file_path).stem.lower().replace("-", "_").replace(".", "_").split("_")
+        )
+        if stem_tokens & _PERSONAL_FILENAME_TOKENS:
             return
 
         current_folder = str(Path(doc.file_path).parent)

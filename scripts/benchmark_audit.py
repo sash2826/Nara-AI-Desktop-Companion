@@ -38,7 +38,13 @@ DOWNLOAD_RECS = ONEDRIVE / "download-recommendations"
 
 # Must match AuditService thresholds exactly
 _MIN_TOP_SCORE  = 0.22
-_MIN_SCORE_DELTA = 0.10
+_MIN_SCORE_DELTA = 0.248
+
+# Personal/domestic filename tokens — mirrors AuditService._PERSONAL_FILENAME_TOKENS
+_PERSONAL_FILENAME_TOKENS: frozenset[str] = frozenset({
+    "personal", "home", "garden", "family", "renovation",
+    "private", "hobby", "leisure",
+})
 
 sys.path.insert(0, str(BACKEND_SRC))
 
@@ -298,6 +304,19 @@ async def main() -> None:
             continue
 
         current_score = 0.0  # root is ancestor
+
+        # Skip personal/domestic documents — same logic as AuditService._score_doc
+        stem_tokens = frozenset(
+            Path(file_path).stem.lower().replace("-", "_").replace(".", "_").split("_")
+        )
+        if stem_tokens & _PERSONAL_FILENAME_TOKENS:
+            top_folder = None
+            all_folders = []
+            score_val = 0.0
+            pts, verdict = _score_result(filename, None, [])
+            rows.append((filename, CATEGORIES[filename], None, None, 0.0, pts,
+                         verdict if pts else "SKIP  personal document filter"))
+            continue
 
         scores = await scorer.score_all(
             doc.id, non_current_candidates, file_path=file_path, graph_gate=0.0
