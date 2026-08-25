@@ -366,15 +366,17 @@ async def _cleanup(conn, chunk_repo, doc_ids: list[str]) -> None:
 async def main() -> None:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-    # Validate paths
+    # Validate paths (Suite 2 is optional — skipped when floating files/ absent)
     for label, path in [
         ("synthetic-projects/ (corpus)", CORPUS_ROOT),
         ("synthetic-downloads/ (Suite 1)", DOWNLOADS_ROOT),
-        ("floating files/ (Suite 2)", FLOATING_ROOT),
     ]:
         if not path.exists():
             print(f"ERROR: {label} not found at {path}")
             sys.exit(1)
+    _SUITE2_AVAILABLE = FLOATING_ROOT.exists()
+    if not _SUITE2_AVAILABLE:
+        print(f"NOTE: floating files/ not found — Suite 2 will be skipped.\n")
 
     missing = [p for p in PROJECT_FOLDERS if not Path(p).is_dir()]
     if missing:
@@ -437,9 +439,12 @@ async def main() -> None:
     print(f"  {r1.files_indexed} indexed, {r1.files_skipped} skipped, {len(r1.errors)} errors\n")
 
     # ── Index Suite 2 (Floating files) ────────────────────────────────────
-    print(f"Suite 2 — indexing {len(S2_TESTS)} real floating file(s)…\n")
-    r2 = await file_indexer.index_workspace(str(FLOATING_ROOT))
-    print(f"  {r2.files_indexed} indexed, {r2.files_skipped} skipped, {len(r2.errors)} errors\n")
+    if _SUITE2_AVAILABLE:
+        print(f"Suite 2 — indexing {len(S2_TESTS)} real floating file(s)…\n")
+        r2 = await file_indexer.index_workspace(str(FLOATING_ROOT))
+        print(f"  {r2.files_indexed} indexed, {r2.files_skipped} skipped, {len(r2.errors)} errors\n")
+    else:
+        print("Suite 2 — skipped (floating files/ not found)\n")
 
     # ── Score Suite 1 ─────────────────────────────────────────────────────
     print(f"Scoring Suite 1 ({len(S1_TESTS)} files) — Downloads placement…")
@@ -474,12 +479,15 @@ async def main() -> None:
                                     score_val=score_val, pts=pts, verdict=verdict))
 
     # ── Score Suite 2 ─────────────────────────────────────────────────────
-    print(f"Scoring Suite 2 ({len(S2_TESTS)} files) — Floating file placement…")
-
     s2_rows: list[PlacementRow] = []
     s2_doc_ids: list[str] = []
 
-    for tc in S2_TESTS:
+    if not _SUITE2_AVAILABLE:
+        print("Suite 2 — skipped\n")
+    else:
+      print(f"Scoring Suite 2 ({len(S2_TESTS)} files) — Floating file placement…")
+
+    for tc in S2_TESTS if _SUITE2_AVAILABLE else []:
         file_path = str(FLOATING_ROOT / tc.filename)
         doc = await doc_repo.get_by_path(file_path)
         if doc is None:
