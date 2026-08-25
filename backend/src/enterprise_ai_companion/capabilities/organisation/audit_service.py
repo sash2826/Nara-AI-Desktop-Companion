@@ -164,6 +164,16 @@ class AuditService:
         if not scores:
             return
 
+        # Drop destinations that already contain a file with the same name.
+        # Without this, every project folder that shares a generic filename
+        # (e.g. Project_Overview.pdf, Vendor_Evaluation.docx) gets flagged as
+        # a move target for identically-named files in sibling folders, producing
+        # large numbers of duplicate-name false positives.
+        filename = Path(doc.file_path).name
+        scores = [s for s in scores if not Path(s["folder"], filename).exists()]
+        if not scores:
+            return
+
         non_current = scores
 
         top = non_current[0]
