@@ -90,9 +90,13 @@ class AuditService:
         pending = await self._rec_repo.list_pending()
         pending_paths: set[str] = {rec.source_path for rec in pending}
 
-        # Load incremental audit state: doc_id → audited_at timestamp.
-        async with self._db.execute("SELECT doc_id, audited_at FROM doc_audit_log") as cur:
-            audit_log: dict[str, str] = {row[0]: row[1] for row in await cur.fetchall()}
+        # Load incremental audit state: doc_id → file_hash at last audit.
+        # Hash-based comparison means a workspace re-index that produces the
+        # same file content (same hash) will not invalidate the audit log entry,
+        # even though indexed_at is refreshed. Only genuine content changes
+        # (new hash) or never-audited documents trigger re-scoring.
+        async with self._db.execute("SELECT doc_id, file_hash FROM doc_audit_log") as cur:
+            audit_log: dict[str, str | None] = {row[0]: row[1] for row in await cur.fetchall()}
 
         # Paginate through all indexed documents.
         all_docs = []
@@ -109,8 +113,8 @@ class AuditService:
         eligible = [
             doc for doc in all_docs
             if str(Path(doc.file_path).parent) != _DOWNLOADS_PATH
-            # Incremental skip: only process docs not yet audited or re-indexed since last audit.
-            and (doc.id not in audit_log or audit_log[doc.id] < doc.indexed_at)
+            # Incremental skip: re-score only when content changed or never audited.
+            and audit_log.get(doc.id) != doc.file_hash
         ]
         self.state.total = len(eligible)
 
@@ -201,7 +205,7 @@ class AuditService:
             and not current_folder.startswith(f.rstrip(os.sep) + os.sep)
         ]
         if not non_current_candidates:
-            await self._mark_audited(doc.id)
+            await self._mark_audited(doc.id, doc.file_hash)
             return
 
         # graph_gate=0.0: for existing indexed files the graph signal alone may
@@ -211,7 +215,7 @@ class AuditService:
             doc.id, non_current_candidates, file_path=doc.file_path, graph_gate=0.0
         )
 
-        await self._mark_audited(doc.id)
+        await self._mark_audited(doc.id, doc.file_hash)
 
         if not scores:
             return
@@ -235,11 +239,11 @@ class AuditService:
             top["score"] - current_score,
         )
 
-    async def _mark_audited(self, doc_id: str) -> None:
+    async def _mark_audited(self, doc_id: str, file_hash: str) -> None:
         """Record that this document has been scored so future audits skip it."""
         now = datetime.now(timezone.utc).isoformat()
         await self._db.execute(
-            "INSERT OR REPLACE INTO doc_audit_log (doc_id, audited_at) VALUES (?, ?)",
-            (doc_id, now),
+            "INSERT OR REPLACE INTO doc_audit_log (doc_id, audited_at, file_hash) VALUES (?, ?, ?)",
+            (doc_id, now, file_hash),
         )
         await self._db.commit()
