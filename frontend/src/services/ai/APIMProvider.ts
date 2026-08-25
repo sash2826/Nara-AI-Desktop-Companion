@@ -1,4 +1,11 @@
-import type { LLMProvider, LLMRequestOptions, LLMStreamChunk } from "./LLMProvider";
+import type {
+  LLMProvider,
+  LLMRequestOptions,
+  LLMStreamChunk,
+  ToolDefinition,
+  ParsedToolCall,
+  ChatMessage,
+} from "./LLMProvider";
 import type { APIMConfig } from "@/config/ai";
 
 /**
@@ -32,28 +39,43 @@ const IS_DEV = import.meta.env.DEV;
 
 // ─── Internal request / response types ────────────────────────────────────────
 
-export interface APIMChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
+/** APIMChatMessage covers all OpenAI-compatible message roles including tool. */
+export type APIMChatMessage = ChatMessage;
 
 interface APIMRequestBody {
   model: string;
   messages: APIMChatMessage[];
   stream: boolean;
+  tools?: ToolDefinition[];
+  tool_choice?: "auto" | "none";
 }
 
 // OpenAI-compatible non-streaming response envelope.
 interface APIMChatCompletion {
   choices: Array<{
-    message: { content: string };
+    message: {
+      content: string | null;
+      tool_calls?: Array<{
+        id: string;
+        type: "function";
+        function: { name: string; arguments: string };
+      }>;
+    };
   }>;
 }
 
 // OpenAI-compatible streaming delta envelope.
 interface APIMStreamDelta {
   choices: Array<{
-    delta: { content?: string };
+    delta: {
+      content?: string;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        type?: "function";
+        function?: { name?: string; arguments?: string };
+      }>;
+    };
     finish_reason: string | null;
   }>;
 }
@@ -159,10 +181,15 @@ export class APIMProvider implements LLMProvider {
       // true SSE streaming is used.
       const useStreaming = !IS_DEV;
 
-      const response = await this.fetchWithRetry(
-        { model: this.config.model, messages, stream: useStreaming },
-        signal
-      );
+      const tools = options?.tools;
+      const requestBody: APIMRequestBody = {
+        model: this.config.model,
+        messages,
+        stream: useStreaming,
+        ...(tools && tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
+      };
+
+      const response = await this.fetchWithRetry(requestBody, signal);
 
       // Always read via text() first — response.json() fails when the proxy
       // forwards chunked-encoding headers that the browser cannot decode.
@@ -188,6 +215,25 @@ export class APIMProvider implements LLMProvider {
       } catch {
         throw new APIMError(`APIM response is not valid JSON: ${rawText.slice(0, 200)}`);
       }
+
+      // Check for tool calls in non-streaming response.
+      const rawToolCalls = json.choices?.[0]?.message?.tool_calls;
+      if (rawToolCalls && rawToolCalls.length > 0) {
+        const parsedCalls: ParsedToolCall[] = rawToolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.function.name,
+          arguments: (() => {
+            try {
+              return JSON.parse(tc.function.arguments) as Record<string, unknown>;
+            } catch {
+              return {};
+            }
+          })(),
+        }));
+        yield { content: "", done: true, toolCalls: parsedCalls };
+        return;
+      }
+
       const content = json.choices?.[0]?.message?.content;
       if (typeof content !== "string") {
         throw new APIMError("APIM response missing expected content field.");
@@ -227,12 +273,18 @@ export class APIMProvider implements LLMProvider {
   /**
    * Parses a complete SSE response string chunk-by-chunk.
    *
+   * Accumulates tool_calls fragments across deltas so that a complete
+   * ParsedToolCall is emitted on finish_reason === "tool_calls".
+   *
    * Yields a microtask between each SSE event so that an AbortSignal fired
    * mid-parse (e.g. from the Stop button) is honoured promptly rather than
    * being processed only after the entire string has been consumed.
    */
   private async *parseSSEText(text: string, signal?: AbortSignal): AsyncIterable<LLMStreamChunk> {
     const lines = text.split("\n");
+    // Accumulator for streaming tool call fragments keyed by index.
+    const toolCallBuffer: { id: string; name: string; argumentsStr: string }[] = [];
+
     for (const line of lines) {
       if (signal?.aborted) return;
 
@@ -240,7 +292,13 @@ export class APIMProvider implements LLMProvider {
       if (!trimmed.startsWith("data: ")) continue;
 
       const payload = trimmed.slice(6).trim();
-      if (payload === "[DONE]") return;
+      if (payload === "[DONE]") {
+        // If tool calls were accumulated without an explicit finish_reason event, emit them.
+        if (toolCallBuffer.length > 0) {
+          yield { content: "", done: true, toolCalls: this.resolveToolBuffer(toolCallBuffer) };
+        }
+        return;
+      }
       if (!payload) continue;
 
       let parsed: APIMStreamDelta;
@@ -250,13 +308,53 @@ export class APIMProvider implements LLMProvider {
         continue;
       }
 
-      const content = parsed.choices?.[0]?.delta?.content;
+      const choice = parsed.choices?.[0];
+      if (!choice) continue;
+
+      // Accumulate tool_calls fragments (each delta may add to name or arguments).
+      if (choice.delta.tool_calls) {
+        for (const tc of choice.delta.tool_calls) {
+          while (toolCallBuffer.length <= tc.index) {
+            toolCallBuffer.push({ id: "", name: "", argumentsStr: "" });
+          }
+          const slot = toolCallBuffer[tc.index];
+          if (tc.id) slot.id = tc.id;
+          if (tc.function?.name) slot.name += tc.function.name;
+          if (tc.function?.arguments) slot.argumentsStr += tc.function.arguments;
+        }
+      }
+
+      if (choice.finish_reason === "tool_calls") {
+        yield { content: "", done: true, toolCalls: this.resolveToolBuffer(toolCallBuffer) };
+        return;
+      }
+
+      const content = choice.delta.content;
       if (content) {
         yield { content, done: false };
         // Yield to the event loop so abort signals and UI updates land between chunks.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
     }
+  }
+
+  /** Parses the accumulated tool call buffer into ParsedToolCall objects. */
+  private resolveToolBuffer(
+    buffer: { id: string; name: string; argumentsStr: string }[]
+  ): ParsedToolCall[] {
+    return buffer
+      .filter((tc) => tc.id && tc.name)
+      .map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        arguments: (() => {
+          try {
+            return JSON.parse(tc.argumentsStr) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })(),
+      }));
   }
 
   // ─── Retry logic ──────────────────────────────────────────────────────────
@@ -317,7 +415,10 @@ export class APIMProvider implements LLMProvider {
     if (history) {
       messages.push(...history);
     }
-    messages.push({ role: "user", content: prompt });
+    // Skip the user prompt on tool-call re-loops (prompt is empty string).
+    if (prompt) {
+      messages.push({ role: "user", content: prompt });
+    }
     return messages;
   }
 

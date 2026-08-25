@@ -164,6 +164,12 @@ async def _run_indexing(
                     )
                 except Exception as exc:
                     logger.warning("Failed to reload abbreviation expansions: %s", exc)
+
+            # Trigger organisation audit for newly indexed files so placement
+            # recommendations appear without requiring a manual Organise trigger.
+            audit_service = getattr(app_state, "audit_service", None)
+            if audit_service is not None:
+                asyncio.create_task(audit_service.run_audit())
     except asyncio.CancelledError:
         tasks[task_id]["status"] = "cancelled"
         logger.info("Indexing task %s was cancelled", task_id)

@@ -21,6 +21,39 @@
  * returns deterministic keyword-matched responses with no network calls.
  */
 
+/** A single message in a multi-turn conversation, including tool roles. */
+export interface ChatMessage {
+  role: "user" | "assistant" | "system" | "tool";
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}
+
+/** OpenAI-compatible function tool definition. */
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, { type: string; description: string }>;
+      required?: string[];
+    };
+  };
+}
+
+/** A fully parsed tool call returned when the model invokes a function. */
+export interface ParsedToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
 export interface LLMRequestOptions {
   /** Caller-supplied signal for cooperative cancellation. */
   signal?: AbortSignal;
@@ -31,7 +64,7 @@ export interface LLMRequestOptions {
    * include these in the request. Providers that do not (e.g. MockProvider)
    * may ignore this field.
    */
-  history?: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  history?: ChatMessage[];
 
   /**
    * Optional system message prepended before history and the user prompt.
@@ -40,6 +73,12 @@ export interface LLMRequestOptions {
    * system messages may ignore this field.
    */
   systemMessage?: string;
+
+  /**
+   * OpenAI-compatible tool definitions to pass with the request.
+   * When provided the model may respond with tool calls instead of content.
+   */
+  tools?: ToolDefinition[];
 }
 
 export interface LLMStreamChunk {
@@ -47,6 +86,12 @@ export interface LLMStreamChunk {
   content: string;
   /** True on the final chunk — the response is complete. */
   done: boolean;
+  /**
+   * Set on the final chunk when the model responded with tool calls instead
+   * of content (finish_reason === "tool_calls"). The content field will be
+   * empty in this case.
+   */
+  toolCalls?: ParsedToolCall[];
 }
 
 export interface LLMProvider {

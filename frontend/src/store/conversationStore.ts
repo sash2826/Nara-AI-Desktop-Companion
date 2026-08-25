@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { CitationMeta, Message, MessageRole, MessageStatus } from "@/types/conversation";
 import { MAX_INPUT_CHARACTERS } from "@/types/conversation";
+import type { PendingToolAction } from "@/services/conversation/ConversationService";
 
 let _messageCounter = 0;
 
@@ -15,6 +16,7 @@ interface ConversationStore {
   isStreaming: boolean;
   streamingMessageId: string | null;
   inputValue: string;
+  pendingToolAction: PendingToolAction | null;
 
   addMessage: (role: MessageRole, content: string, status?: MessageStatus) => string;
   updateMessageContent: (id: string, content: string) => void;
@@ -26,6 +28,8 @@ interface ConversationStore {
   setInputValue: (value: string) => void;
   clearInput: () => void;
   clearMessages: () => void;
+  setPendingToolAction: (action: PendingToolAction | null) => void;
+  clearPendingToolAction: () => void;
 }
 
 export const useConversationStore = create<ConversationStore>((set) => ({
@@ -34,6 +38,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
   isStreaming: false,
   streamingMessageId: null,
   inputValue: "",
+  pendingToolAction: null,
 
   addMessage: (role, content, status = "complete") => {
     const id = makeId();
@@ -78,4 +83,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
   clearInput: () => set({ inputValue: "" }),
 
   clearMessages: () => set({ messages: [] }),
+
+  setPendingToolAction: (action) => set({ pendingToolAction: action }),
+  clearPendingToolAction: () => set({ pendingToolAction: null }),
 }));

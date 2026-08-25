@@ -124,6 +124,12 @@ async def _purge_orphaned_folder_documents(state: object) -> None:
 
 
 @asynccontextmanager
+async def _auto_audit_on_startup(audit_service: AuditService) -> None:
+    """Run the organisation audit shortly after startup to surface recommendations without manual trigger."""
+    await asyncio.sleep(15)
+    await audit_service.run_audit()
+
+
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Open all stores on startup; close them on shutdown."""
     app.state.db = await open_db()
@@ -243,6 +249,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Purge index records for files deleted while the backend was offline.
     # Runs as a background task so it never blocks startup.
     asyncio.create_task(watcher.reconcile_stale_files())
+
+    # Passive background suggester — runs the organisation audit automatically
+    # after a short delay so recommendations are ready before the user opens the tab.
+    asyncio.create_task(_auto_audit_on_startup(audit_service))
 
     # Purge documents belonging to workspace folders that are no longer watched.
     # Catches orphans left behind when a folder was removed while the backend

@@ -10,6 +10,7 @@ import type {
   ConversationCallbacks,
   ConversationTurn,
   ContextSnapshot,
+  PendingToolAction,
 } from "@/services/conversation/ConversationService";
 
 // Retrieval configuration — mirrors backend context_assembler.py constants.
@@ -366,11 +367,77 @@ export function useConversation() {
             });
           }
         },
+
+        async onReadToolCall(name, args) {
+          try {
+            if (name === "list_indexed_folders") {
+              const folders = await IPCClient.listWatchedFolders();
+              if (folders.length === 0) return "No folders are currently being watched or indexed.";
+              return (
+                `Watched folders (${folders.length}):\n` +
+                folders.map((f: { path: string }) => `- ${f.path}`).join("\n")
+              );
+            }
+            if (name === "list_indexed_files") {
+              const workspacePath =
+                typeof args.workspace_path === "string" ? args.workspace_path : undefined;
+              const docs = await IPCClient.listDocuments(workspacePath);
+              if (docs.length === 0) return "No files have been indexed yet.";
+              return (
+                `Indexed files (${docs.length}):\n` +
+                docs.map((d: { file_path: string }) => `- ${d.file_path}`).join("\n")
+              );
+            }
+            return "Unknown tool.";
+          } catch (err) {
+            return `Tool call failed: ${err instanceof Error ? err.message : String(err)}`;
+          }
+        },
+
+        onPendingToolAction(action: PendingToolAction) {
+          store.setPendingToolAction(action);
+        },
       };
 
       await service.send(trimmed, callbacks, history, context);
     },
     [service, contextEngine, conversationId, store, getConversationSummary]
+  );
+
+  const confirmToolAction = useCallback(
+    async (confirmed: boolean) => {
+      const action = store.pendingToolAction;
+      if (!action) return;
+
+      store.clearPendingToolAction();
+
+      let resultMessage: string;
+
+      if (confirmed) {
+        try {
+          if (action.type === "add_folder") {
+            await IPCClient.addWatchedFolder(action.path);
+            resultMessage = `Done! I've added **${action.path}** to the index. Indexing will begin in the background.`;
+          } else {
+            if (action.folderId) {
+              await IPCClient.removeWatchedFolder(action.folderId);
+            }
+            resultMessage = `Done! I've removed **${action.path}** from the index.`;
+          }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          resultMessage = `Sorry, that didn't work: ${errMsg}`;
+        }
+      } else {
+        resultMessage =
+          action.type === "add_folder"
+            ? `Understood — I won't add that folder to the index.`
+            : `Understood — I won't remove that folder from the index.`;
+      }
+
+      store.addMessage("assistant", resultMessage, "complete");
+    },
+    [store]
   );
 
   const cancelStream = useCallback(() => {
@@ -392,9 +459,11 @@ export function useConversation() {
     isTyping: store.isTyping,
     isStreaming: store.isStreaming,
     inputValue: store.inputValue,
+    pendingToolAction: store.pendingToolAction,
     setInputValue: store.setInputValue,
     cancelStream,
     clearMessages,
     sendMessage,
+    confirmToolAction,
   };
 }

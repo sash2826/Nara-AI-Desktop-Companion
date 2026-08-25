@@ -1,7 +1,9 @@
 import { useCallback } from "react";
+import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { ConversationView } from "./ConversationView";
 import { AssistantFooter } from "./AssistantFooter";
+import { ToolConfirmationCard } from "./ToolConfirmationCard";
 import { useConversation } from "@/hooks/useConversation";
 import { useDashboard } from "@/hooks/useDashboard";
 import { cn } from "@/lib/utils";
@@ -16,10 +18,12 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
     isTyping,
     isStreaming,
     inputValue,
+    pendingToolAction,
     setInputValue,
     cancelStream,
     clearMessages,
     sendMessage,
+    confirmToolAction,
   } = useConversation();
 
   const { suggestions, reshuffleSuggestions } = useDashboard();
@@ -38,6 +42,17 @@ export function AssistantWidget({ className }: AssistantWidgetProps) {
       aria-label="AI Assistant"
     >
       <ConversationView messages={messages} isTyping={isTyping} onQuickPrompt={setInputValue} />
+
+      <AnimatePresence>
+        {pendingToolAction && (
+          <ToolConfirmationCard
+            key="tool-confirmation"
+            action={pendingToolAction}
+            onConfirm={() => void confirmToolAction(true)}
+            onCancel={() => void confirmToolAction(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AssistantFooter
         inputValue={inputValue}
