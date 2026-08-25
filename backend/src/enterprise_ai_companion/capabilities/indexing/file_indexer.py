@@ -508,16 +508,6 @@ class FileIndexer:
                     )
                     await asyncio.sleep(2.0 ** _attempt)  # 1s, 2s
                     continue
-                if _is_zip_err:
-                    # All retries exhausted — file is not a valid package (corrupt or
-                    # a stub with a .docx/.xlsx/.pptx extension). Fall back to plain
-                    # text so at least any readable content is indexed.
-                    logger.warning(
-                        "Extraction failed for %s after %d attempts (%s) — falling back to plain text",
-                        file_path.name, _extract_attempts, exc,
-                    )
-                    text = file_path.read_text(encoding="utf-8", errors="replace")
-                    break
                 raise
 
         # Run text through enabled TextProcessorPlugins before hashing/chunking.

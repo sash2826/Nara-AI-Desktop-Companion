@@ -15,7 +15,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import aiosqlite
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -80,9 +80,6 @@ class DebounceHandler(FileSystemEventHandler):
         self._loop = loop
         self._post_index_hook = post_index_hook
         self._post_delete_hook = post_delete_hook
-        # Optional hook that replaces bare index_workspace for modified/existing
-        # files — allows callers to run an audit after each workspace re-index.
-        self._post_workspace_hook: "Callable[[str], Any] | None" = None
         self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
         # Tracks paths that arrived via on_created (truly new files).
@@ -175,12 +172,6 @@ class DebounceHandler(FileSystemEventHandler):
                 self._folder_path, Path(src_path).name,
             )
             coro = self._fire_new_file(src_path)
-        elif self._post_workspace_hook is not None:
-            logger.debug(
-                "File change detected, re-indexing + auditing folder: %s (triggered by %s)",
-                self._folder_path, Path(src_path).name,
-            )
-            coro = self._post_workspace_hook(self._folder_path)
         else:
             logger.debug(
                 "File change detected, re-indexing folder: %s (triggered by %s)",
@@ -237,8 +228,6 @@ class WatcherService:
         self._running = False
         # Set by app.py after construction — wires the Downloads → recommendation pipeline.
         self.recommendation_service: object | None = None
-        # Set by app.py after construction — wires non-Downloads → audit pipeline.
-        self.audit_service: object | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -528,25 +517,6 @@ class WatcherService:
             else:
                 self._schedule_watch(downloads_str)
 
-    async def _index_and_audit(self, folder_path: str) -> None:
-        """Re-index a workspace folder then trigger an incremental organisation audit."""
-        await self._indexer.index_workspace(folder_path)
-        if self.audit_service is not None:
-            await self.audit_service.run_audit()
-
-    def wire_audit(self, audit_service: object) -> None:
-        """Attach an audit service and update all existing non-Downloads handlers.
-
-        Called by app.py after audit_service is constructed so that workspace
-        re-indexing events (file modifications in watched folders) automatically
-        trigger an incremental audit without requiring a manual Organise trigger.
-        Handlers created before this call are updated retroactively.
-        """
-        self.audit_service = audit_service
-        for path, (_, handler) in self._watches.items():
-            if path != DOWNLOADS_PATH:
-                handler._post_workspace_hook = self._index_and_audit
-
     def _schedule_watch(self, path: str) -> None:
         if path in self._watches:
             return
@@ -564,8 +534,6 @@ class WatcherService:
             post_index_hook=index_hook,
             post_delete_hook=delete_hook,
         )
-        if path != DOWNLOADS_PATH and self.audit_service is not None:
-            handler._post_workspace_hook = self._index_and_audit
         watch = self._observer.schedule(handler, path, recursive=True)
         self._watches[path] = (watch, handler)
         logger.debug(
