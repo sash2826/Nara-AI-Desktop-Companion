@@ -246,6 +246,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         db=app.state.db,
     )
     app.state.audit_service = audit_service
+    watcher.wire_audit(audit_service)
 
     # Purge index records for files deleted while the backend was offline.
     # Runs as a background task so it never blocks startup.
