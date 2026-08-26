@@ -12,6 +12,8 @@ import { OrbNotificationOverlay } from "./OrbNotificationOverlay";
 // the start of a drag rather than a click.
 const DRAG_THRESHOLD_PX = 4;
 const DOUBLE_CLICK_MS = 300;
+// Small margin around the interactive bounds so edge clicks aren't lost.
+const HIT_REGION_PADDING = 6;
 
 /**
  * OrbShell — the root visual and interaction layer for the standalone orb window.
@@ -34,6 +36,10 @@ export function OrbShell() {
   } = useOrbWindowStore();
 
   const [isHovered, setIsHovered] = useState(false);
+  // True between mousedown and mouseup — the window must stay interactive for
+  // the whole drag even when the cursor leaves the orb's hit region.
+  const [isPointerDown, setIsPointerDown] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   // ── Drag state ─────────────────────────────────────────────────────────────
   // Cached orb window position — avoids an IPC round-trip on every mousedown.
@@ -97,6 +103,7 @@ export function OrbShell() {
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    setIsPointerDown(true);
     dragStartScreen.current = { x: e.screenX, y: e.screenY };
     dragStart.current = {
       screenX: e.screenX,
@@ -141,6 +148,7 @@ export function OrbShell() {
 
     const onMouseUp = () => {
       dragStart.current = null;
+      setIsPointerDown(false);
     };
 
     window.addEventListener("mousemove", onMouseMove);
@@ -150,6 +158,55 @@ export function OrbShell() {
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, []);
+
+  // ── Click-through region ───────────────────────────────────────────────────
+  // The orb window is much larger than the orb itself so overlays have room.
+  // Report the actual interactive bounds so Rust can make the rest of the
+  // window transparent to clicks.
+  useEffect(() => {
+    const reportHitRegion = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+
+      if (isPointerDown) {
+        invoke("set_orb_hit_region", {
+          x: 0,
+          y: 0,
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }).catch(() => {});
+        return;
+      }
+
+      const base = anchor.getBoundingClientRect();
+      let { left, top, right, bottom } = base;
+
+      // Overlays are absolutely positioned, so they sit outside the anchor's box.
+      anchor.querySelectorAll<HTMLElement>("[data-orb-surface]").forEach((surface) => {
+        const r = surface.getBoundingClientRect();
+        left = Math.min(left, r.left);
+        top = Math.min(top, r.top);
+        right = Math.max(right, r.right);
+        bottom = Math.max(bottom, r.bottom);
+      });
+
+      invoke("set_orb_hit_region", {
+        x: left - HIT_REGION_PADDING,
+        y: top - HIT_REGION_PADDING,
+        width: right - left + HIT_REGION_PADDING * 2,
+        height: bottom - top + HIT_REGION_PADDING * 2,
+      }).catch(() => {});
+    };
+
+    reportHitRegion();
+    // Overlays animate open/closed, so re-measure until they settle.
+    const interval = setInterval(reportHitRegion, 150);
+    window.addEventListener("resize", reportHitRegion);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("resize", reportHitRegion);
+    };
+  }, [overlayMode, isPointerDown]);
 
   // ── Click handlers ─────────────────────────────────────────────────────────
 
@@ -230,12 +287,15 @@ export function OrbShell() {
         background: "transparent",
         userSelect: "none",
         WebkitUserSelect: "none",
+        // Window is larger than the orb to give overlays room; only real
+        // controls should capture clicks so the desktop stays reachable.
+        pointerEvents: "none",
       }}
     >
       <OrbSvgFilters />
 
       {/* Orb hit-target + overlays anchor */}
-      <div style={{ position: "relative" }}>
+      <div ref={anchorRef} style={{ position: "relative", pointerEvents: "auto" }}>
         {/* Overlays rendered above the orb */}
         <AnimatePresence>
           {overlayMode === "query" && <OrbQueryOverlay key="query" />}
@@ -296,7 +356,7 @@ export function OrbShell() {
                 right: -2,
                 minWidth: 16,
                 height: 16,
-                borderRadius: 8,
+                borderRadius: 999,
                 background: "hsl(38 95% 55%)",
                 border: "1.5px solid hsl(0 0% 12%)",
                 fontSize: 10,
@@ -305,12 +365,13 @@ export function OrbShell() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: "0 3px",
+                padding: "0 4px",
+                boxSizing: "border-box",
                 fontFamily: "system-ui, sans-serif",
                 pointerEvents: "none",
               }}
             >
-              {pendingCount > 9 ? "9+" : pendingCount}
+              {pendingCount > 99 ? "99+" : pendingCount}
             </div>
           )}
         </AnimatePresence>

@@ -1,25 +1,30 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FolderInput, PackageSearch, Loader2, Folder } from "lucide-react";
+import { FolderInput, PackageSearch, Loader2, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { WorkspaceFolderRail } from "./WorkspaceFolderRail";
 import { RecommendationRow } from "./RecommendationRow";
 import { FolderContentsList } from "./FolderContentsList";
-import { buildFolderTree, flattenFolderTree, findDeepestMatch } from "./folderTree";
+import { OrganiseDashboard } from "./OrganiseDashboard";
+import { FolderGrid } from "./FolderGrid";
+import {
+  buildFolderTree,
+  flattenFolderTree,
+  findDeepestMatch,
+  findNodeByPath,
+  aggregateCounts,
+  isDirectChildFile,
+} from "./folderTree";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { IPCClient, PendingRecommendation, AuditStatus } from "@/services/ipc/IPCClient";
 
-function folderName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-}
+const SKIP_ALL_KEY = "__all__";
 
 /**
- * Folder-scoped organisation review: pick a folder in the rail to see only the
- * suggestions that target it, plus its existing contents for context — instead
- * of a single flat list of every pending suggestion across the workspace.
+ * Finder-style organisation review: browse folders as tiles, double-click to
+ * open one, and act on the suggestions that target that exact folder.
  */
 export function OrganiseTab() {
-  const { folders, documents, selectedFolderPath } = useWorkspace();
+  const { folders, documents } = useWorkspace();
 
   const [recommendations, setRecommendations] = useState<PendingRecommendation[]>([]);
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -27,6 +32,11 @@ export function OrganiseTab() {
   const [conflicts, setConflicts] = useState<Map<string, string>>(new Map()); // id → target folder
   const [auditRunning, setAuditRunning] = useState(false);
   const [auditStatus, setAuditStatus] = useState<AuditStatus | null>(null);
+  const [bulk, setBulk] = useState<{ key: string; done: number; total: number } | null>(null);
+  const [confirmSkipAll, setConfirmSkipAll] = useState(false);
+  // Folder currently opened for review; null shows the top-level grid.
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const [selectedTilePath, setSelectedTilePath] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchRecommendations = useCallback(() => {
@@ -206,12 +216,38 @@ export function OrganiseTab() {
     });
   }, []);
 
+  // Bulk actions run sequentially and never interrupt mid-batch — anything that
+  // conflicts or errors stays in the list as residue once the batch finishes.
+  const handleAcceptMany = useCallback(
+    async (key: string, recs: PendingRecommendation[], folder: string) => {
+      setBulk({ key, done: 0, total: recs.length });
+      for (let i = 0; i < recs.length; i++) {
+        await _doAccept(recs[i], folder);
+        setBulk({ key, done: i + 1, total: recs.length });
+      }
+      setBulk(null);
+    },
+    [_doAccept]
+  );
+
+  const handleDismissMany = useCallback(async (key: string, ids: string[]) => {
+    setBulk({ key, done: 0, total: ids.length });
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        await IPCClient.dismissRecommendation(ids[i]);
+        setRecommendations((prev) => prev.filter((r) => r.id !== ids[i]));
+      } catch {
+        // A failed skip shouldn't halt the rest of the batch.
+      }
+      setBulk({ key, done: i + 1, total: ids.length });
+    }
+    setBulk(null);
+  }, []);
+
   // Group suggestions by the most specific folder (root or subfolder) that their
   // top candidate falls under, so each suggestion belongs to exactly one node in the rail.
-  const flatNodes = useMemo(
-    () => flattenFolderTree(buildFolderTree(folders, documents)),
-    [folders, documents]
-  );
+  const folderTree = useMemo(() => buildFolderTree(folders, documents), [folders, documents]);
+  const flatNodes = useMemo(() => flattenFolderTree(folderTree), [folderTree]);
 
   const recommendationsByFolderPath = useMemo(() => {
     const map = new Map<string, PendingRecommendation[]>();
@@ -227,18 +263,27 @@ export function OrganiseTab() {
     return map;
   }, [recommendations, flatNodes]);
 
-  const recommendationCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const [path, list] of recommendationsByFolderPath) counts.set(path, list.length);
-    return counts;
-  }, [recommendationsByFolderPath]);
+  // Badges roll subfolder suggestions up into their parent folder.
+  const badgeCounts = useMemo(() => {
+    const own = new Map<string, number>();
+    for (const [path, list] of recommendationsByFolderPath) own.set(path, list.length);
+    return aggregateCounts(folderTree, own);
+  }, [recommendationsByFolderPath, folderTree]);
 
-  const selectedFolderRecs = selectedFolderPath
-    ? (recommendationsByFolderPath.get(selectedFolderPath) ?? [])
+  const openNode = openPath ? findNodeByPath(flatNodes, openPath) : null;
+  const openFolderRecs = openPath ? (recommendationsByFolderPath.get(openPath) ?? []) : [];
+  // Subfolder files are reachable by opening that subfolder, so only loose files show here.
+  const openFolderDocs = openNode
+    ? documents.filter((d) => isDirectChildFile(openNode.path, d.file_path))
     : [];
-  const selectedFolderDocs = selectedFolderPath
-    ? documents.filter((d) => d.file_path.startsWith(selectedFolderPath))
-    : [];
+
+  // Breadcrumb trail from the watched root down to the open folder.
+  const trail = useMemo(() => {
+    if (!openNode) return [];
+    return flatNodes
+      .filter((n) => openNode.path === n.path || openNode.path.startsWith(n.path))
+      .sort((a, b) => a.path.length - b.path.length);
+  }, [flatNodes, openNode]);
 
   const statusLabel =
     auditStatus && auditStatus.total > 0
@@ -246,6 +291,13 @@ export function OrganiseTab() {
       : auditRunning
         ? "Starting…"
         : null;
+
+  const isBulkBusy = bulk !== null;
+
+  const handleOpenFolder = useCallback((path: string) => {
+    setOpenPath(path);
+    setSelectedTilePath(null);
+  }, []);
 
   const renderRec = (rec: PendingRecommendation) => (
     <RecommendationRow
@@ -265,8 +317,6 @@ export function OrganiseTab() {
 
   return (
     <div className="flex h-full min-h-0">
-      <WorkspaceFolderRail recommendationCounts={recommendationCounts} />
-
       <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4">
         {/* Action bar */}
         <div className="mb-4 flex items-center gap-3">
@@ -293,59 +343,166 @@ export function OrganiseTab() {
               Found {auditStatus.found} suggestion{auditStatus.found !== 1 ? "s" : ""}
             </span>
           )}
+
+          {recommendations.length > 1 && (
+            <div className="ml-auto flex items-center gap-2">
+              {confirmSkipAll ? (
+                <>
+                  <span className="text-xs text-foreground">
+                    Skip all {recommendations.length}?
+                  </span>
+                  <button
+                    onClick={() => {
+                      setConfirmSkipAll(false);
+                      void handleDismissMany(
+                        SKIP_ALL_KEY,
+                        recommendations.map((r) => r.id)
+                      );
+                    }}
+                    disabled={isBulkBusy}
+                    className="rounded-md border border-destructive/50 bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20 disabled:opacity-50"
+                  >
+                    Skip all
+                  </button>
+                  <button
+                    onClick={() => setConfirmSkipAll(false)}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent/50"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setConfirmSkipAll(true)}
+                  disabled={isBulkBusy}
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                >
+                  {bulk?.key === SKIP_ALL_KEY
+                    ? `Skipping ${bulk.done}/${bulk.total}…`
+                    : `Skip all ${recommendations.length}`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {selectedFolderPath ? (
+        {openNode ? (
           <div className="flex flex-col gap-5">
-            <div className="flex items-center gap-2">
-              <Folder size={16} className="flex-shrink-0 text-muted-foreground" strokeWidth={1.5} />
-              <h3 className="text-sm font-semibold text-foreground">
-                {folderName(selectedFolderPath)}
-              </h3>
-              <span className="text-xs text-muted-foreground">
-                {selectedFolderDocs.length} file{selectedFolderDocs.length !== 1 ? "s" : ""} ·{" "}
-                {selectedFolderRecs.length} suggestion
-                {selectedFolderRecs.length !== 1 ? "s" : ""} to review
+            {/* Breadcrumb */}
+            <div className="flex flex-wrap items-center gap-1 text-xs">
+              <button
+                onClick={() => setOpenPath(null)}
+                className="rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+              >
+                All folders
+              </button>
+              {trail.map((node, i) => (
+                <span key={node.path} className="flex items-center gap-1">
+                  <ChevronRight size={12} className="text-muted-foreground" />
+                  {i === trail.length - 1 ? (
+                    <span className="px-1 font-semibold text-foreground">{node.name}</span>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenFolder(node.path)}
+                      className="rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+                    >
+                      {node.name}
+                    </button>
+                  )}
+                </span>
+              ))}
+              <span className="ml-1 text-muted-foreground">
+                {openFolderDocs.length} file{openFolderDocs.length !== 1 ? "s" : ""} ·{" "}
+                {openFolderRecs.length} suggestion{openFolderRecs.length !== 1 ? "s" : ""} here
               </span>
             </div>
 
-            {selectedFolderRecs.length > 0 && (
+            {openNode.children.length > 0 && (
+              <FolderGrid
+                nodes={openNode.children}
+                badgeCounts={badgeCounts}
+                selectedPath={selectedTilePath}
+                onSelect={setSelectedTilePath}
+                onOpen={handleOpenFolder}
+                emptyMessage="No subfolders."
+              />
+            )}
+
+            {openFolderRecs.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
                   <FolderInput size={13} strokeWidth={1.5} />
                   Suggested for this folder
                 </p>
-                {selectedFolderRecs.map(renderRec)}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      void handleAcceptMany(openNode.path, openFolderRecs, openNode.path)
+                    }
+                    disabled={isBulkBusy}
+                    title={openNode.path}
+                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {bulk?.key === openNode.path
+                      ? `Moving ${bulk.done}/${bulk.total}…`
+                      : `Move all ${openFolderRecs.length} to ${openNode.name}`}
+                  </button>
+                  <button
+                    onClick={() =>
+                      void handleDismissMany(
+                        openNode.path,
+                        openFolderRecs.map((r) => r.id)
+                      )
+                    }
+                    disabled={isBulkBusy}
+                    className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent/50 disabled:opacity-50"
+                  >
+                    Skip this folder
+                  </button>
+                </div>
+
+                {openFolderRecs.map(renderRec)}
               </div>
             )}
 
             <div>
               <p className="mb-2 text-xs font-semibold text-foreground">
-                Contents ({selectedFolderDocs.length})
+                Contents ({openFolderDocs.length})
               </p>
-              <FolderContentsList documents={selectedFolderDocs} />
-            </div>
-          </div>
-        ) : recommendations.length === 0 && !auditRunning ? (
-          /* Overview / empty state */
-          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
-            <PackageSearch size={32} strokeWidth={1} className="text-muted-foreground/50" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">No suggestions yet</p>
-              <p className="text-xs text-muted-foreground">
-                Run an audit to find files that may be better organised elsewhere.
-              </p>
+              <FolderContentsList documents={openFolderDocs} />
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-10 text-center">
-            <p className="text-sm font-medium text-foreground">
-              {recommendations.length} suggestion{recommendations.length !== 1 ? "s" : ""} ready to
-              review
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Pick a folder on the left to review its suggestions one at a time.
-            </p>
+          <div className="flex flex-col gap-5">
+            {recommendations.length === 0 && !auditRunning ? (
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
+                <PackageSearch size={32} strokeWidth={1} className="text-muted-foreground/50" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">No suggestions yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Run an audit to find files that may be better organised elsewhere.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <OrganiseDashboard recommendations={recommendations} />
+            )}
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold text-foreground">Folders ({folderTree.length})</p>
+              <FolderGrid
+                nodes={folderTree}
+                badgeCounts={badgeCounts}
+                selectedPath={selectedTilePath}
+                onSelect={setSelectedTilePath}
+                onOpen={handleOpenFolder}
+                emptyMessage="No watched folders yet."
+              />
+              <p className="text-2xs text-muted-foreground">
+                Double-click a folder to review its suggestions.
+              </p>
+            </div>
           </div>
         )}
       </div>

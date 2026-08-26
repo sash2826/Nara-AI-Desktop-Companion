@@ -99,3 +99,35 @@ export function findDeepestMatch(
   }
   return best;
 }
+
+export function findNodeByPath(flatNodes: FolderTreeNode[], path: string): FolderTreeNode | null {
+  return flatNodes.find((n) => n.path === path) ?? null;
+}
+
+/** True when filePath sits directly in folderPath rather than in one of its subfolders. */
+export function isDirectChildFile(folderPath: string, filePath: string): boolean {
+  if (!filePath.startsWith(folderPath)) return false;
+  const rest = filePath.slice(folderPath.length).replace(/^[\\/]+/, "");
+  return rest.length > 0 && !/[\\/]/.test(rest);
+}
+
+/**
+ * Rolls per-folder counts up the tree so a parent badge also reflects
+ * suggestions that target its subfolders.
+ */
+export function aggregateCounts(
+  nodes: FolderTreeNode[],
+  ownCounts: Map<string, number>
+): Map<string, number> {
+  const totals = new Map<string, number>();
+
+  const walk = (node: FolderTreeNode): number => {
+    let total = ownCounts.get(node.path) ?? 0;
+    for (const child of node.children) total += walk(child);
+    totals.set(node.path, total);
+    return total;
+  };
+
+  nodes.forEach(walk);
+  return totals;
+}

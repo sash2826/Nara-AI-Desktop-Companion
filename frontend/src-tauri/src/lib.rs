@@ -116,10 +116,17 @@ pub struct IndexWorkspaceResponse {
 pub struct IndexingStatusResponse {
     pub task_id: String,
     pub status: String,
+    /// "indexing" | "building_graph" | "linking_entities" | "completed"
+    #[serde(default)]
+    pub stage: String,
     pub files_found: u32,
     pub files_indexed: u32,
     pub files_skipped: u32,
     pub errors: Vec<String>,
+    #[serde(default)]
+    pub graph_files_total: u32,
+    #[serde(default)]
+    pub graph_files_processed: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1615,7 +1622,7 @@ fn register_windows_startup() {
 /// Window properties:
 ///   - label: "orb"
 ///   - always_on_top, decorations: false, transparent, skip_taskbar
-///   - 80 wide × 340 tall (orb 56px + overlay expansion headroom 284px)
+///   - 400 wide × 620 tall (orb 56px + overlay expansion headroom)
 ///   - Positioned bottom-right of the primary monitor, scale-factor corrected
 fn create_orb_window(app: &tauri::App) {
     let primary_monitor = app
@@ -1630,24 +1637,23 @@ fn create_orb_window(app: &tauri::App) {
         let size = monitor.size();
         let pos = monitor.position();
         let scale = monitor.scale_factor();
-        // Orb window is 80×340 logical pixels; inset 24px from right, 56px from bottom.
         let logical_w = (size.width as f64 / scale) as i32;
         let logical_h = (size.height as f64 / scale) as i32;
         let logical_x = (pos.x as f64 / scale) as i32;
         let logical_y = (pos.y as f64 / scale) as i32;
-        // Window is 400 wide × 380 tall. Right edge flush with screen right (24px inset).
-        // Orb sphere sits in the bottom-right corner; overlay expands leftward inside the window.
+        // Window is 400 wide × 620 tall. Right edge flush with screen right (24px inset).
+        // Orb sphere sits in the bottom-right corner; overlays expand upward inside the window.
         (
             logical_x + logical_w - 400 - 24,
-            logical_y + logical_h - 380 - 48,
+            logical_y + logical_h - 620 - 48,
         )
     } else {
-        (840, 620)
+        (840, 380)
     };
 
     match WebviewWindowBuilder::new(app, "orb", WebviewUrl::App("index.html".into()))
         .title("EAC Orb")
-        .inner_size(400.0, 380.0)
+        .inner_size(400.0, 620.0)
         .resizable(false)
         .always_on_top(true)
         .decorations(false)
@@ -1660,6 +1666,61 @@ fn create_orb_window(app: &tauri::App) {
         Ok(_) => println!("[orb] window created at ({}, {})", start_x, start_y),
         Err(e) => eprintln!("[orb] failed to create window: {}", e),
     }
+}
+
+// ─── Orb click-through ────────────────────────────────────────────────────────
+
+/// Interactive rect of the orb window, in window-local logical pixels.
+/// Everything outside it is made click-through so the desktop stays reachable.
+static ORB_HIT_REGION: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
+
+/// Reported by the orb frontend whenever the orb or its overlays change size.
+#[tauri::command]
+fn set_orb_hit_region(x: f64, y: f64, width: f64, height: f64) {
+    if let Ok(mut region) = ORB_HIT_REGION.lock() {
+        *region = Some((x, y, width, height));
+    }
+}
+
+/// Polls the cursor and toggles `ignore_cursor_events` on the orb window.
+///
+/// CSS `pointer-events: none` cannot make a native window click-through — the
+/// webview still receives the hit test — so this must be done at the OS level.
+fn start_orb_click_through_watcher(app: &tauri::App) {
+    let handle = app.handle().clone();
+    std::thread::spawn(move || {
+        let mut applied: Option<bool> = None;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(80));
+
+            let Some(window) = handle.get_webview_window("orb") else {
+                continue;
+            };
+
+            let region = ORB_HIT_REGION.lock().ok().and_then(|r| *r);
+
+            // Fail safe: if anything is unknown, keep the window interactive.
+            let inside = match (
+                region,
+                handle.cursor_position(),
+                window.outer_position(),
+                window.scale_factor(),
+            ) {
+                (Some((rx, ry, rw, rh)), Ok(cursor), Ok(origin), Ok(scale)) => {
+                    let local_x = (cursor.x - origin.x as f64) / scale;
+                    let local_y = (cursor.y - origin.y as f64) / scale;
+                    local_x >= rx && local_x <= rx + rw && local_y >= ry && local_y <= ry + rh
+                }
+                _ => true,
+            };
+
+            let ignore = !inside;
+            if applied != Some(ignore) {
+                let _ = window.set_ignore_cursor_events(ignore);
+                applied = Some(ignore);
+            }
+        }
+    });
 }
 
 // ─── Global shortcut ──────────────────────────────────────────────────────────
@@ -1829,6 +1890,7 @@ pub fn run() {
             register_global_shortcut(app);
             register_windows_startup();
             create_orb_window(app);
+            start_orb_click_through_watcher(app);
 
             let handle = app.handle().clone();
             start_sidecar(handle.clone(), state_for_setup);
@@ -1890,6 +1952,7 @@ pub fn run() {
             auth::auth_get_token,
             get_orb_position,
             set_orb_position,
+            set_orb_hit_region,
             focus_main_window,
             relay_orb_handoff,
             get_pending_recommendation_count,

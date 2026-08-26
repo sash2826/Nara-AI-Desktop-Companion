@@ -153,13 +153,14 @@ export function OrbQueryOverlay() {
       // Main window may already be focused — ignore
     }
     handleDismiss();
-  }, [queryState.submittedQuery, queryState.response, handleDismiss]);
+  }, [queryState.submittedQuery, queryState.response, queryState.sources, handleDismiss]);
 
   const isSubmitting = queryState.status === "submitting";
   const hasResult = queryState.status === "answered" || queryState.status === "error";
 
   return (
     <motion.div
+      data-orb-surface
       initial={{ opacity: 0, y: 8, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.95 }}

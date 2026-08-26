@@ -13,17 +13,27 @@ export interface Recommendation {
   }>;
 }
 
+export interface BulkProgress {
+  /** Group key currently being processed, or "__all__" for skip-all. */
+  key: string;
+  done: number;
+  total: number;
+}
+
 export interface UseRecommendationsResult {
   recommendations: Recommendation[];
   loading: boolean;
   errors: Map<string, string>;
   conflicts: Map<string, string>;
+  bulk: BulkProgress | null;
   handleAccept: (recId: string, folder: string) => void;
   handleChooseFolder: (recId: string) => Promise<void>;
   handleConflictReplace: (recId: string) => void;
   handleConflictKeepBoth: (recId: string) => void;
   handleConflictCancel: (recId: string) => void;
   handleSkip: (recId: string) => Promise<void>;
+  handleAcceptMany: (key: string, recIds: string[], folder: string) => Promise<void>;
+  handleSkipMany: (key: string, recIds: string[]) => Promise<void>;
   handleDismiss: () => void;
 }
 
@@ -33,6 +43,7 @@ export function useRecommendations(): UseRecommendationsResult {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
   const [conflicts, setConflicts] = useState<Map<string, string>>(new Map());
+  const [bulk, setBulk] = useState<BulkProgress | null>(null);
 
   const fetchRecommendations = useCallback(() => {
     invoke<Recommendation[]>("list_pending_recommendations")
@@ -162,17 +173,51 @@ export function useRecommendations(): UseRecommendationsResult {
     [_removeRec, handleDismiss]
   );
 
+  // Runs sequentially and never interrupts mid-batch — files that conflict or
+  // error stay pending and surface as residue once the batch finishes.
+  const handleAcceptMany = useCallback(
+    async (key: string, recIds: string[], folder: string) => {
+      setBulk({ key, done: 0, total: recIds.length });
+      for (let i = 0; i < recIds.length; i++) {
+        await _doAccept(recIds[i], folder);
+        setBulk({ key, done: i + 1, total: recIds.length });
+      }
+      setBulk(null);
+    },
+    [_doAccept]
+  );
+
+  const handleSkipMany = useCallback(
+    async (key: string, recIds: string[]) => {
+      setBulk({ key, done: 0, total: recIds.length });
+      for (let i = 0; i < recIds.length; i++) {
+        try {
+          await invoke("dismiss_recommendation", { recommendationId: recIds[i] });
+          _removeRec(recIds[i]);
+        } catch {
+          // A failed skip shouldn't halt the rest of the batch.
+        }
+        setBulk({ key, done: i + 1, total: recIds.length });
+      }
+      setBulk(null);
+    },
+    [_removeRec]
+  );
+
   return {
     recommendations,
     loading,
     errors,
     conflicts,
+    bulk,
     handleAccept,
     handleChooseFolder,
     handleConflictReplace,
     handleConflictKeepBoth,
     handleConflictCancel,
     handleSkip,
+    handleAcceptMany,
+    handleSkipMany,
     handleDismiss,
   };
 }
