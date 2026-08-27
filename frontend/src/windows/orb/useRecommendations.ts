@@ -9,7 +9,7 @@ export interface Recommendation {
   candidates: Array<{
     folder: string;
     score: number;
-    label: "Most Likely" | "Likely" | "Possible";
+    label: "Strong" | "Good" | "Possible";
   }>;
 }
 

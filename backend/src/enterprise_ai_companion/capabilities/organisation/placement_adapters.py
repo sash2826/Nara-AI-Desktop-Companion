@@ -159,11 +159,14 @@ class SqliteGraphScoreAdapter(GraphScorePort):
         async with self._conn.execute("SELECT file_path FROM documents") as cur:
             rows = await cur.fetchall()
 
-        exclude = exclude_paths or set()
+        # Resolve exclude roots once; use is_relative_to so any subdirectory
+        # of an excluded path (e.g. Downloads/subfolder) is also excluded.
+        exclude_resolved = {Path(p).resolve() for p in (exclude_paths or set())}
         folder_counts: dict[str, int] = {}
         for row in rows:
-            parent = str(Path(row[0]).parent)
-            if parent not in exclude:
+            parent_path = Path(row[0]).parent.resolve()
+            if not any(parent_path.is_relative_to(excl) for excl in exclude_resolved):
+                parent = str(parent_path)
                 folder_counts[parent] = folder_counts.get(parent, 0) + 1
 
         ranked = sorted(folder_counts, key=lambda p: folder_counts[p], reverse=True)

@@ -1,10 +1,6 @@
 """Thin async wrapper around the Volvo GenAI Hub (OpenAI-compatible) API.
 
-Auth priority (evaluated per request):
-  1. Azure AD bearer token — forwarded by Tauri via X-Azure-Token header
-     and stored in _azure_token_var by AzureTokenMiddleware in app.py.
-  2. APIM subscription key — EAC_APIM_SUBSCRIPTION_KEY env var (legacy / dev fallback).
-
+Auth: APIM subscription key via EAC_APIM_SUBSCRIPTION_KEY env var.
 The model deployment ID is configurable via EAC_LLM_MODEL_ID.
 """
 
@@ -12,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextvars import ContextVar
 
 import httpx
 
@@ -25,9 +20,6 @@ _RETRY_BACKOFF = [1.0, 2.0, 4.0]  # seconds between attempts
 
 _API_VERSION = "preview"
 
-# Set by AzureTokenMiddleware for the duration of each request.
-_azure_token_var: ContextVar[str] = ContextVar("azure_token", default="")
-
 
 def _base_url() -> str:
     endpoint = get_config().apim_endpoint
@@ -35,19 +27,13 @@ def _base_url() -> str:
 
 
 def _auth_headers() -> dict[str, str]:
-    """Return the correct auth header for the current request context."""
-    azure_token = _azure_token_var.get()
-    if azure_token:
-        return {"Authorization": f"Bearer {azure_token}"}
-
-    # Fallback: APIM subscription key (dev / legacy).
+    """Return the APIM subscription key header."""
     cfg = get_config()
     if cfg.apim_subscription_key:
         return {"api-key": cfg.apim_subscription_key.get_secret_value()}
 
     logger.warning(
-        "No Azure AD token and no APIM subscription key configured — "
-        "APIM calls will likely fail with 401."
+        "No APIM subscription key configured — APIM calls will likely fail with 401."
     )
     return {}
 

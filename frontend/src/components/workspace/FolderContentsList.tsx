@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import type { IndexedDocument } from "@/types/workspace";
 
 function fileName(path: string): string {
@@ -19,7 +19,7 @@ export function FolderContentsList({ documents }: FolderContentsListProps) {
     <div className="space-y-1">
       {documents.map((doc) => (
         <div key={doc.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs">
-          <FileText size={13} className="flex-shrink-0 text-muted-foreground" strokeWidth={1.5} />
+          <FileTypeIcon path={doc.file_path} size={17} className="flex-shrink-0" />
           <span className="min-w-0 flex-1 truncate text-foreground" title={doc.file_path}>
             {fileName(doc.file_path)}
           </span>

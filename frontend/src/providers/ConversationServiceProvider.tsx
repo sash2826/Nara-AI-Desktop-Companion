@@ -8,6 +8,7 @@ import { createLLMProvider } from "@/services/providers/ProviderFactory";
 import { APIMProvider } from "@/services/ai/APIMProvider";
 import { LLM_CONFIG } from "@/config/ai";
 import { useConversationStore } from "@/store/conversationStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { IPCClient } from "@/services/ipc/IPCClient";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -40,6 +41,7 @@ function makeConversationId(): string {
 export function ConversationServiceProvider({ children }: ConversationServiceProviderProps) {
   const [llmProvider] = useState(() => createLLMProvider(LLM_CONFIG));
   const [service] = useState<ConversationService>(() => new ConversationService(llmProvider));
+  const apiKeyVersion = useSettingsStore((s) => s.apiKeyVersion);
 
   const [contextEngine] = useState(() => new WorkspaceContextEngine());
 
@@ -70,7 +72,7 @@ export function ConversationServiceProvider({ children }: ConversationServicePro
       .catch((err: unknown) => {
         console.warn("[ConversationService] failed to load APIM key from keychain:", err);
       });
-  }, [llmProvider]);
+  }, [llmProvider, apiKeyVersion]);
 
   // Clear any stuck conversation state left over from HMR or a previous session.
   useEffect(() => {

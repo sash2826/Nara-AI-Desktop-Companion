@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { FileText, FolderOpen, Loader2 } from "lucide-react";
+import { FolderOpen, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IPCClient } from "@/services/ipc/IPCClient";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import type { SearchResultItem } from "@/services/ipc/IPCClient";
 
 interface SearchResultCardProps {
@@ -121,7 +122,7 @@ export function SearchResultCard({ result, rank, query, className }: SearchResul
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
+            <FileTypeIcon path={result.document_path} size={16} />
           </span>
           <span
             className="truncate text-sm font-medium text-foreground"

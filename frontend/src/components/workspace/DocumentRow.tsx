@@ -1,19 +1,8 @@
 import { useState } from "react";
-import { FileText, FileType, File, Trash2, Check } from "lucide-react";
+import { Trash2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import type { IndexedDocument } from "@/types/workspace";
-
-const EXT_ICONS: Record<string, React.ElementType> = {
-  ".pdf": FileType,
-  ".docx": FileText,
-  ".md": FileText,
-  ".txt": File,
-};
-
-function getExtension(filePath: string): string {
-  const dot = filePath.lastIndexOf(".");
-  return dot >= 0 ? filePath.slice(dot).toLowerCase() : "";
-}
 
 function getFileName(filePath: string): string {
   return filePath.replace(/\\/g, "/").split("/").pop() ?? filePath;
@@ -49,8 +38,6 @@ export function DocumentRow({
   onToggleSelect,
   className,
 }: DocumentRowProps) {
-  const ext = getExtension(document.file_path);
-  const Icon = EXT_ICONS[ext] ?? File;
   const fileName = getFileName(document.file_path);
 
   const [confirming, setConfirming] = useState(false);
@@ -81,7 +68,7 @@ export function DocumentRow({
       </button>
 
       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
-        <Icon size={15} className="text-muted-foreground" strokeWidth={1.5} />
+        <FileTypeIcon path={document.file_path} size={20} />
       </div>
 
       <div className="min-w-0 flex-1">

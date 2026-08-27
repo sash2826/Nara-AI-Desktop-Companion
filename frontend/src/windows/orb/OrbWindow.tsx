@@ -1,12 +1,18 @@
+import { useEffect } from "react";
 import { OrbShell } from "./OrbShell";
 
 /**
  * Root component for the standalone orb WebviewWindow.
- *
- * This is intentionally minimal — all logic lives in OrbShell.
- * The window is 80×340px (orb + overlay space), transparent, no decorations.
+ * Clamps overflow so the transparent window never shows scrollbars.
  */
 export function OrbWindow() {
+  useEffect(() => {
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.margin = "0";
+    document.body.style.padding = "0";
+  }, []);
+
   return (
     <div
       style={{

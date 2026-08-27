@@ -146,6 +146,9 @@ class DebounceHandler(FileSystemEventHandler):
     def _schedule(self, src_path: str, is_new: bool = False) -> None:
         if _is_excluded(src_path):
             return
+        # Office lock files (~$filename) are temporary and must never be indexed.
+        if Path(src_path).name.startswith("~$"):
+            return
         ext = Path(src_path).suffix.lower()
         if ext not in SUPPORTED_EXTENSIONS:
             return

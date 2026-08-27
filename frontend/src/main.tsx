@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { OrbWindow } from "./windows/orb/OrbWindow";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/source-serif-4";
@@ -28,5 +29,13 @@ if (windowLabel === "orb") {
 const root = document.getElementById("root") as HTMLElement;
 
 ReactDOM.createRoot(root).render(
-  <React.StrictMode>{windowLabel === "orb" ? <OrbWindow /> : <App />}</React.StrictMode>
+  <React.StrictMode>
+    {windowLabel === "orb" ? (
+      <ThemeProvider>
+        <OrbWindow />
+      </ThemeProvider>
+    ) : (
+      <App />
+    )}
+  </React.StrictMode>
 );

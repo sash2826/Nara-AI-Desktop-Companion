@@ -1,9 +1,8 @@
 """Graph traversal engine for path-finding and connected component discovery.
 
 Provides higher-level traversal operations above the GraphProvider interface.
-Supports SQLiteGraphProvider (recursive CTE path-finding) and Neo4jProvider
-(Cypher shortestPath). Returns empty/not-found results gracefully for
-NullGraphProvider.
+Supports SQLiteGraphProvider (recursive CTE path-finding). Returns empty/not-found
+results gracefully for NullGraphProvider.
 """
 
 from __future__ import annotations
@@ -36,7 +35,6 @@ class TraversalEngine:
     def __init__(self, graph_provider: GraphProvider) -> None:
         self._provider = graph_provider
         self._is_sqlite = hasattr(graph_provider, "_conn")
-        self._is_neo4j = hasattr(graph_provider, "_driver")
 
     async def find_path(self, source_name: str, target_name: str) -> GraphPath:
         """Find the shortest path between two named entities (max 6 hops).
@@ -46,8 +44,6 @@ class TraversalEngine:
         """
         if self._is_sqlite:
             return await self._find_path_sqlite(source_name, target_name)
-        if self._is_neo4j:
-            return await self._find_path_neo4j(source_name, target_name)
         return GraphPath(source_name=source_name, target_name=target_name)
 
     async def get_connected_documents(self, entity_name: str) -> list[str]:
@@ -57,8 +53,6 @@ class TraversalEngine:
         """
         if self._is_sqlite:
             return await self._connected_documents_sqlite(entity_name)
-        if self._is_neo4j:
-            return await self._connected_documents_neo4j(entity_name)
         return []
 
     # ------------------------------------------------------------------
@@ -157,70 +151,3 @@ class TraversalEngine:
         """Delegate to the provider — it already implements 2-hop traversal."""
         return await self._provider.get_connected_documents(entity_name)
 
-    # ------------------------------------------------------------------
-    # Neo4j implementations (unchanged)
-    # ------------------------------------------------------------------
-
-    async def _find_path_neo4j(self, source_name: str, target_name: str) -> GraphPath:
-        from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider  # noqa: PLC0415
-        provider: Neo4jProvider = self._provider  # type: ignore[assignment]
-        driver = provider._driver  # noqa: SLF001
-        if driver is None:
-            return GraphPath(source_name=source_name, target_name=target_name)
-
-        cypher = (
-            "MATCH path = shortestPath("
-            "  (src:Entity {name: $src_name})-[*..6]-(tgt:Entity {name: $tgt_name})"
-            ") "
-            "RETURN [node IN nodes(path) | node.name] AS names, length(path) AS len"
-        )
-        try:
-            async with driver.session() as session:
-                result = await session.run(
-                    cypher, src_name=source_name, tgt_name=target_name
-                )
-                record = await result.single()
-        except Exception as exc:
-            logger.warning(
-                "TraversalEngine._find_path_neo4j(%r → %r) failed: %s",
-                source_name, target_name, exc,
-            )
-            return GraphPath(source_name=source_name, target_name=target_name)
-
-        if record is None:
-            return GraphPath(source_name=source_name, target_name=target_name)
-
-        return GraphPath(
-            source_name=source_name,
-            target_name=target_name,
-            node_names=list(record["names"]),
-            length=int(record["len"]),
-            found=True,
-        )
-
-    async def _connected_documents_neo4j(self, entity_name: str) -> list[str]:
-        from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider  # noqa: PLC0415
-        provider: Neo4jProvider = self._provider  # type: ignore[assignment]
-        driver = provider._driver  # noqa: SLF001
-        if driver is None:
-            return []
-
-        cypher = (
-            "MATCH (root:Entity {name: $name})-[*0..2]-(neighbour:Entity) "
-            "WHERE neighbour.source_document_id IS NOT NULL "
-            "RETURN collect(DISTINCT neighbour.source_document_id) AS doc_ids"
-        )
-        try:
-            async with driver.session() as session:
-                result = await session.run(cypher, name=entity_name)
-                record = await result.single()
-        except Exception as exc:
-            logger.warning(
-                "TraversalEngine._connected_documents_neo4j(%r) failed: %s",
-                entity_name, exc,
-            )
-            return []
-
-        if record is None:
-            return []
-        return [str(d) for d in (record["doc_ids"] or []) if d]

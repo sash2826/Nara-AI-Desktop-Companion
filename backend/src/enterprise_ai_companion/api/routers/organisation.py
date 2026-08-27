@@ -207,6 +207,7 @@ async def get_audit_status(request: Request) -> AuditStatusResponse:
 
 
 def _to_response(rec: PlacementRecommendation) -> PendingRecommendationResponse:
+    label_map = {"Most Likely": "Strong", "Likely": "Good"}
     return PendingRecommendationResponse(
         id=rec.id,
         source_path=rec.source_path,
@@ -214,7 +215,7 @@ def _to_response(rec: PlacementRecommendation) -> PendingRecommendationResponse:
             CandidateItem(
                 folder=c.get("folder", ""),
                 score=float(c.get("score", 0.0)),
-                label=c.get("label", "Possible"),
+                label=label_map.get(c.get("label", "Possible"), c.get("label", "Possible")),
             )
             for c in rec.recommendations
         ],

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Folder, FolderOpen } from "lucide-react";
 import { useRecommendations, type BulkProgress } from "./useRecommendations";
 import {
   AUTO_EXPAND_MAX_TOTAL,
@@ -9,6 +9,7 @@ import {
   type RecommendationGroup,
 } from "./recommendationGroups";
 import { RecommendationCard } from "./RecommendationCard";
+import { useOrbWindowStore } from "./orbWindowStore";
 
 const SKIP_ALL_KEY = "__all__";
 /** Lets the exit animation finish before a completed group collapses. */
@@ -35,8 +36,9 @@ export function OrbNotificationOverlay() {
     handleSkip,
     handleAcceptMany,
     handleSkipMany,
-    handleDismiss,
   } = useRecommendations();
+
+  const { setOverlayMode } = useOrbWindowStore();
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [confirmSkipAll, setConfirmSkipAll] = useState(false);
@@ -72,11 +74,11 @@ export function OrbNotificationOverlay() {
       if (e.key !== "Escape") return;
       if (confirmSkipAll) setConfirmSkipAll(false);
       else if (expandedKey) setExpandedKey(null);
-      else handleDismiss();
+      else setOverlayMode("none");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [confirmSkipAll, expandedKey, handleDismiss]);
+  }, [confirmSkipAll, expandedKey, setOverlayMode]);
 
   return (
     <motion.div
@@ -126,21 +128,6 @@ export function OrbNotificationOverlay() {
             <span style={{ color: "hsl(var(--muted-foreground))", marginLeft: 6 }}>{total}</span>
           )}
         </span>
-        <button
-          onClick={handleDismiss}
-          style={{
-            background: "none",
-            border: "none",
-            color: "hsl(var(--muted-foreground))",
-            cursor: "pointer",
-            fontSize: 16,
-            lineHeight: 1,
-            padding: "0 2px",
-          }}
-          aria-label="Close suggestions"
-        >
-          ×
-        </button>
       </div>
 
       {/* List */}
@@ -181,78 +168,93 @@ export function OrbNotificationOverlay() {
         </AnimatePresence>
       </div>
 
-      {total > 1 && (
-        <div
+      <div
+        style={{
+          padding: "8px 14px",
+          borderTop: "1px solid hsl(var(--border) / 0.6)",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <button
+          onClick={() => setOverlayMode("none")}
+          disabled={isBusy}
           style={{
-            padding: "8px 14px",
-            borderTop: "1px solid hsl(var(--border) / 0.6)",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
+            background: "none",
+            border: "none",
+            color: "hsl(var(--muted-foreground))",
+            fontSize: 12,
+            cursor: isBusy ? "default" : "pointer",
+            padding: 0,
+            opacity: isBusy ? 0.5 : 1,
+            marginRight: "auto",
           }}
         >
-          {confirmSkipAll ? (
-            <>
-              <span style={{ fontSize: 12, flex: 1 }}>Skip all {total}?</span>
-              <button
-                onClick={() => {
-                  setConfirmSkipAll(false);
-                  void handleSkipMany(
-                    SKIP_ALL_KEY,
-                    recommendations.map((r) => r.id)
-                  );
-                }}
-                disabled={isBusy}
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: 7,
-                  border: "1px solid hsl(var(--destructive) / 0.5)",
-                  background: "hsl(var(--destructive) / 0.15)",
-                  color: "hsl(var(--destructive))",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: isBusy ? "default" : "pointer",
-                }}
-              >
-                Skip all
-              </button>
-              <button
-                onClick={() => setConfirmSkipAll(false)}
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: 7,
-                  border: "1px solid hsl(var(--border))",
-                  background: "hsl(var(--muted) / 0.6)",
-                  color: "hsl(var(--muted-foreground))",
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
+          Dismiss
+        </button>
+
+        {total > 1 && confirmSkipAll ? (
+          <>
+            <span style={{ fontSize: 12, flex: 1 }}>Skip all {total}?</span>
             <button
-              onClick={() => setConfirmSkipAll(true)}
+              onClick={() => {
+                setConfirmSkipAll(false);
+                void handleSkipMany(
+                  SKIP_ALL_KEY,
+                  recommendations.map((r) => r.id)
+                );
+              }}
               disabled={isBusy}
               style={{
-                background: "none",
-                border: "none",
-                color: "hsl(var(--muted-foreground))",
+                padding: "3px 10px",
+                borderRadius: 7,
+                border: "1px solid hsl(var(--destructive) / 0.5)",
+                background: "hsl(var(--destructive) / 0.15)",
+                color: "hsl(var(--destructive))",
                 fontSize: 12,
+                fontWeight: 600,
                 cursor: isBusy ? "default" : "pointer",
-                padding: 0,
-                opacity: isBusy ? 0.5 : 1,
               }}
             >
-              {bulk?.key === SKIP_ALL_KEY
-                ? `Skipping ${bulk.done}/${bulk.total}…`
-                : `Skip all ${total}`}
+              Skip all
             </button>
-          )}
-        </div>
-      )}
+            <button
+              onClick={() => setConfirmSkipAll(false)}
+              style={{
+                padding: "3px 10px",
+                borderRadius: 7,
+                border: "1px solid hsl(var(--border))",
+                background: "hsl(var(--muted) / 0.6)",
+                color: "hsl(var(--muted-foreground))",
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : total > 1 ? (
+          <button
+            onClick={() => setConfirmSkipAll(true)}
+            disabled={isBusy}
+            style={{
+              background: "none",
+              border: "none",
+              color: "hsl(var(--muted-foreground))",
+              fontSize: 12,
+              cursor: isBusy ? "default" : "pointer",
+              padding: 0,
+              opacity: isBusy ? 0.5 : 1,
+            }}
+          >
+            {bulk?.key === SKIP_ALL_KEY
+              ? `Skipping ${bulk.done}/${bulk.total}…`
+              : `Skip all ${total}`}
+          </button>
+        ) : null}
+      </div>
     </motion.div>
   );
 }
@@ -319,9 +321,9 @@ function GroupSection({
         }}
       >
         {expanded ? (
-          <ChevronDown size={14} style={{ flexShrink: 0 }} />
+          <FolderOpen size={15} style={{ flexShrink: 0 }} />
         ) : (
-          <ChevronRight size={14} style={{ flexShrink: 0 }} />
+          <Folder size={15} style={{ flexShrink: 0 }} />
         )}
         <span
           style={{

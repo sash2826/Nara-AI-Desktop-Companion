@@ -48,6 +48,10 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".xlsx", ".pptx"}
 
+# Filename prefixes that must never be indexed regardless of extension.
+# ~$ — Office lock/temp files created while a document is open.
+_IGNORED_PREFIXES: tuple[str, ...] = ("~$",)
+
 # Maximum number of files processed concurrently during workspace indexing.
 # Kept at 1 because all repositories share a single aiosqlite connection; with
 # concurrent coroutines the transaction-state tracking (in_transaction flag)
@@ -113,6 +117,8 @@ def _collect_files(root: Path) -> list[Path]:
         # Prune excluded dirs in-place so os.walk does not recurse into them.
         dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS]
         for name in filenames:
+            if name.startswith(_IGNORED_PREFIXES):
+                continue
             p = Path(dirpath) / name
             if p.suffix.lower() in SUPPORTED_EXTENSIONS:
                 collected.append(p)

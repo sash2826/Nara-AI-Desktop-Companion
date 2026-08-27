@@ -12,6 +12,5 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { id: "workspace", label: "Workspace", iconName: "LayoutDashboard" },
   { id: "search", label: "Search", iconName: "Search" },
   { id: "knowledge-graph", label: "Knowledge Graph", iconName: "Network" },
-  { id: "automation", label: "Automation", iconName: "Zap" },
   { id: "settings", label: "Settings", iconName: "Settings" },
 ];

@@ -1,12 +1,13 @@
 import type { CSSProperties } from "react";
 import { motion } from "framer-motion";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import type { Recommendation } from "./useRecommendations";
 import { fileName, folderName } from "./recommendationGroups";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function labelColor(label: Recommendation["candidates"][0]["label"]): string {
-  if (label === "Most Likely") return "hsl(var(--success))";
-  if (label === "Likely") return "hsl(var(--primary))";
+  if (label === "Strong") return "hsl(var(--success))";
+  if (label === "Good") return "hsl(var(--primary))";
   return "hsl(var(--muted-foreground))";
 }
 
@@ -68,7 +69,6 @@ export function RecommendationCard({
   onConflictCancel,
 }: RecommendationCardProps) {
   const top = rec.candidates[0];
-  const alternates = rec.candidates.slice(1);
   const name = fileName(rec.source_path);
 
   return (
@@ -78,17 +78,20 @@ export function RecommendationCard({
       transition={{ duration: 0.18 }}
       style={{ padding: "10px 14px", borderBottom: "1px solid hsl(var(--border) / 0.4)" }}
     >
-      <div
-        style={{
-          fontWeight: 500,
-          marginBottom: 4,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-        title={rec.source_path}
-      >
-        {name}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+        <FileTypeIcon path={rec.source_path} size={17} style={{ flexShrink: 0 }} />
+        <div
+          style={{
+            minWidth: 0,
+            fontWeight: 500,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={rec.source_path}
+        >
+          {name}
+        </div>
       </div>
 
       {conflictFolder ? (
@@ -172,42 +175,6 @@ export function RecommendationCard({
               Skip
             </button>
           </div>
-
-          {alternates.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                flexWrap: "wrap",
-                marginTop: 8,
-                alignItems: "center",
-              }}
-            >
-              <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}>Or:</span>
-              {alternates.map((alt) => (
-                <button
-                  key={alt.folder}
-                  onClick={() => onAccept(rec.id, alt.folder)}
-                  disabled={disabled}
-                  title={`${alt.folder} · ${Math.round(alt.score * 100)}%`}
-                  style={disabledStyle(
-                    {
-                      ...baseButton,
-                      padding: "2px 8px",
-                      fontSize: 11,
-                      borderRadius: 999,
-                      border: "1px solid hsl(var(--border))",
-                      background: "transparent",
-                      color: "hsl(var(--muted-foreground))",
-                    },
-                    disabled
-                  )}
-                >
-                  {folderName(alt.folder)} {Math.round(alt.score * 100)}%
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
     </motion.div>

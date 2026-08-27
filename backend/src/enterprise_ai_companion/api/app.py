@@ -25,7 +25,6 @@ from enterprise_ai_companion.capabilities.organisation.recommendation_repository
 from enterprise_ai_companion.capabilities.organisation.audit_service import AuditService
 from enterprise_ai_companion.capabilities.organisation.recommendation_service import RecommendationService
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
-from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
 from enterprise_ai_companion.capabilities.graph.sqlite_graph_provider import SQLiteGraphProvider
 from enterprise_ai_companion.capabilities.indexing.abbreviation_repository import AbbreviationRepository
@@ -52,19 +51,14 @@ logger = logging.getLogger(__name__)
 
 def _build_graph_provider(
     conn: "aiosqlite.Connection | None" = None,
-) -> SQLiteGraphProvider | Neo4jProvider | NullGraphProvider:
+) -> SQLiteGraphProvider | NullGraphProvider:
     """Return the appropriate graph provider based on EAC_GRAPH_PROVIDER.
 
     Default (no env var): SQLiteGraphProvider — embedded, zero-config.
-    EAC_GRAPH_PROVIDER=neo4j: Neo4jProvider — requires running Neo4j.
     EAC_GRAPH_PROVIDER=null: NullGraphProvider — graph features disabled.
     """
-    mode = get_config().graph_provider.lower()
-    if mode == "neo4j":
-        return Neo4jProvider()
-    if mode == "null":
+    if get_config().graph_provider.lower() == "null":
         return NullGraphProvider()
-    # Default: SQLite
     if conn is None:
         raise RuntimeError("SQLiteGraphProvider requires a database connection")
     return SQLiteGraphProvider(conn)
@@ -250,6 +244,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # the folder was removed outside the app entirely.
     asyncio.create_task(_purge_orphaned_folder_documents(app.state))
 
+    # Dismiss any existing recommendations whose target folders are inside
+    # Downloads — these are invalid and were created before the exclusion fix.
+    from pathlib import Path as _Path
+    _downloads = str(_Path.home() / "Downloads")
+    asyncio.create_task(recommendation_repo.purge_downloads_targets(_downloads))
+
     app.state.indexing_tasks: dict = {}
 
     try:
@@ -287,28 +287,6 @@ class TokenVerificationMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-class AzureTokenMiddleware(BaseHTTPMiddleware):
-    """Extract the Azure AD access token from X-Azure-Token and store it in a
-    ContextVar so deep service layers (e.g. llm_client) can forward it to APIM
-    without requiring the request object to be threaded through every call.
-
-    JWT signature/claims validation is deferred until the App Registration exists
-    and the JWKS endpoint is known. The IPC channel already ensures only the local
-    Tauri app can reach this backend.
-    """
-
-    async def dispatch(
-        self, request: StarletteRequest, call_next  # type: ignore[override]
-    ):
-        from enterprise_ai_companion.capabilities.ai import llm_client as _llm
-        token = request.headers.get("X-Azure-Token")
-        token_ctx = _llm._azure_token_var.set(token or "")
-        try:
-            return await call_next(request)
-        finally:
-            _llm._azure_token_var.reset(token_ctx)
-
-
 app = FastAPI(
     title="Enterprise AI Companion",
     version="0.1.0",
@@ -316,7 +294,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(AzureTokenMiddleware)
 app.add_middleware(TokenVerificationMiddleware)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 

@@ -33,11 +33,6 @@ class AppConfig(BaseSettings):
     # ── Graph provider ───────────────────────────────────────────────────────
     graph_provider: str = Field("sqlite", alias="EAC_GRAPH_PROVIDER")
 
-    # ── Neo4j (optional — only used when graph_provider="neo4j") ────────────
-    neo4j_uri: str = Field("bolt://localhost:7687", alias="EAC_NEO4J_URI")
-    neo4j_user: str = Field("neo4j", alias="EAC_NEO4J_USER")
-    neo4j_password: SecretStr = Field("eac-dev-password", alias="EAC_NEO4J_PASSWORD")
-
     # ── Storage paths ────────────────────────────────────────────────────────
     qdrant_path: str | None = Field(None, alias="EAC_QDRANT_PATH")
     db_path: str | None = Field(None, alias="EAC_DB_PATH")

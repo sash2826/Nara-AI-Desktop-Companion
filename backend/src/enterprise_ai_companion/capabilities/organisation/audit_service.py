@@ -107,7 +107,11 @@ class AuditService:
             if len(page) < _PAGE_SIZE:
                 break
 
-        eligible = [doc for doc in all_docs if str(Path(doc.file_path).parent) != _DOWNLOADS_PATH]
+        downloads_resolved = Path(_DOWNLOADS_PATH).resolve()
+        eligible = [
+            doc for doc in all_docs
+            if not Path(doc.file_path).parent.resolve().is_relative_to(downloads_resolved)
+        ]
         self.state.total = len(eligible)
         logger.info("[AUDIT] %d eligible file(s) to analyse", self.state.total)
 

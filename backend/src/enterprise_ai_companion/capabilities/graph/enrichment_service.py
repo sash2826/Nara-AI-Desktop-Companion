@@ -7,8 +7,7 @@ Runs after entity and relationship extraction to improve graph quality:
     the higher-confidence node, then the duplicate is deleted.
   - Confidence accumulation: stored confidence is updated to max(existing, new).
 
-Works with both SQLiteGraphProvider and Neo4jProvider.  Falls back to a
-no-op for NullGraphProvider.
+Works with SQLiteGraphProvider.  Falls back to a no-op for NullGraphProvider.
 """
 
 from __future__ import annotations
@@ -45,24 +44,18 @@ def canonical_name(name: str) -> str:
 class EnrichmentService:
     """Post-extraction enrichment for the knowledge graph.
 
-    Supports SQLiteGraphProvider and Neo4jProvider.  NullGraphProvider is
-    detected by the absence of the required internal attributes and all
-    methods return immediately.
+    Supports SQLiteGraphProvider.  NullGraphProvider is detected by the absence
+    of the required internal attributes and all methods return immediately.
     """
 
     def __init__(self, graph_provider: GraphProvider) -> None:
         self._provider = graph_provider
-        # Detect provider type by capability rather than isinstance() to avoid
-        # import coupling between this service and both provider modules.
         self._is_sqlite = hasattr(graph_provider, "_conn")
-        self._is_neo4j = hasattr(graph_provider, "_driver")
 
     async def enrich(self) -> None:
         """Run the full enrichment pipeline — merge duplicates across all entity types."""
         if self._is_sqlite:
             await self._enrich_sqlite()
-        elif self._is_neo4j:
-            await self._enrich_neo4j()
         # NullGraphProvider: do nothing
 
     # ------------------------------------------------------------------
@@ -150,68 +143,3 @@ class EnrichmentService:
                         dup_id, canonical_id, exc,
                     )
 
-    # ------------------------------------------------------------------
-    # Neo4j enrichment (unchanged from previous implementation)
-    # ------------------------------------------------------------------
-
-    async def _enrich_neo4j(self) -> None:
-        try:
-            for entity_type in EntityType:
-                await self._merge_duplicates_neo4j(entity_type)
-        except Exception as exc:
-            logger.warning("EnrichmentService._enrich_neo4j() failed: %s", exc)
-
-    async def _merge_duplicates_neo4j(self, entity_type: EntityType) -> None:
-        from enterprise_ai_companion.capabilities.graph.neo4j_provider import Neo4jProvider  # noqa: PLC0415
-        provider: Neo4jProvider = self._provider  # type: ignore[assignment]
-        driver = provider._driver  # noqa: SLF001
-        if driver is None:
-            return
-
-        fetch_cypher = (
-            "MATCH (e:Entity {entity_type: $entity_type}) "
-            "RETURN e.id AS id, e.name AS name, e.confidence AS confidence"
-        )
-        async with driver.session() as session:
-            result = await session.run(fetch_cypher, entity_type=entity_type.value)
-            records = await result.data()
-
-        groups: dict[str, list[dict]] = {}
-        for record in records:
-            key = canonical_name(str(record["name"]))
-            groups.setdefault(key, []).append(record)
-
-        for key, members in groups.items():
-            if len(members) < 2:
-                continue
-            canonical = max(members, key=lambda r: (float(r["confidence"] or 0), r["id"]))
-            duplicates = [m for m in members if m["id"] != canonical["id"]]
-            for dup in duplicates:
-                await self._merge_node_into_neo4j(driver, dup["id"], canonical["id"])
-                logger.debug(
-                    "Merged duplicate entity '%s' (%s) → canonical id=%s",
-                    dup["name"], entity_type.value, canonical["id"],
-                )
-
-    async def _merge_node_into_neo4j(self, driver, duplicate_id: str, canonical_id: str) -> None:
-        async with driver.session() as session:
-            await session.run(
-                "MATCH (dup:Entity {id: $dup_id})-[r]->(other) "
-                "WHERE other.id <> $canonical_id "
-                "MATCH (canonical:Entity {id: $canonical_id}) "
-                "MERGE (canonical)-[r2]->(other) "
-                "ON CREATE SET r2 = properties(r)",
-                dup_id=duplicate_id, canonical_id=canonical_id,
-            )
-            await session.run(
-                "MATCH (other)-[r]->(dup:Entity {id: $dup_id}) "
-                "WHERE other.id <> $canonical_id "
-                "MATCH (canonical:Entity {id: $canonical_id}) "
-                "MERGE (other)-[r2]->(canonical) "
-                "ON CREATE SET r2 = properties(r)",
-                dup_id=duplicate_id, canonical_id=canonical_id,
-            )
-            await session.run(
-                "MATCH (e:Entity {id: $dup_id}) DETACH DELETE e",
-                dup_id=duplicate_id,
-            )

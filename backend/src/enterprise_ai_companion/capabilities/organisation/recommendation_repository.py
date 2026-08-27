@@ -153,6 +153,52 @@ class RecommendationRepository:
         return count
 
 
+    async def purge_downloads_targets(self, downloads_path: str) -> int:
+        """Dismiss any pending recommendation whose every suggested folder is
+        inside *downloads_path* (exact match or any subdirectory).
+
+        Called at startup so stale records created before the Downloads-exclusion
+        fix are cleaned up automatically.
+        """
+        from pathlib import Path as _Path
+        downloads_resolved = _Path(downloads_path).resolve()
+        resolved_at = datetime.now(UTC).isoformat()
+
+        pending = await self.list_pending()
+        dismissed = 0
+        for rec in pending:
+            tainted = [
+                r for r in rec.recommendations
+                if _Path(r["folder"]).resolve().is_relative_to(downloads_resolved)
+            ]
+            if len(tainted) == len(rec.recommendations):
+                # All suggestions point into Downloads — dismiss entirely.
+                await self._conn.execute(
+                    "UPDATE file_placement_recommendations "
+                    "SET status='dismissed', resolved_at=? WHERE id=?",
+                    (resolved_at, rec.id),
+                )
+                dismissed += 1
+            elif tainted:
+                # Some suggestions are valid — strip the Downloads ones.
+                clean = [r for r in rec.recommendations if r not in tainted]
+                await self._conn.execute(
+                    "UPDATE file_placement_recommendations "
+                    "SET recommendations=? WHERE id=?",
+                    (json.dumps(clean), rec.id),
+                )
+        if dismissed:
+            await self._conn.commit()
+            logger.info("purge_downloads_targets: dismissed %d stale recommendation(s)", dismissed)
+        elif any(
+            r for rec in pending
+            for r in rec.recommendations
+            if _Path(r["folder"]).resolve().is_relative_to(downloads_resolved)
+        ):
+            await self._conn.commit()
+        return dismissed
+
+
 def _row_to_recommendation(row: Any) -> PlacementRecommendation:
     try:
         recs = json.loads(row[3]) if row[3] else []

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "vgds-icon": {
+      "source": "VolvoGroup-Internal/volvo-group-design-system",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "packages/vcdk-ai-kit/skills/vgds-icon/SKILL.md",
+      "computedHash": "2bc6fb3702a216b50949216433d7b1249f6ce29c0bb00883cc71ab3b2bc85761"
+    },
+    "vgds-page-patterns": {
+      "source": "VolvoGroup-Internal/volvo-group-design-system",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "packages/vcdk-ai-kit/skills/vgds-page-patterns/SKILL.md",
+      "computedHash": "d9808b15768ce52695c545758bc6e4b5e017b48b2d1857e3a7031ea05e9cc67d"
+    },
+    "vgds-react": {
+      "source": "VolvoGroup-Internal/volvo-group-design-system",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "packages/vcdk-ai-kit/skills/vgds-react/SKILL.md",
+      "computedHash": "1c3f80e7ca8c2046c8d0c309b81b79d779ba65bf003ab252a187420bf93422a3"
+    },
+    "vgds-styling": {
+      "source": "VolvoGroup-Internal/volvo-group-design-system",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "packages/vcdk-ai-kit/skills/vgds-styling/SKILL.md",
+      "computedHash": "a388650d6fcadb6c47be62d6ec612cb3e9f2abceccc9d970c24f5acb6fefba4f"
+    },
+    "vgds-tailwindcss": {
+      "source": "VolvoGroup-Internal/volvo-group-design-system",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "packages/vcdk-ai-kit/skills/vgds-tailwindcss/SKILL.md",
+      "computedHash": "2a42e1ea478f69773f3f8bb5ede1b4b284d0bad6017d890c6504f37e1d513e2f"
+    },
+    "vgds-ux-writing": {
+      "source": "VolvoGroup-Internal/volvo-group-design-system",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "packages/vcdk-ai-kit/skills/vgds-ux-writing/SKILL.md",
+      "computedHash": "b54cf4b68cc4d943f5a919b7e4a258244caf914778c3209eb0ccd1e95004e96b"
+    }
+  }
+}

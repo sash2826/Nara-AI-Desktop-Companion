@@ -30,9 +30,9 @@ describe("folderName", () => {
 describe("groupRecommendations", () => {
   it("buckets recommendations by their top candidate folder", () => {
     const groups = groupRecommendations([
-      rec("a", [["/w/Horizon", 0.8, "Most Likely"]]),
-      rec("b", [["/w/Horizon", 0.7, "Most Likely"]]),
-      rec("c", [["/w/Polaris", 0.6, "Likely"]]),
+      rec("a", [["/w/Horizon", 0.8, "Strong"]]),
+      rec("b", [["/w/Horizon", 0.7, "Strong"]]),
+      rec("c", [["/w/Polaris", 0.6, "Good"]]),
     ]);
 
     expect(groups).toHaveLength(2);
@@ -43,8 +43,8 @@ describe("groupRecommendations", () => {
 
   it("orders groups by mean confidence so easy wins come first", () => {
     const groups = groupRecommendations([
-      rec("low", [["/w/Weak", 0.45, "Likely"]]),
-      rec("high", [["/w/Strong", 0.95, "Most Likely"]]),
+      rec("low", [["/w/Weak", 0.45, "Good"]]),
+      rec("high", [["/w/Strong", 0.95, "Strong"]]),
     ]);
 
     expect(groups.map((g) => g.label)).toEqual(["Strong", "Weak"]);
@@ -52,7 +52,7 @@ describe("groupRecommendations", () => {
 
   it("routes weak matches to Needs review instead of a folder heading", () => {
     const groups = groupRecommendations([
-      rec("strong", [["/w/Horizon", 0.9, "Most Likely"]]),
+      rec("strong", [["/w/Horizon", 0.9, "Strong"]]),
       rec("weak", [["/w/Horizon", 0.2, "Possible"]]),
     ]);
 
@@ -65,7 +65,7 @@ describe("groupRecommendations", () => {
     const groups = groupRecommendations([
       rec("w1", [["/w/A", 0.1, "Possible"]]),
       rec("w2", [["/w/B", 0.1, "Possible"]]),
-      rec("ok", [["/w/Horizon", 0.9, "Most Likely"]]),
+      rec("ok", [["/w/Horizon", 0.9, "Strong"]]),
     ]);
 
     expect(groups[groups.length - 1].key).toBe(NEEDS_REVIEW_KEY);
@@ -80,8 +80,8 @@ describe("groupRecommendations", () => {
 
   it("counts only confident matches in the group summary", () => {
     const groups = groupRecommendations([
-      rec("a", [["/w/Horizon", 0.9, "Most Likely"]]),
-      rec("b", [["/w/Horizon", 0.45, "Likely"]]),
+      rec("a", [["/w/Horizon", 0.9, "Strong"]]),
+      rec("b", [["/w/Horizon", 0.45, "Good"]]),
     ]);
 
     expect(groups[0].recommendations).toHaveLength(2);

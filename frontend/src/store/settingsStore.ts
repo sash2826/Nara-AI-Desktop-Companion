@@ -80,17 +80,20 @@ function save(settings: AppSettings): void {
 interface SettingsStore {
   settings: AppSettings;
   isDirty: boolean;
+  apiKeyVersion: number;
 
   updateTheme: (theme: ThemeMode) => void;
   updateAIProvider: (patch: Partial<AIProviderSettings>) => void;
   updateIndexing: (patch: Partial<IndexingSettings>) => void;
   saveSettings: () => void;
   resetToDefaults: () => void;
+  bumpApiKeyVersion: () => void;
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   settings: load(),
   isDirty: false,
+  apiKeyVersion: 0,
 
   updateTheme: (theme) =>
     set((state) => ({
@@ -126,4 +129,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     save(DEFAULT_SETTINGS);
     set({ settings: DEFAULT_SETTINGS, isDirty: false });
   },
+
+  bumpApiKeyVersion: () => set((state) => ({ apiKeyVersion: state.apiKeyVersion + 1 })),
 }));

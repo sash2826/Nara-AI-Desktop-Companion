@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
-import { FolderOpen, Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { IPCClient } from "@/services/ipc/IPCClient";
 import { cn } from "@/lib/utils";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -53,7 +54,7 @@ export function FilePathChip({ path }: FilePathChipProps) {
         ) : error ? (
           <AlertCircle size={11} className="flex-shrink-0" />
         ) : (
-          <FolderOpen size={11} className="flex-shrink-0" strokeWidth={1.5} />
+          <FileTypeIcon path={cleanPath} size={14} className="flex-shrink-0" />
         )}
         <span className="truncate">{filename}</span>
       </button>

@@ -6,7 +6,6 @@ import { ChatPage } from "@/pages/ChatPage";
 import { WorkspacePage } from "@/pages/WorkspacePage";
 import { SearchPage } from "@/pages/SearchPage";
 import { KnowledgeGraphPage } from "@/pages/KnowledgeGraphPage";
-import { AutomationPage } from "@/pages/AutomationPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import type { NavItemId } from "@/types/navigation";
 import type { ComponentType } from "react";
@@ -24,7 +23,6 @@ const PAGE_MAP: Record<NavItemId, PageModule> = {
   workspace: { component: WorkspacePage },
   search: { component: SearchPage },
   "knowledge-graph": { component: KnowledgeGraphPage },
-  automation: { component: AutomationPage },
   settings: { component: SettingsPage },
 };
 

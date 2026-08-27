@@ -100,10 +100,11 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
                     # "Atlas-Workplace/Project_Overview.pdf" not just "Project_Overview.pdf"
                     label = "/".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
                     name = parts[-1]
-                    snippets.append(f"[{label}]\n{r.content[:600]}")
                     if path not in seen_paths:
                         seen_paths.add(path)
                         sources.append(OrbSourceItem(path=path, name=name))
+                        source_index = len(sources)
+                        snippets.append(f"[{source_index}] {label}\n{r.content[:480]}")
                 context_text = "\n\n".join(snippets[:5])
         except Exception:
             logger.debug("Orb RAG context fetch failed — proceeding without context")
@@ -116,14 +117,19 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
             "- Name the specific document title and project (e.g. 'Atlas Workplace — Access Control Plan').\n"
             "- Use the exact names, people, document IDs, and terms as they appear in the sources.\n"
             "- If the source includes a document ID (e.g. 'AW-DOC-004'), mention it.\n"
-            "- Answer concisely — 3–4 sentences max. No markdown headers or bullet lists.\n\n"
+            "- Be concise but complete: a short paragraph, or up to 4 short markdown\n"
+            "  bullet points when listing files or items. Aim for under 110 words.\n"
+            "- Always finish your final sentence — never stop mid-thought.\n"
+            "- Cite each factual claim with the matching [N] source number.\n"
+            "- No headers, no preamble, no trailing source list.\n\n"
             f"Indexed files context:\n{context_text}"
         )
     else:
         system_content = (
             "You are a helpful AI assistant with access to the user's indexed knowledge base. "
             "No relevant files were found for this query. "
-            "Answer concisely (3–4 sentences max). No markdown headers or bullet lists."
+            "Answer in a short, complete paragraph (under 60 words). "
+            "Always finish your final sentence. No headers, bullet lists, or preamble."
         )
 
     messages = [
@@ -132,7 +138,7 @@ async def orb_query(request: Request, body: OrbQueryRequest) -> Any:
     ]
 
     try:
-        response_text = await chat_complete(messages, max_tokens=256, temperature=0.4)
+        response_text = await chat_complete(messages, max_tokens=320, temperature=0.3)
     except Exception as exc:
         logger.error("Orb query LLM call failed: %s", exc)
         return OrbQueryResponse(

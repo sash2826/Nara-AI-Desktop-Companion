@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ORB_SIZE } from "@/theme/orbTheme";
@@ -7,6 +7,8 @@ import { useOrbWindowStore } from "./orbWindowStore";
 import { OrbSvgFilters, OrbSphere } from "./OrbAnimationEngine";
 import { OrbQueryOverlay } from "./OrbQueryOverlay";
 import { OrbNotificationOverlay } from "./OrbNotificationOverlay";
+import { OrbAmbientBubble } from "./OrbAmbientBubble";
+import { useOrbAmbientMessages } from "./useOrbAmbientMessages";
 
 // How long a pointer must be stationary after mousedown before we treat it as
 // the start of a drag rather than a click.
@@ -14,6 +16,21 @@ const DRAG_THRESHOLD_PX = 4;
 const DOUBLE_CLICK_MS = 300;
 // Small margin around the interactive bounds so edge clicks aren't lost.
 const HIT_REGION_PADDING = 6;
+
+const STATUS_DOT_COLOR: Record<string, string> = {
+  idle: "hsl(142 70% 45%)",
+  listening: "hsl(142 70% 50%)",
+  processing: "hsl(210 100% 60%)",
+  notification: "hsl(38 95% 55%)",
+  error: "hsl(0 84% 60%)",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  idle: "Online",
+  listening: "Listening",
+  processing: "Processing",
+  error: "Error",
+};
 
 /**
  * OrbShell — the root visual and interaction layer for the standalone orb window.
@@ -30,9 +47,11 @@ export function OrbShell() {
     animationState,
     overlayMode,
     pendingCount,
+    notificationsViewed,
     setOverlayMode,
     setPendingCount,
     setAnimationState,
+    markNotificationsViewed,
   } = useOrbWindowStore();
 
   const [isHovered, setIsHovered] = useState(false);
@@ -73,12 +92,12 @@ export function OrbShell() {
         /* sidecar not yet ready — ignore */
       });
 
-    // Poll every 30s so the amber badge appears without needing a Tauri event push.
+    // Poll every 4s so new recommendations appear in the orb promptly.
     const pollInterval = setInterval(() => {
       invoke<number>("get_pending_recommendation_count")
         .then((count) => setPendingCount(count))
         .catch(() => {});
-    }, 30_000);
+    }, 4_000);
 
     return () => {
       unlistenFn?.();
@@ -238,13 +257,11 @@ export function OrbShell() {
         return;
       }
 
-      if (pendingCount > 0 && animationState === "notification") {
-        setOverlayMode("notifications");
-      } else {
-        setOverlayMode("query");
-      }
+      // After the first auto-open, single click always goes to query.
+      // Suggestions are accessible via the chip inside the query overlay.
+      setOverlayMode("query");
     },
-    [animationState, overlayMode, pendingCount, setOverlayMode]
+    [overlayMode, setOverlayMode]
   );
 
   // ── Keyboard activation (accessibility) ───────────────────────────────────
@@ -258,6 +275,17 @@ export function OrbShell() {
     },
     [handleClick]
   );
+
+  // ── Ambient speech bubble ─────────────────────────────────────────────────
+  const ambientMessage = useOrbAmbientMessages({ pendingCount, overlayMode });
+
+  // ── Auto-open notification overlay on first arrival of suggestions ──────────
+  useEffect(() => {
+    if (pendingCount > 0 && !notificationsViewed && overlayMode === "none") {
+      setOverlayMode("notifications");
+      markNotificationsViewed();
+    }
+  }, [pendingCount, notificationsViewed, overlayMode, setOverlayMode, markNotificationsViewed]);
 
   // ── Error recovery: reset error state after 2s ─────────────────────────────
   useEffect(() => {
@@ -281,8 +309,8 @@ export function OrbShell() {
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "flex-end",
-        paddingBottom: 8,
-        paddingRight: 8,
+        paddingBottom: 36,
+        paddingRight: 24,
         position: "relative",
         background: "transparent",
         userSelect: "none",
@@ -296,6 +324,13 @@ export function OrbShell() {
 
       {/* Orb hit-target + overlays anchor */}
       <div ref={anchorRef} style={{ position: "relative", pointerEvents: "auto" }}>
+        {/* Ambient speech bubble — hidden while any overlay is open */}
+        <AnimatePresence>
+          {ambientMessage && overlayMode === "none" && (
+            <OrbAmbientBubble key={ambientMessage.text} message={ambientMessage} />
+          )}
+        </AnimatePresence>
+
         {/* Overlays rendered above the orb */}
         <AnimatePresence>
           {overlayMode === "query" && <OrbQueryOverlay key="query" />}
@@ -372,6 +407,61 @@ export function OrbShell() {
               }}
             >
               {pendingCount > 99 ? "99+" : pendingCount}
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Status line — anchored inside the orb div so left:50% always means
+            the orb's own centre, regardless of window width or paddingRight.
+            Not shown for the notification state; the badge count covers it. */}
+        <AnimatePresence>
+          {animationState !== "notification" && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                left: "50%",
+                transform: "translateX(-50%)",
+                pointerEvents: "none",
+              }}
+            >
+              <motion.div
+                key={animationState}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <motion.span
+                  animate={{ opacity: animationState === "idle" ? 1 : [1, 0.25, 1] }}
+                  transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                  style={{
+                    display: "inline-block",
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: STATUS_DOT_COLOR[animationState] ?? "hsl(var(--muted-foreground))",
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "hsl(var(--popover-foreground) / 0.7)",
+                    fontFamily: "var(--font-sans), system-ui, sans-serif",
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  {STATUS_LABEL[animationState] ?? animationState}
+                </span>
+              </motion.div>
             </div>
           )}
         </AnimatePresence>

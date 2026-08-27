@@ -8,7 +8,6 @@ the top-3 results, and logs the outcome.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
@@ -66,12 +65,15 @@ class RecommendationService:
             )
             return
 
-        # Exclude ancestor directories — a folder that contains the file's
-        # current location is not a meaningful move destination.
-        file_parent = str(Path(file_path).parent)
+        # Exclude the file's own parent and all ancestor directories — moving a
+        # file to where it already lives (or to a parent that already contains
+        # it) is never a meaningful recommendation.
+        # is_relative_to(f) is True when file_parent == f OR file_parent is
+        # nested inside f, catching both the exact-parent case and deeper ancestors.
+        file_parent = Path(file_path).parent.resolve()
         candidate_paths = [
             f for f in candidate_paths
-            if not file_parent.startswith(f.rstrip(os.sep) + os.sep)
+            if not file_parent.is_relative_to(Path(f).resolve())
         ]
 
         logger.info(

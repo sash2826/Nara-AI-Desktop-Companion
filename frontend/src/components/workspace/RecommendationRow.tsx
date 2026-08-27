@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import type { PendingRecommendation } from "@/services/ipc/IPCClient";
 
 interface RecommendationRowProps {
@@ -42,34 +43,42 @@ export function RecommendationRow({
         conflictFolder ? "border-orange-500/30" : "border-amber-500/20"
       )}
     >
-      <div className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-foreground">{fileName}</span>
-        {conflictFolder ? (
-          <span className="text-orange-500 dark:text-orange-400">
-            A file named <span className="font-semibold">{fileName}</span> already exists in{" "}
-            <span className="font-semibold">{conflictFolderName}</span>.
-          </span>
-        ) : (
-          <>
-            {top && folderName && (
-              <span className="text-muted-foreground">
-                → {folderName}
-                <span
-                  className={cn(
-                    "ml-1.5 rounded px-1 py-0.5 text-2xs font-semibold",
-                    top.label === "Strong" &&
-                      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                    top.label === "Good" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-                    top.label === "Possible" && "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {top.label}
+      <div className="min-w-0 flex flex-1 gap-2">
+        <FileTypeIcon path={rec.source_path} size={19} className="mt-0.5 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-foreground">{fileName}</span>
+          {conflictFolder ? (
+            <span className="text-orange-500 dark:text-orange-400">
+              A file named <span className="font-semibold">{fileName}</span> already exists in{" "}
+              <span className="font-semibold">{conflictFolderName}</span>.
+            </span>
+          ) : (
+            <>
+              {top && folderName && (
+                <span className="text-muted-foreground">
+                  → {folderName}
+                  <span
+                    className={cn(
+                      "ml-1.5 rounded px-1 py-0.5 text-2xs font-semibold",
+                      top.label === "Strong" &&
+                        "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                      top.label === "Good" && "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+                      top.label === "Possible" && "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {top.label}
+                  </span>
+                  <span className="ml-1 text-2xs tabular-nums text-muted-foreground">
+                    {Math.round(top.score * 100)}%
+                  </span>
                 </span>
-              </span>
-            )}
-            {errorMsg && <span className="mt-0.5 block text-2xs text-destructive">{errorMsg}</span>}
-          </>
-        )}
+              )}
+              {errorMsg && (
+                <span className="mt-0.5 block text-2xs text-destructive">{errorMsg}</span>
+              )}
+            </>
+          )}
+        </div>
       </div>
       <div className="flex flex-shrink-0 items-center gap-1.5">
         {conflictFolder ? (

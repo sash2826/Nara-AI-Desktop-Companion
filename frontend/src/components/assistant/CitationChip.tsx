@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
-import { FileText, Loader2, AlertCircle, Cloud } from "lucide-react";
+import { Loader2, AlertCircle, Cloud } from "lucide-react";
 import { IPCClient } from "@/services/ipc/IPCClient";
 import { cn } from "@/lib/utils";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import type { CitationMeta } from "@/types/conversation";
 
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -65,7 +66,7 @@ export function CitationChip({ citation, index }: CitationChipProps) {
         ) : error ? (
           <AlertCircle size={10} className="flex-shrink-0" />
         ) : (
-          <FileText size={10} className="flex-shrink-0" strokeWidth={1.5} />
+          <FileTypeIcon path={citation.documentPath} size={13} className="flex-shrink-0" />
         )}
         <span className="max-w-[200px] truncate">{filename}</span>
         {isOneDrive && (

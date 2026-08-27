@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FolderInput, PackageSearch, Loader2, ChevronRight } from "lucide-react";
+import { FolderInput, PackageSearch, Loader2, ChevronRight, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RecommendationRow } from "./RecommendationRow";
 import { FolderContentsList } from "./FolderContentsList";
@@ -14,10 +14,17 @@ import {
   aggregateCounts,
   isDirectChildFile,
 } from "./folderTree";
+import { LOW_CONFIDENCE_THRESHOLD, NEEDS_REVIEW_KEY } from "@/windows/orb/recommendationGroups";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { IPCClient, PendingRecommendation, AuditStatus } from "@/services/ipc/IPCClient";
 
 const SKIP_ALL_KEY = "__all__";
+
+/** A recommendation whose top match is too weak to file under a folder heading. */
+function isNeedsReview(rec: PendingRecommendation): boolean {
+  const top = rec.candidates[0];
+  return !top || top.score < LOW_CONFIDENCE_THRESHOLD;
+}
 
 /**
  * Finder-style organisation review: browse folders as tiles, double-click to
@@ -252,6 +259,8 @@ export function OrganiseTab() {
   const recommendationsByFolderPath = useMemo(() => {
     const map = new Map<string, PendingRecommendation[]>();
     for (const rec of recommendations) {
+      // Weak matches go to the Needs review bucket, not a folder heading.
+      if (isNeedsReview(rec)) continue;
       const top = rec.candidates[0];
       if (!top) continue;
       const owner = findDeepestMatch(flatNodes, top.folder);
@@ -263,6 +272,8 @@ export function OrganiseTab() {
     return map;
   }, [recommendations, flatNodes]);
 
+  const needsReviewRecs = useMemo(() => recommendations.filter(isNeedsReview), [recommendations]);
+
   // Badges roll subfolder suggestions up into their parent folder.
   const badgeCounts = useMemo(() => {
     const own = new Map<string, number>();
@@ -271,6 +282,7 @@ export function OrganiseTab() {
   }, [recommendationsByFolderPath, folderTree]);
 
   const openNode = openPath ? findNodeByPath(flatNodes, openPath) : null;
+  const isNeedsReviewOpen = openPath === NEEDS_REVIEW_KEY;
   const openFolderRecs = openPath ? (recommendationsByFolderPath.get(openPath) ?? []) : [];
   // Subfolder files are reachable by opening that subfolder, so only loose files show here.
   const openFolderDocs = openNode
@@ -386,7 +398,51 @@ export function OrganiseTab() {
           )}
         </div>
 
-        {openNode ? (
+        {isNeedsReviewOpen ? (
+          <div className="flex flex-col gap-5">
+            {/* Breadcrumb */}
+            <div className="flex flex-wrap items-center gap-1 text-xs">
+              <button
+                onClick={() => setOpenPath(null)}
+                className="rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+              >
+                All folders
+              </button>
+              <ChevronRight size={12} className="text-muted-foreground" />
+              <span className="px-1 font-semibold text-foreground">Needs review</span>
+              <span className="ml-1 text-muted-foreground">
+                {needsReviewRecs.length} suggestion{needsReviewRecs.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              These matches are too weak to file automatically. Pick a destination for each, or skip
+              it.
+            </p>
+
+            {needsReviewRecs.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() =>
+                    void handleDismissMany(
+                      NEEDS_REVIEW_KEY,
+                      needsReviewRecs.map((r) => r.id)
+                    )
+                  }
+                  disabled={isBulkBusy}
+                  className="self-start rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent/50 disabled:opacity-50"
+                >
+                  {bulk?.key === NEEDS_REVIEW_KEY
+                    ? `Skipping ${bulk.done}/${bulk.total}…`
+                    : `Skip all ${needsReviewRecs.length}`}
+                </button>
+                {needsReviewRecs.map(renderRec)}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Nothing left to review.</p>
+            )}
+          </div>
+        ) : openNode ? (
           <div className="flex flex-col gap-5">
             {/* Breadcrumb */}
             <div className="flex flex-wrap items-center gap-1 text-xs">
@@ -503,6 +559,26 @@ export function OrganiseTab() {
                 Double-click a folder to review its suggestions.
               </p>
             </div>
+
+            {needsReviewRecs.length > 0 && (
+              <button
+                onClick={() => setOpenPath(NEEDS_REVIEW_KEY)}
+                className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent/50"
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <ShieldQuestion size={18} strokeWidth={1.5} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">Needs review</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Low-confidence matches that need a manual destination
+                  </span>
+                </span>
+                <span className="flex-shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-2xs font-semibold text-muted-foreground">
+                  {needsReviewRecs.length}
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>

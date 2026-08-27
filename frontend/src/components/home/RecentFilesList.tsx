@@ -3,6 +3,7 @@ import { useState } from "react";
 import { IPCClient } from "@/services/ipc/IPCClient";
 import type { RecentFile } from "@/services/ipc/IPCClient";
 import { cn } from "@/lib/utils";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 
 interface RecentFilesListProps {
   files: RecentFile[];
@@ -77,8 +78,8 @@ export function RecentFilesList({ files }: RecentFilesListProps) {
           key={file.id}
           className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-accent/50"
         >
-          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <FileText size={14} strokeWidth={1.5} aria-hidden="true" />
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+            <FileTypeIcon path={file.file_path} size={21} />
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-foreground" title={file.file_path}>

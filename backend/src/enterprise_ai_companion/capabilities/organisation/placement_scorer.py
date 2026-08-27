@@ -40,8 +40,8 @@ logger = logging.getLogger(__name__)
 _GRAPH_WEIGHT = 0.75
 _RERANK_WEIGHT = 0.25
 
-_LABEL_STRONG = "Most Likely"
-_LABEL_GOOD = "Likely"
+_LABEL_STRONG = "Strong"
+_LABEL_GOOD = "Good"
 _LABEL_POSSIBLE = "Possible"
 
 _SCORE_STRONG_THRESHOLD = 0.60

@@ -1,7 +1,8 @@
-import { X, FileText } from "lucide-react";
+import { X } from "lucide-react";
 import type { GraphVisNode, GraphVisEdge } from "@/services/ipc/IPCClient";
 import { IPCClient } from "@/services/ipc/IPCClient";
 import { Button } from "@/components/ui/button";
+import { FileTypeIcon } from "@/components/common/FileTypeIcon";
 import { cn } from "@/lib/utils";
 
 interface EntityCardProps {
@@ -123,7 +124,7 @@ export function EntityCard({ node, edges, onClose, onFocus, className }: EntityC
             className="h-7 justify-start gap-1.5 text-xs"
             onClick={() => void handleOpenDocument(node.source_document_path!)}
           >
-            <FileText size={11} />
+            <FileTypeIcon path={node.source_document_path} size={14} />
             Open source document
           </Button>
         )}

@@ -8,9 +8,6 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 #[cfg(target_os = "windows")]
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
-mod auth;
-mod auth_config;
-
 // ─── App state ────────────────────────────────────────────────────────────────
 
 /// Shared application state injected into every Tauri command.
@@ -23,9 +20,6 @@ pub struct AppState {
     pub ipc_token: Mutex<Option<String>>,
     /// Handle to the Python child process for lifecycle management.
     pub sidecar_process: Mutex<Option<Child>>,
-    /// Current Azure AD access token (and refresh token + expiry).
-    /// Populated by `auth_check` on app open or `auth_login` on first login.
-    pub azure_token: Mutex<Option<auth::AzureTokenData>>,
 }
 
 impl AppState {
@@ -34,7 +28,6 @@ impl AppState {
             sidecar_port: Mutex::new(None),
             ipc_token: Mutex::new(None),
             sidecar_process: Mutex::new(None),
-            azure_token: Mutex::new(None),
         }
     }
 }
@@ -366,16 +359,6 @@ fn ipc_client(state: &AppState) -> reqwest::Client {
     if let Some(token) = ipc_token(state) {
         if let Ok(val) = reqwest::header::HeaderValue::from_str(&token) {
             headers.insert("X-EAC-Token", val);
-        }
-    }
-
-    // Forward the Azure AD access token so the Python backend can use it
-    // as the Authorization: Bearer header when calling APIM.
-    if let Some(azure) = state.azure_token.lock().unwrap().as_ref() {
-        if !azure.is_expired() {
-            if let Ok(val) = reqwest::header::HeaderValue::from_str(&azure.access_token) {
-                headers.insert("X-Azure-Token", val);
-            }
         }
     }
 
@@ -1317,6 +1300,23 @@ async fn get_pending_recommendation_count(
     }
 }
 
+/// Fetches the current pending recommendation count and emits it to the orb window.
+/// Fire-and-forget — errors are silently ignored.
+async fn push_pending_count_to_orb(state: &Arc<AppState>, app: &tauri::AppHandle) {
+    let Ok(base) = sidecar_base(state) else { return };
+    let url = format!("{}/organisation/recommendations/pending/count", base);
+    if let Ok(resp) = ipc_client(state).get(&url).send().await {
+        if resp.status().is_success() {
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                let count = body["count"].as_u64().unwrap_or(0) as u32;
+                if let Some(orb) = app.get_webview_window("orb") {
+                    let _ = orb.emit("orb-pending-count", count);
+                }
+            }
+        }
+    }
+}
+
 /// Accepts a file placement recommendation and triggers the physical move.
 #[tauri::command]
 async fn accept_recommendation(
@@ -1324,6 +1324,7 @@ async fn accept_recommendation(
     folder: String,
     conflict_strategy: Option<String>,
     state: State<'_, Arc<AppState>>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     let base = sidecar_base(&state)?;
     let url = format!("{}/organisation/recommendations/{}/accept", base, recommendation_id);
@@ -1347,6 +1348,7 @@ async fn accept_recommendation(
             .unwrap_or_else(|| format!("HTTP {}", status));
         return Err(detail);
     }
+    push_pending_count_to_orb(&state, &app).await;
     Ok(())
 }
 
@@ -1355,6 +1357,7 @@ async fn accept_recommendation(
 async fn dismiss_recommendation(
     recommendation_id: String,
     state: State<'_, Arc<AppState>>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     let base = sidecar_base(&state)?;
     let url = format!(
@@ -1372,6 +1375,7 @@ async fn dismiss_recommendation(
             resp.status().as_u16()
         ));
     }
+    push_pending_count_to_orb(&state, &app).await;
     Ok(())
 }
 
@@ -1622,7 +1626,7 @@ fn register_windows_startup() {
 /// Window properties:
 ///   - label: "orb"
 ///   - always_on_top, decorations: false, transparent, skip_taskbar
-///   - 400 wide × 620 tall (orb 56px + overlay expansion headroom)
+///   - 440 wide × 660 tall (orb 56px + overlay headroom + 40px for status line; extra 40px right for status text)
 ///   - Positioned bottom-right of the primary monitor, scale-factor corrected
 fn create_orb_window(app: &tauri::App) {
     let primary_monitor = app
@@ -1641,19 +1645,19 @@ fn create_orb_window(app: &tauri::App) {
         let logical_h = (size.height as f64 / scale) as i32;
         let logical_x = (pos.x as f64 / scale) as i32;
         let logical_y = (pos.y as f64 / scale) as i32;
-        // Window is 400 wide × 620 tall. Right edge flush with screen right (24px inset).
-        // Orb sphere sits in the bottom-right corner; overlays expand upward inside the window.
+        // Window is 440 wide × 660 tall. Right edge 4px from screen right so the
+        // status-line label centred under the orb has room without clipping.
         (
-            logical_x + logical_w - 400 - 24,
-            logical_y + logical_h - 620 - 48,
+            logical_x + logical_w - 440 - 4,
+            logical_y + logical_h - 660 - 48,
         )
     } else {
-        (840, 380)
+        (800, 340)
     };
 
     match WebviewWindowBuilder::new(app, "orb", WebviewUrl::App("index.html".into()))
         .title("EAC Orb")
-        .inner_size(400.0, 620.0)
+        .inner_size(440.0, 660.0)
         .resizable(false)
         .always_on_top(true)
         .decorations(false)
@@ -1946,10 +1950,6 @@ pub fn run() {
             store_credential,
             load_credential,
             delete_credential,
-            auth::auth_check,
-            auth::auth_login,
-            auth::auth_logout,
-            auth::auth_get_token,
             get_orb_position,
             set_orb_position,
             set_orb_hit_region,

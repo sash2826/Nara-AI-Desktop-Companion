@@ -16,21 +16,32 @@ interface OrbWindowStore {
   pendingCount: number;
   /** Which overlay is currently open. */
   overlayMode: OrbOverlayMode;
+  /**
+   * False when a new batch of suggestions has arrived and the notification
+   * overlay hasn't been shown yet. Drives the auto-open on first arrival.
+   * Resets to false whenever pendingCount rises from 0.
+   */
+  notificationsViewed: boolean;
 
   setAnimationState: (state: OrbAnimationState) => void;
   setPendingCount: (count: number) => void;
   setOverlayMode: (mode: OrbOverlayMode) => void;
+  markNotificationsViewed: () => void;
 }
 
 export const useOrbWindowStore = create<OrbWindowStore>((set) => ({
   animationState: "idle",
   pendingCount: 0,
   overlayMode: "none",
+  notificationsViewed: false,
 
   setAnimationState: (animationState) => set({ animationState }),
+  markNotificationsViewed: () => set({ notificationsViewed: true }),
   setPendingCount: (pendingCount) =>
     set((s) => ({
       pendingCount,
+      // Reset viewed flag when a fresh batch of suggestions arrives.
+      notificationsViewed: pendingCount > 0 && s.pendingCount === 0 ? false : s.notificationsViewed,
       // Auto-transition to notification state when recommendations arrive
       animationState:
         pendingCount > 0 && s.animationState === "idle"
