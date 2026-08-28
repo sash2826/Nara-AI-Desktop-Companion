@@ -5,11 +5,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import socket
+
 import aiosqlite
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from enterprise_ai_companion.capabilities.ai.llm_client import chat_complete
+from enterprise_ai_companion.infrastructure.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,11 @@ async def _get_stats(conn: aiosqlite.Connection) -> DashboardStats:
         row = await cur.fetchone()
         watched_folder_count = row["cnt"]
 
-    async with conn.execute("SELECT COUNT(*) AS cnt FROM indexing_errors") as cur:
+    # Exclude stale errors for files that have since been indexed successfully.
+    async with conn.execute(
+        "SELECT COUNT(*) AS cnt FROM indexing_errors "
+        "WHERE file_path NOT IN (SELECT file_path FROM documents)"
+    ) as cur:
         row = await cur.fetchone()
         indexing_error_count = row["cnt"]
 
@@ -126,6 +133,11 @@ async def get_suggested_queries(body: SuggestionsRequest) -> SuggestionsResponse
     if not body.recent_file_paths:
         return SuggestionsResponse(suggestions=[])
 
+    # Skip the LLM call entirely when no subscription key is configured — avoids
+    # spurious DNS/network errors logged when the user hasn't entered a key yet.
+    if not get_config().apim_subscription_key:
+        return SuggestionsResponse(suggestions=[])
+
     file_list = "\n".join(f"- {p}" for p in body.recent_file_paths[:10])
     messages: list[dict[str, Any]] = [
         {
@@ -155,6 +167,10 @@ async def get_suggested_queries(body: SuggestionsRequest) -> SuggestionsResponse
         if not isinstance(suggestions, list):
             raise ValueError("LLM did not return a JSON array")
         suggestions = [str(s) for s in suggestions[: body.max_suggestions]]
+    except (socket.gaierror, OSError) as exc:
+        # DNS resolution / network unreachable — expected when not on VPN.
+        logger.debug("[stats] suggestion generation skipped — network unreachable: %s", exc)
+        suggestions = []
     except Exception as exc:
         logger.warning("[stats] suggestion generation failed: %s", exc)
         suggestions = []
