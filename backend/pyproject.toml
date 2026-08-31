@@ -20,6 +20,7 @@ dependencies = [
     "pypdf>=4.0",
     "python-docx>=1.0",
     "python-pptx>=0.6",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]

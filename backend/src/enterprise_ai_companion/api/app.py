@@ -23,6 +23,13 @@ from enterprise_ai_companion.capabilities.organisation.placement_adapters import
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import RecommendationRepository
 from enterprise_ai_companion.capabilities.organisation.audit_service import AuditService
+from enterprise_ai_companion.capabilities.organisation.cluster_discovery_service import ClusterDiscoveryService
+from enterprise_ai_companion.capabilities.organisation.cluster_engine import ClusterEngine
+from enterprise_ai_companion.capabilities.organisation.cluster_proposal_repository import ClusterProposalRepository
+from enterprise_ai_companion.capabilities.organisation.cluster_scorer import ClusterScorer
+from enterprise_ai_companion.capabilities.organisation.document_vector_service import DocumentVectorService
+from enterprise_ai_companion.capabilities.organisation.floating_file_filter import FloatingFileFilter
+from enterprise_ai_companion.capabilities.organisation.folder_naming_service import FolderNamingService
 from enterprise_ai_companion.capabilities.organisation.recommendation_service import RecommendationService
 from enterprise_ai_companion.capabilities.graph.graph_state_repository import GraphStateRepository
 from enterprise_ai_companion.capabilities.graph.null_graph_provider import NullGraphProvider
@@ -227,12 +234,51 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     watcher.recommendation_service = recommendation_service
     await watcher._ensure_downloads_registered()
 
-    audit_service = AuditService(
+    cfg = get_config()
+    system_index_paths: frozenset[str] = (
+        frozenset(p.strip() for p in cfg.system_index_paths.split(",") if p.strip())
+        if cfg.system_index_paths
+        else frozenset()
+    )
+    floating_filter = FloatingFileFilter(
         document_repo=doc_repo,
+        recommendation_repo=recommendation_repo,
+        watcher_service=watcher,
+        system_index_paths=system_index_paths,
+    )
+
+    audit_service = AuditService(
+        floating_filter=floating_filter,
         placement_scorer=placement_scorer,
         recommendation_repo=recommendation_repo,
     )
     app.state.audit_service = audit_service
+
+    # Cluster-based intelligent folder discovery (Phase 10 Scenario 3).
+    graph_score_port = SqliteGraphScoreAdapter(conn=app.state.db)
+    cluster_proposal_repo = ClusterProposalRepository(app.state.db)
+    app.state.cluster_proposal_repo = cluster_proposal_repo
+
+    cluster_discovery_service = ClusterDiscoveryService(
+        floating_filter=floating_filter,
+        vector_service=DocumentVectorService(qdrant.get_client()),
+        cluster_scorer=ClusterScorer(
+            graph_score_port=graph_score_port,
+            entity_weight=cfg.cluster_entity_weight,
+        ),
+        cluster_engine=ClusterEngine(
+            distance_threshold=cfg.cluster_distance_threshold,
+        ),
+        naming_service=FolderNamingService(
+            graph_score_port=graph_score_port,
+            llm_enabled=cfg.cluster_naming_llm_enabled,
+        ),
+        proposal_repo=cluster_proposal_repo,
+        watcher_service=watcher,
+        file_mover=app.state.file_mover,
+        recommendation_repo=recommendation_repo,
+    )
+    app.state.cluster_discovery_service = cluster_discovery_service
 
     # Purge index records for files deleted while the backend was offline.
     # Runs as a background task so it never blocks startup.

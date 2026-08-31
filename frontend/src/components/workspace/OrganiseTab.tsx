@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   FolderInput,
+  FolderPlus,
   PackageSearch,
   Loader2,
   ChevronRight,
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { RecommendationRow } from "./RecommendationRow";
 import { FolderContentsList } from "./FolderContentsList";
 import { OrganiseDashboard } from "./OrganiseDashboard";
+import { ClusterProposalCard } from "./ClusterProposalCard";
 import { FolderGrid } from "./FolderGrid";
 import {
   buildFolderTree,
@@ -23,7 +25,12 @@ import {
 } from "./folderTree";
 import { LOW_CONFIDENCE_THRESHOLD, NEEDS_REVIEW_KEY } from "@/windows/orb/recommendationGroups";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { IPCClient, PendingRecommendation, AuditStatus } from "@/services/ipc/IPCClient";
+import {
+  IPCClient,
+  PendingRecommendation,
+  AuditStatus,
+  ClusterProposal,
+} from "@/services/ipc/IPCClient";
 
 const SKIP_ALL_KEY = "__all__";
 
@@ -54,12 +61,94 @@ export function OrganiseTab() {
   const [selectedTilePath, setSelectedTilePath] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [clusterProposals, setClusterProposals] = useState<ClusterProposal[]>([]);
+  const [clusterBusy, setClusterBusy] = useState<Set<string>>(new Set());
+  const [clusterErrors, setClusterErrors] = useState<Map<string, string>>(new Map());
+  const [discovering, setDiscovering] = useState(false);
+
   const fetchRecommendations = useCallback(() => {
     IPCClient.listPendingRecommendations()
       .then((recs) => setRecommendations(recs))
       .catch(() => {
         /* backend not ready */
       });
+  }, []);
+
+  const fetchClusterProposals = useCallback(() => {
+    IPCClient.listClusterProposals()
+      .then((proposals) => setClusterProposals(proposals))
+      .catch(() => {
+        /* backend not ready */
+      });
+  }, []);
+
+  const handleDiscover = useCallback(async () => {
+    if (discovering) return;
+    setDiscovering(true);
+    try {
+      await IPCClient.discoverClusters();
+      fetchClusterProposals();
+    } finally {
+      setDiscovering(false);
+    }
+  }, [discovering, fetchClusterProposals]);
+
+  const handleClusterAccept = useCallback(async (proposal: ClusterProposal, folder: string) => {
+    setClusterBusy((prev) => new Set(prev).add(proposal.id));
+    setClusterErrors((prev) => {
+      const m = new Map(prev);
+      m.delete(proposal.id);
+      return m;
+    });
+    try {
+      await IPCClient.acceptClusterProposal(proposal.id, folder);
+      setClusterProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : typeof err === "string" ? err : "Move failed";
+      setClusterErrors((prev) => new Map(prev).set(proposal.id, msg));
+    } finally {
+      setClusterBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(proposal.id);
+        return next;
+      });
+    }
+  }, []);
+
+  // "Create folder" — pick a parent, then place files in <parent>/<proposed_name>
+  const handleClusterCreate = useCallback(
+    async (proposal: ClusterProposal) => {
+      const parent = await openDialog({ directory: true, multiple: false });
+      if (!parent) return;
+      const fullPath = `${parent as string}/${proposal.proposed_folder_name}`;
+      void handleClusterAccept(proposal, fullPath);
+    },
+    [handleClusterAccept]
+  );
+
+  // "Choose folder" — pick any existing folder as the destination
+  const handleClusterChooseFolder = useCallback(
+    async (proposal: ClusterProposal) => {
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (!selected) return;
+      void handleClusterAccept(proposal, selected as string);
+    },
+    [handleClusterAccept]
+  );
+
+  const handleClusterDismiss = useCallback(async (proposalId: string) => {
+    setClusterBusy((prev) => new Set(prev).add(proposalId));
+    try {
+      await IPCClient.dismissClusterProposal(proposalId);
+      setClusterProposals((prev) => prev.filter((p) => p.id !== proposalId));
+    } finally {
+      setClusterBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(proposalId);
+        return next;
+      });
+    }
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -73,12 +162,16 @@ export function OrganiseTab() {
     }
   }, [refreshing, loadFolders, loadDocuments, fetchRecommendations]);
 
-  // 5s rec polling
+  // 5s rec + cluster proposals polling
   useEffect(() => {
     fetchRecommendations();
-    const interval = setInterval(fetchRecommendations, 5_000);
+    fetchClusterProposals();
+    const interval = setInterval(() => {
+      fetchRecommendations();
+      fetchClusterProposals();
+    }, 5_000);
     return () => clearInterval(interval);
-  }, [fetchRecommendations]);
+  }, [fetchRecommendations, fetchClusterProposals]);
 
   // 2s audit status polling while running
   const startAuditPoll = useCallback(() => {
@@ -369,6 +462,23 @@ export function OrganiseTab() {
             Organise
           </button>
           <button
+            onClick={() => void handleDiscover()}
+            disabled={discovering}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-xs font-semibold transition-colors",
+              discovering
+                ? "opacity-60 cursor-not-allowed text-muted-foreground"
+                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+            )}
+          >
+            {discovering ? (
+              <Loader2 size={13} className="animate-spin" strokeWidth={2} />
+            ) : (
+              <FolderPlus size={13} strokeWidth={1.5} />
+            )}
+            Discover folders
+          </button>
+          <button
             onClick={() => void handleRefresh()}
             disabled={refreshing}
             title="Refresh folders and suggestions"
@@ -560,18 +670,21 @@ export function OrganiseTab() {
           </div>
         ) : (
           <div className="flex flex-col gap-5">
-            {recommendations.length === 0 && !auditRunning ? (
+            {recommendations.length === 0 && clusterProposals.length === 0 && !auditRunning ? (
               <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
                 <PackageSearch size={32} strokeWidth={1} className="text-muted-foreground/50" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-foreground">No suggestions yet</p>
                   <p className="text-xs text-muted-foreground">
-                    Run an audit to find files that may be better organised elsewhere.
+                    Run an audit or discover folders to find organisation opportunities.
                   </p>
                 </div>
               </div>
             ) : (
-              <OrganiseDashboard recommendations={recommendations} />
+              <OrganiseDashboard
+                recommendations={recommendations}
+                clusterProposalCount={clusterProposals.length}
+              />
             )}
 
             <div className="flex flex-col gap-2">
@@ -588,6 +701,27 @@ export function OrganiseTab() {
                 Double-click a folder to review its suggestions.
               </p>
             </div>
+
+            {clusterProposals.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <FolderPlus size={13} strokeWidth={1.5} />
+                  Folder proposals ({clusterProposals.length})
+                </p>
+                {clusterProposals.map((proposal) => (
+                  <ClusterProposalCard
+                    key={proposal.id}
+                    proposal={proposal}
+                    isAccepting={clusterBusy.has(proposal.id)}
+                    isDismissing={clusterBusy.has(proposal.id)}
+                    error={clusterErrors.get(proposal.id)}
+                    onAccept={(p) => void handleClusterCreate(p)}
+                    onChooseFolder={(p) => void handleClusterChooseFolder(p)}
+                    onDismiss={(id) => void handleClusterDismiss(id)}
+                  />
+                ))}
+              </div>
+            )}
 
             {needsReviewRecs.length > 0 && (
               <button

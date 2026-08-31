@@ -47,6 +47,22 @@ class AppConfig(BaseSettings):
     # They remain fully indexed and searchable.
     system_index_paths: str = Field("", alias="EAC_SYSTEM_INDEX_PATHS")
 
+    # ── Cluster discovery (Phase 10 / Scenario 3) ────────────────────────────
+    # Weight of entity-overlap signal vs cosine similarity in the pairwise
+    # distance matrix: combined = weight × entity_overlap + (1-weight) × cosine.
+    # Calibrated against benchmark Suite 1 in Phase I; default mirrors the
+    # placement scorer's graph/rerank split (0.75/0.25).
+    cluster_entity_weight: float = Field(0.75, alias="EAC_CLUSTER_ENTITY_WEIGHT")
+
+    # Agglomerative linkage distance threshold above which clusters are not
+    # merged. Values in [0, 1]; lower = tighter clusters, fewer proposals.
+    # Calibrated in Phase I — treat this default as a placeholder.
+    cluster_distance_threshold: float = Field(0.45, alias="EAC_CLUSTER_DISTANCE_THRESHOLD")
+
+    # Kill switch for LLM-based folder naming. Must remain False until data
+    # governance approval is confirmed. When False, deterministic naming is used.
+    cluster_naming_llm_enabled: bool = Field(False, alias="EAC_CLUSTER_NAMING_LLM_ENABLED")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

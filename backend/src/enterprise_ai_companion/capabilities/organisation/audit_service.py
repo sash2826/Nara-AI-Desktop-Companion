@@ -6,7 +6,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from enterprise_ai_companion.capabilities.indexing.document_repository import DocumentRepository
+from enterprise_ai_companion.capabilities.organisation.floating_file_filter import (
+    FloatingFileFilter,
+)
 from enterprise_ai_companion.capabilities.organisation.placement_scorer import PlacementScorer
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import (
     RecommendationRepository,
@@ -30,16 +32,6 @@ _MIN_SCORE_DELTA = 0.248
 # (files sit in the root, subfolders are the candidates), so they use
 # _MIN_SCORE_DELTA and are unaffected by this constant.
 _MIN_SCORE_DELTA_PLACED = 0.50
-_PAGE_SIZE = 100
-
-# Filename tokens that identify personal/domestic documents.  Files whose
-# stem contains any of these words (case-insensitive, split on _-. ) are
-# skipped by the audit — recommending personal documents to work project
-# folders is always wrong regardless of semantic similarity.
-_PERSONAL_FILENAME_TOKENS: frozenset[str] = frozenset({
-    "personal", "home", "garden", "family", "renovation",
-    "private", "hobby", "leisure",
-})
 
 
 @dataclass
@@ -53,19 +45,19 @@ class AuditState:
 class AuditService:
     """Iterates all indexed documents and surfaces reorganisation suggestions.
 
-    Skips files in the Downloads folder (handled by Phase 09) and files that
-    already have an active pending recommendation. Creates a pending rec when
-    a non-current folder scores ≥ 0.55 with a delta ≥ 0.20 over the current
-    folder score.
+    Eligibility filtering (Downloads exclusion, personal tokens, pending recs,
+    excluded dirs) is delegated to FloatingFileFilter. AuditService is
+    responsible only for scoring eligible documents against candidate folders
+    and persisting recommendations.
     """
 
     def __init__(
         self,
-        document_repo: DocumentRepository,
+        floating_filter: FloatingFileFilter,
         placement_scorer: PlacementScorer,
         recommendation_repo: RecommendationRepository,
     ) -> None:
-        self._doc_repo = document_repo
+        self._filter = floating_filter
         self._placement_scorer = placement_scorer
         self._rec_repo = recommendation_repo
         self.state = AuditState()
@@ -92,26 +84,7 @@ class AuditService:
             )
 
     async def _run(self) -> None:
-        pending = await self._rec_repo.list_pending()
-        pending_paths: set[str] = {rec.source_path for rec in pending}
-
-        # Paginate through all indexed documents
-        all_docs = []
-        offset = 0
-        while True:
-            page = await self._doc_repo.list_all(limit=_PAGE_SIZE, offset=offset)
-            if not page:
-                break
-            all_docs.extend(page)
-            offset += _PAGE_SIZE
-            if len(page) < _PAGE_SIZE:
-                break
-
-        downloads_resolved = Path(_DOWNLOADS_PATH).resolve()
-        eligible = [
-            doc for doc in all_docs
-            if not Path(doc.file_path).parent.resolve().is_relative_to(downloads_resolved)
-        ]
+        eligible = await self._filter.get_eligible_docs()
         self.state.total = len(eligible)
         logger.info("[AUDIT] %d eligible file(s) to analyse", self.state.total)
 
@@ -131,25 +104,19 @@ class AuditService:
 
         logger.info("[AUDIT] %d candidate subfolder(s) discovered", len(candidate_paths))
 
+        # Track paths for which we created a rec during this run so we never
+        # issue a duplicate recommendation for the same file in one audit pass.
+        newly_pending: set[str] = set()
         for doc in eligible:
-            await self._score_doc(doc, candidate_paths, pending_paths)
+            if doc.file_path in newly_pending:
+                continue
+            await self._score_doc(doc, candidate_paths, newly_pending)
             self.state.analysed += 1
             await asyncio.sleep(0)  # yield so FastAPI stays responsive
 
     async def _score_doc(
-        self, doc, candidate_paths: list[str], pending_paths: set[str]
+        self, doc, candidate_paths: list[str], newly_pending: set[str]
     ) -> None:
-        if doc.file_path in pending_paths:
-            return
-
-        # Skip files whose name signals personal/domestic content — these
-        # should never be recommended to a work project folder.
-        stem_tokens = frozenset(
-            Path(doc.file_path).stem.lower().replace("-", "_").replace(".", "_").split("_")
-        )
-        if stem_tokens & _PERSONAL_FILENAME_TOKENS:
-            return
-
         current_folder = str(Path(doc.file_path).parent)
 
         # Score the current folder independently of score_all's top-3 cap.
@@ -242,7 +209,7 @@ class AuditService:
             return
 
         await self._rec_repo.create(doc.file_path, non_current[:3])
-        pending_paths.add(doc.file_path)
+        newly_pending.add(doc.file_path)
         self.state.found += 1
         logger.info(
             "[AUDIT] Suggestion: %s → %s (score=%.2f delta=%.2f)",

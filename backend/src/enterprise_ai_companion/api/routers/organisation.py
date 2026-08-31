@@ -1,15 +1,24 @@
-"""REST endpoints for file organisation — placement recommendations and audit.
+"""REST endpoints for file organisation — placement recommendations, audit,
+and cluster-based folder proposals.
 
 These endpoints are called by the Rust IPC layer, which bridges to the
-orb notification overlay and the main-window Suggestions inbox.
+orb notification overlay and the main-window Organise dashboard.
 
-Routes:
+Routes — placement recommendations:
     GET  /organisation/recommendations/pending/count
     GET  /organisation/recommendations/pending
     POST /organisation/recommendations/{id}/accept
     POST /organisation/recommendations/{id}/dismiss
     POST /organisation/audit
     GET  /organisation/audit/status
+
+Routes — cluster proposals (Intelligent Folder Discovery):
+    POST /organisation/clusters/discover
+    GET  /organisation/clusters/proposals/count
+    GET  /organisation/clusters/proposals
+    GET  /organisation/clusters/proposals/{id}
+    POST /organisation/clusters/proposals/{id}/accept
+    POST /organisation/clusters/proposals/{id}/dismiss
 """
 
 from __future__ import annotations
@@ -20,6 +29,9 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
+from enterprise_ai_companion.capabilities.organisation.cluster_proposal_repository import (
+    ClusterProposal,
+)
 from enterprise_ai_companion.capabilities.organisation.recommendation_repository import (
     PlacementRecommendation,
 )
@@ -204,6 +216,142 @@ async def get_audit_status(request: Request) -> AuditStatusResponse:
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Cluster proposal endpoints
+# ---------------------------------------------------------------------------
+
+
+class ClusterProposalResponse(BaseModel):
+    """Shape consumed by the Organise dashboard and orb cluster overlay."""
+
+    id: str
+    status: str
+    proposed_folder_name: str
+    document_ids: list[str]
+    file_paths: list[str]
+    accepted_folder: str | None
+    created_at: str
+    resolved_at: str | None
+
+
+class ClusterAcceptBody(BaseModel):
+    accepted_folder: str
+
+
+@router.post("/clusters/discover")
+async def discover_clusters(request: Request) -> dict[str, Any]:
+    """Run the clustering pipeline and return newly-created folder proposals.
+
+    Idempotent: clusters whose document set already has a pending proposal are
+    skipped. Returns immediately with the list of new proposals created.
+    """
+    svc = getattr(request.app.state, "cluster_discovery_service", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail="Cluster discovery service not available")
+
+    try:
+        new_proposals = await svc.discover_proposals()
+    except Exception as exc:
+        logger.error("[CLUSTER-API] discover_proposals failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Cluster discovery failed") from exc
+
+    return {
+        "count_created": len(new_proposals),
+        "proposals": [_to_cluster_response(p) for p in new_proposals],
+    }
+
+
+@router.get("/clusters/proposals/count")
+async def cluster_proposals_count(request: Request) -> dict[str, int]:
+    """Return the number of pending cluster proposals."""
+    repo = getattr(request.app.state, "cluster_proposal_repo", None)
+    if repo is None:
+        return {"count": 0}
+    count = await repo.count_pending()
+    return {"count": count}
+
+
+@router.get("/clusters/proposals", response_model=list[ClusterProposalResponse])
+async def list_cluster_proposals(request: Request) -> Any:
+    """Return all pending cluster proposals, oldest first."""
+    repo = getattr(request.app.state, "cluster_proposal_repo", None)
+    if repo is None:
+        return []
+    proposals: list[ClusterProposal] = await repo.list_pending()
+    return [_to_cluster_response(p) for p in proposals]
+
+
+@router.get("/clusters/proposals/{proposal_id}", response_model=ClusterProposalResponse)
+async def get_cluster_proposal(proposal_id: str, request: Request) -> Any:
+    """Return a single cluster proposal by ID."""
+    repo = getattr(request.app.state, "cluster_proposal_repo", None)
+    if repo is None:
+        raise HTTPException(status_code=503, detail="Cluster proposal repository not available")
+
+    proposal = await repo.get(proposal_id)
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="Cluster proposal not found")
+    return _to_cluster_response(proposal)
+
+
+@router.post("/clusters/proposals/{proposal_id}/accept", status_code=204)
+async def accept_cluster_proposal(
+    proposal_id: str,
+    body: ClusterAcceptBody,
+    request: Request,
+) -> None:
+    """Accept a cluster proposal — move all files and create the folder."""
+    svc = getattr(request.app.state, "cluster_discovery_service", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail="Cluster discovery service not available")
+
+    try:
+        await svc.accept_proposal(proposal_id, body.accepted_folder)
+    except ValueError as exc:
+        detail = str(exc)
+        status = 404 if "not found" in detail else 409
+        raise HTTPException(status_code=status, detail=detail) from exc
+    except OSError as exc:
+        logger.error("[CLUSTER-API] accept_proposal OS error for %s: %s", proposal_id, exc)
+        raise HTTPException(status_code=500, detail="File operation failed") from exc
+
+
+@router.post("/clusters/proposals/{proposal_id}/dismiss", status_code=204)
+async def dismiss_cluster_proposal(
+    proposal_id: str,
+    request: Request,
+) -> None:
+    """Dismiss a cluster proposal without moving any files."""
+    svc = getattr(request.app.state, "cluster_discovery_service", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail="Cluster discovery service not available")
+
+    try:
+        await svc.dismiss_proposal(proposal_id)
+    except ValueError as exc:
+        detail = str(exc)
+        status = 404 if "not found" in detail else 409
+        raise HTTPException(status_code=status, detail=detail) from exc
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _to_cluster_response(proposal: ClusterProposal) -> ClusterProposalResponse:
+    return ClusterProposalResponse(
+        id=proposal.id,
+        status=proposal.status,
+        proposed_folder_name=proposal.proposed_folder_name,
+        document_ids=proposal.document_ids,
+        file_paths=proposal.file_paths,
+        accepted_folder=proposal.accepted_folder,
+        created_at=proposal.created_at,
+        resolved_at=proposal.resolved_at,
+    )
 
 
 def _to_response(rec: PlacementRecommendation) -> PendingRecommendationResponse:

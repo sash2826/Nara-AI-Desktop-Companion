@@ -676,6 +676,47 @@ async function getAuditStatus(): Promise<AuditStatus> {
   return invoke<AuditStatus>("get_audit_status");
 }
 
+export interface ClusterProposal {
+  id: string;
+  status: "pending" | "accepted" | "dismissed";
+  proposed_folder_name: string;
+  document_ids: string[];
+  file_paths: string[];
+  accepted_folder: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface DiscoverClustersResult {
+  count_created: number;
+  proposals: ClusterProposal[];
+}
+
+/** Runs the clustering pipeline and returns newly-created folder proposals. */
+async function discoverClusters(): Promise<DiscoverClustersResult> {
+  return invoke<DiscoverClustersResult>("discover_clusters");
+}
+
+/** Returns the number of pending cluster proposals. */
+async function getClusterProposalCount(): Promise<number> {
+  return invoke<number>("get_cluster_proposal_count");
+}
+
+/** Returns all pending cluster proposals. */
+async function listClusterProposals(): Promise<ClusterProposal[]> {
+  return invoke<ClusterProposal[]>("list_cluster_proposals");
+}
+
+/** Accepts a cluster proposal — moves all files to the chosen folder. */
+async function acceptClusterProposal(proposalId: string, acceptedFolder: string): Promise<void> {
+  return invoke<void>("accept_cluster_proposal", { proposalId, acceptedFolder });
+}
+
+/** Dismisses a cluster proposal without moving any files. */
+async function dismissClusterProposal(proposalId: string): Promise<void> {
+  return invoke<void>("dismiss_cluster_proposal", { proposalId });
+}
+
 /** Sends a single-turn query to the LLM via the backend. Returns the response text. */
 async function orbQuery(query: string): Promise<string> {
   return invoke<string>("orb_query", { query });
@@ -741,5 +782,10 @@ export const IPCClient = {
   dismissRecommendation,
   runOrganisationAudit,
   getAuditStatus,
+  discoverClusters,
+  getClusterProposalCount,
+  listClusterProposals,
+  acceptClusterProposal,
+  dismissClusterProposal,
   orbQuery,
 } as const;

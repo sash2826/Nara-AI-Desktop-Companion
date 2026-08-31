@@ -1442,6 +1442,119 @@ async fn get_audit_status(state: State<'_, Arc<AppState>>) -> Result<serde_json:
         .map_err(|e| e.to_string())
 }
 
+/// Runs the clustering pipeline and returns newly-created cluster proposals.
+#[tauri::command]
+async fn discover_clusters(state: State<'_, Arc<AppState>>) -> Result<serde_json::Value, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/organisation/clusters/discover", base);
+    let resp = ipc_client(&state)
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("discover_clusters returned HTTP {}", resp.status().as_u16()));
+    }
+    resp.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+}
+
+/// Returns the number of pending cluster proposals. Returns 0 when sidecar is not ready.
+#[tauri::command]
+async fn get_cluster_proposal_count(
+    state: State<'_, Arc<AppState>>,
+) -> Result<u32, String> {
+    let base = match sidecar_base(&state) {
+        Ok(b) => b,
+        Err(_) => return Ok(0),
+    };
+    let url = format!("{}/organisation/clusters/proposals/count", base);
+    match ipc_client(&state).get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+            Ok(body["count"].as_u64().unwrap_or(0) as u32)
+        }
+        _ => Ok(0),
+    }
+}
+
+/// Returns all pending cluster proposals.
+#[tauri::command]
+async fn list_cluster_proposals(
+    state: State<'_, Arc<AppState>>,
+) -> Result<serde_json::Value, String> {
+    let base = sidecar_base(&state)?;
+    let url = format!("{}/organisation/clusters/proposals", base);
+    let resp = ipc_client(&state)
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "list_cluster_proposals returned HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    resp.json::<serde_json::Value>().await.map_err(|e| e.to_string())
+}
+
+/// Accepts a cluster proposal — moves all files to the given folder.
+#[tauri::command]
+async fn accept_cluster_proposal(
+    proposal_id: String,
+    accepted_folder: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!(
+        "{}/organisation/clusters/proposals/{}/accept",
+        base, proposal_id
+    );
+    let body = serde_json::json!({ "accepted_folder": accepted_folder });
+    let resp = ipc_client(&state)
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        let detail = resp
+            .json::<serde_json::Value>()
+            .await
+            .ok()
+            .and_then(|v| v["detail"].as_str().map(String::from))
+            .unwrap_or_else(|| format!("HTTP {}", status));
+        return Err(detail);
+    }
+    Ok(())
+}
+
+/// Dismisses a cluster proposal without moving any files.
+#[tauri::command]
+async fn dismiss_cluster_proposal(
+    proposal_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let base = sidecar_base(&state)?;
+    let url = format!(
+        "{}/organisation/clusters/proposals/{}/dismiss",
+        base, proposal_id
+    );
+    let resp = ipc_client(&state)
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!(
+            "dismiss_cluster_proposal returned HTTP {}",
+            resp.status().as_u16()
+        ));
+    }
+    Ok(())
+}
+
 /// Sends a single-turn query to the LLM through the backend.
 /// Returns both the response text and a list of source file paths.
 #[tauri::command]
@@ -1961,6 +2074,11 @@ pub fn run() {
             list_pending_recommendations,
             run_organisation_audit,
             get_audit_status,
+            discover_clusters,
+            get_cluster_proposal_count,
+            list_cluster_proposals,
+            accept_cluster_proposal,
+            dismiss_cluster_proposal,
             orb_query
         ])
         .on_window_event(|window, event| {
