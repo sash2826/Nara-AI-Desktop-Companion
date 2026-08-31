@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FolderInput, PackageSearch, Loader2, ChevronRight, ShieldQuestion } from "lucide-react";
+import {
+  FolderInput,
+  PackageSearch,
+  Loader2,
+  ChevronRight,
+  ShieldQuestion,
+  RefreshCw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RecommendationRow } from "./RecommendationRow";
 import { FolderContentsList } from "./FolderContentsList";
@@ -31,7 +38,7 @@ function isNeedsReview(rec: PendingRecommendation): boolean {
  * open one, and act on the suggestions that target that exact folder.
  */
 export function OrganiseTab() {
-  const { folders, documents } = useWorkspace();
+  const { folders, documents, loadFolders, loadDocuments } = useWorkspace();
 
   const [recommendations, setRecommendations] = useState<PendingRecommendation[]>([]);
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -41,6 +48,7 @@ export function OrganiseTab() {
   const [auditStatus, setAuditStatus] = useState<AuditStatus | null>(null);
   const [bulk, setBulk] = useState<{ key: string; done: number; total: number } | null>(null);
   const [confirmSkipAll, setConfirmSkipAll] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   // Folder currently opened for review; null shows the top-level grid.
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [selectedTilePath, setSelectedTilePath] = useState<string | null>(null);
@@ -53,6 +61,17 @@ export function OrganiseTab() {
         /* backend not ready */
       });
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([loadFolders(), loadDocuments()]);
+      fetchRecommendations();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, loadFolders, loadDocuments, fetchRecommendations]);
 
   // 5s rec polling
   useEffect(() => {
@@ -348,6 +367,16 @@ export function OrganiseTab() {
               <PackageSearch size={13} strokeWidth={1.5} />
             )}
             Organise
+          </button>
+          <button
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            title="Refresh folders and suggestions"
+            aria-label="Refresh"
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground disabled:opacity-50"
+          >
+            <RefreshCw size={13} strokeWidth={1.5} className={cn(refreshing && "animate-spin")} />
+            Refresh
           </button>
           {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
           {auditStatus && !auditRunning && auditStatus.found > 0 && (

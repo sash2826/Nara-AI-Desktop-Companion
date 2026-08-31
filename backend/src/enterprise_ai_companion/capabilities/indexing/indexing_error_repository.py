@@ -34,6 +34,11 @@ class IndexingErrorRepository:
             error_message=error_message,
             failed_at=datetime.now(UTC).isoformat(),
         )
+        # Keep only the latest error per file — a retried/re-run failure replaces
+        # the previous row instead of stacking duplicates.
+        await self._conn.execute(
+            "DELETE FROM indexing_errors WHERE file_path = ?", (file_path,)
+        )
         await self._conn.execute(
             "INSERT INTO indexing_errors (id, workspace_path, file_path, error_message, failed_at) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -42,7 +47,21 @@ class IndexingErrorRepository:
         await self._conn.commit()
         return error
 
+    async def delete_by_path(self, file_path: str) -> None:
+        """Clear any stored error for a file — called once it indexes successfully."""
+        await self._conn.execute(
+            "DELETE FROM indexing_errors WHERE file_path = ?", (file_path,)
+        )
+        await self._conn.commit()
+
     async def list_all(self, limit: int = 500) -> list[IndexingError]:
+        # Self-heal: an error is stale the moment its file appears in `documents`
+        # (successfully indexed since). Drop those rows before returning.
+        await self._conn.execute(
+            "DELETE FROM indexing_errors "
+            "WHERE file_path IN (SELECT file_path FROM documents)"
+        )
+        await self._conn.commit()
         async with self._conn.execute(
             "SELECT id, workspace_path, file_path, error_message, failed_at "
             "FROM indexing_errors ORDER BY failed_at DESC LIMIT ?",

@@ -11,17 +11,18 @@ type Phase = "greeting" | "nudge" | "reminder" | "cooldown";
 // Message content
 // ---------------------------------------------------------------------------
 
+// Keep each nudge short enough to fit the single-line ambient pill.
 const NUDGES = [
-  "Ask me anything about your indexed files",
-  "Try: find documents related to a topic",
-  "I can suggest where new files should go",
-  "Ask me to summarise a recent document",
-  "Your knowledge graph connects everything you've indexed",
-  "Try: which files are related to a project?",
-  "I can help audit your folder organisation",
-  "Ask me to find anything across your workspace",
-  "Try: show me what changed recently in my files",
-  "I can trace topics and people across all your documents",
+  "Ask me anything about your files",
+  "Try: find documents on a topic",
+  "I can suggest where new files go",
+  "Ask me to summarise a document",
+  "Explore your knowledge graph",
+  "Try: which files relate to a project?",
+  "I can audit your folder organisation",
+  "Ask me to find anything you've indexed",
+  "Try: what changed recently in my files",
+  "Trace topics and people across files",
 ];
 
 function getGreeting(): string {

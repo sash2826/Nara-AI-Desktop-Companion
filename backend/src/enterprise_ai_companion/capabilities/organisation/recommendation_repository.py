@@ -152,6 +152,24 @@ class RecommendationRepository:
             )
         return count
 
+    async def set_accepted_by_source_path(self, source_path: str, folder: str) -> int:
+        """Mark the pending recommendation for *source_path* as accepted.
+
+        Used after a cluster recommendation moves a file into a newly-created
+        folder — the underlying per-file recommendation is resolved so the
+        file no longer appears in "Needs review". Returns rows updated.
+        """
+        resolved_at = datetime.now(UTC).isoformat()
+        async with self._conn.execute(
+            "UPDATE file_placement_recommendations "
+            "SET status='accepted', accepted_folder=?, resolved_at=? "
+            "WHERE source_path=? AND status='pending'",
+            (folder, resolved_at, source_path),
+        ) as cur:
+            count = cur.rowcount
+        await self._conn.commit()
+        return count
+
 
     async def purge_downloads_targets(self, downloads_path: str) -> int:
         """Dismiss any pending recommendation whose every suggested folder is

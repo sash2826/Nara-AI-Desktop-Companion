@@ -295,6 +295,8 @@ class FileIndexer:
             if _is_cloud_stub(fp):
                 logger.debug("Skipping cloud-only stub: %s", fp.name)
                 result.files_skipped += 1
+                # Intentionally skipped, not failed — drop any prior stale error.
+                await self._clear_indexing_error(fp)
                 if progress_cb:
                     progress_cb(result)
                 return
@@ -304,6 +306,8 @@ class FileIndexer:
                     result.files_indexed += 1
                 else:
                     result.files_skipped += 1
+                # Succeeded (or unchanged) — this file is no longer in error.
+                await self._clear_indexing_error(fp)
             except Exception as exc:
                 logger.warning("Failed to index %s: %s", fp, exc)
                 result.errors.append(f"{fp}: {exc}")
@@ -487,6 +491,15 @@ class FileIndexer:
         """
         async with self._file_lock(str(file_path)):
             return await self._index_file_locked(file_path, workspace_path, deferred)
+
+    async def _clear_indexing_error(self, file_path: Path) -> None:
+        """Remove any persisted error for a file that no longer failed."""
+        if self._error_repo is None:
+            return
+        try:
+            await self._error_repo.delete_by_path(str(file_path))
+        except Exception as exc:
+            logger.debug("Failed to clear stale indexing error for %s: %s", file_path.name, exc)
 
     async def _index_file_locked(
         self,

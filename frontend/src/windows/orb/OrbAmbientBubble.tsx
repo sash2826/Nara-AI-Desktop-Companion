@@ -30,7 +30,7 @@ export function OrbAmbientBubble({ message }: OrbAmbientBubbleProps) {
         position: "absolute",
         bottom: "calc(100% + 12px)",
         right: 0,
-        maxWidth: 320,
+        maxWidth: 340,
         zIndex: 90,
         background: bgColor,
         backdropFilter: "blur(20px) saturate(180%)",

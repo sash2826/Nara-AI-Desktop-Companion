@@ -361,7 +361,8 @@ export function OrbShell() {
             outline: "none",
           }}
         >
-          {/* Liquid Glass backdrop ring — frosted glass effect around the sphere */}
+          {/* Liquid Glass backdrop ring — frosted glass effect around the sphere.
+              The dark outer shadow/ring keeps the orb defined on light backdrops. */}
           <div
             aria-hidden="true"
             style={{
@@ -372,9 +373,13 @@ export function OrbShell() {
               backdropFilter: "blur(12px) saturate(160%)",
               WebkitBackdropFilter: "blur(12px) saturate(160%)",
               border: "1px solid hsl(0 0% 100% / 0.12)",
-              boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.18)",
+              boxShadow: [
+                "inset 0 1px 0 hsl(0 0% 100% / 0.18)",
+                "0 0 0 1px hsl(0 0% 0% / 0.12)",
+                "0 3px 14px hsl(0 0% 0% / 0.35)",
+              ].join(", "),
               transition: "opacity 0.3s ease",
-              opacity: isHovered ? 1 : 0.7,
+              opacity: isHovered ? 1 : 0.85,
             }}
           />
           {/* Animated sphere */}
@@ -436,6 +441,15 @@ export function OrbShell() {
                   alignItems: "center",
                   gap: 5,
                   whiteSpace: "nowrap",
+                  // Dark translucent chip so the dot + label stay legible on any
+                  // desktop backdrop, light or dark.
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  background: "hsl(220 15% 12% / 0.6)",
+                  backdropFilter: "blur(8px) saturate(160%)",
+                  WebkitBackdropFilter: "blur(8px) saturate(160%)",
+                  border: "1px solid hsl(0 0% 100% / 0.15)",
+                  boxShadow: "0 2px 8px hsl(0 0% 0% / 0.3)",
                 }}
               >
                 <motion.span
@@ -447,6 +461,7 @@ export function OrbShell() {
                     height: 6,
                     borderRadius: "50%",
                     background: STATUS_DOT_COLOR[animationState] ?? "hsl(var(--muted-foreground))",
+                    boxShadow: `0 0 5px ${STATUS_DOT_COLOR[animationState] ?? "transparent"}`,
                     flexShrink: 0,
                   }}
                 />
@@ -454,7 +469,7 @@ export function OrbShell() {
                   style={{
                     fontSize: 11,
                     fontWeight: 500,
-                    color: "hsl(var(--popover-foreground) / 0.7)",
+                    color: "hsl(0 0% 96%)",
                     fontFamily: "var(--font-sans), system-ui, sans-serif",
                     letterSpacing: "0.01em",
                   }}
