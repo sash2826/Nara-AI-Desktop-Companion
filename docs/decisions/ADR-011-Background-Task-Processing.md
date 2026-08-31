@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion performs numerous operations that may require significant processing time.
+The Document-Management-RAG-Graph-Agent performs numerous operations that may require significant processing time.
 
 Examples include:
 
@@ -31,7 +31,7 @@ The architecture therefore requires a mechanism for executing long-running opera
 
 # Decision
 
-The Enterprise AI Companion will implement a background task processing architecture.
+The Document-Management-RAG-Graph-Agent will implement a background task processing architecture.
 
 Long-running operations will execute independently of the user interface.
 
@@ -212,7 +212,7 @@ This option was selected.
 * More sophisticated scheduling logic.
 * Task coordination introduces additional architectural components.
 
-These trade-offs are acceptable given the long-term goals of the Enterprise AI Companion.
+These trade-offs are acceptable given the long-term goals of the Document-Management-RAG-Graph-Agent.
 
 ---
 
@@ -239,6 +239,6 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the background processing strategy for the Enterprise AI Companion.
+This decision establishes the background processing strategy for the Document-Management-RAG-Graph-Agent.
 
 Future scheduling mechanisms, distributed execution models, or additional processing frameworks should integrate through the centralized background task architecture while preserving consistent execution behavior across the application.

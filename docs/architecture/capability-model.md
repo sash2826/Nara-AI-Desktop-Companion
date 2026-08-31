@@ -8,9 +8,9 @@
 
 # 1. Purpose
 
-This document defines the functional organization of the Enterprise AI Companion.
+This document defines the functional organization of the Document-Management-RAG-Graph-Agent.
 
-Rather than organizing the system around technologies or technical layers, the Enterprise AI Companion is organized around business capabilities.
+Rather than organizing the system around technologies or technical layers, the Document-Management-RAG-Graph-Agent is organized around business capabilities.
 
 A capability represents a cohesive set of functionality responsible for solving a specific user problem.
 
@@ -37,10 +37,10 @@ The capability model follows these principles:
 
 # 3. Capability Overview
 
-The Enterprise AI Companion is composed of the following primary capabilities.
+The Document-Management-RAG-Graph-Agent is composed of the following primary capabilities.
 
 ```text id="yr2mx2"
-Enterprise AI Companion
+Document-Management-RAG-Graph-Agent
 │
 ├── File Intelligence
 ├── Search & Retrieval
@@ -299,7 +299,7 @@ New capabilities should integrate into the existing architecture without disrupt
 
 # 16. Relationship to Other Documents
 
-This document defines the functional decomposition of the Enterprise AI Companion.
+This document defines the functional decomposition of the Document-Management-RAG-Graph-Agent.
 
 Related documentation includes:
 

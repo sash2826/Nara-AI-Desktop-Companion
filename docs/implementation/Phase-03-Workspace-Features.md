@@ -10,7 +10,7 @@
 
 # Purpose
 
-Phase 03 implements the workspace-specific user interface and frontend capabilities of the Enterprise AI Companion.
+Phase 03 implements the workspace-specific user interface and frontend capabilities of the Document-Management-RAG-Graph-Agent.
 
 The objective is to surface the data, search, and knowledge capabilities introduced in Phase 02 through a coherent, usable workspace experience that keeps the assistant at the centre of the interface.
 

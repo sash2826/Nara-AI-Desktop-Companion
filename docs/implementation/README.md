@@ -8,7 +8,7 @@
 
 # Overview
 
-This directory contains the implementation documentation for the Enterprise AI Companion.
+This directory contains the implementation documentation for the Document-Management-RAG-Graph-Agent.
 
 The implementation guides describe how the architecture defined in the Architecture Documentation should be realized.
 

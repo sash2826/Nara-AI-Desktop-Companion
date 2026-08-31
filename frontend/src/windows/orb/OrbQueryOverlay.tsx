@@ -260,7 +260,7 @@ function buildOrbMarkdownComponents(citationMap: Map<number, SourceItem>): Compo
  *
  * Provides a text input, submits a query via the main window's backend,
  * renders the response inline (max ~5 lines before scroll), and offers
- * an "Open in EAC" button to escalate to the full window.
+ * an "Open in Chat" button to escalate to the full window.
  *
  * Dismissed on Escape or after the user acknowledges the response.
  */
@@ -363,7 +363,7 @@ export function OrbQueryOverlay() {
     }
   }, [query, queryState.status, setAnimationState]);
 
-  const handleOpenInEAC = useCallback(async () => {
+  const handleOpenInChat = useCallback(async () => {
     // Route via Rust so the event is guaranteed to arrive in the main webview.
     // Direct frontend emitTo is unreliable across separate Tauri webview windows.
     try {
@@ -620,7 +620,7 @@ export function OrbQueryOverlay() {
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
                 {queryState.status === "answered" && (
                   <button
-                    onClick={handleOpenInEAC}
+                    onClick={handleOpenInChat}
                     style={{
                       padding: "4px 10px",
                       borderRadius: 7,
@@ -631,7 +631,7 @@ export function OrbQueryOverlay() {
                       cursor: "pointer",
                     }}
                   >
-                    Open in EAC
+                    Open in Chat
                   </button>
                 )}
                 <button

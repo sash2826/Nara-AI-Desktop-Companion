@@ -8,7 +8,7 @@
 
 # Overview
 
-This directory contains the architectural documentation for the Enterprise AI Companion.
+This directory contains the architectural documentation for the Document-Management-RAG-Graph-Agent.
 
 These documents define the high-level design of the system independently of implementation details. Together, they describe what the system is, how it is organized, and the principles that guide its evolution.
 
@@ -38,7 +38,7 @@ The documents should be read in the following order:
 
 1. **System Overview**
 
-   * Understand what the Enterprise AI Companion is.
+   * Understand what the Document-Management-RAG-Graph-Agent is.
    * Learn the system vision and architectural principles.
 
 2. **Repository Layout**
@@ -143,4 +143,4 @@ Additional project documentation includes:
 * `/docs/decisions/` — Architecture Decision Records documenting significant engineering decisions.
 * `/docs/implementation/` — Implementation guides describing how the architecture should be built.
 
-Together, these documents provide a complete view of the Enterprise AI Companion from architectural design through implementation.
+Together, these documents provide a complete view of the Document-Management-RAG-Graph-Agent from architectural design through implementation.

@@ -10,7 +10,7 @@
 
 # Purpose
 
-Phase 06 implements the extensibility and security framework for the Enterprise AI Companion.
+Phase 06 implements the extensibility and security framework for the Document-Management-RAG-Graph-Agent.
 
 The two areas of this phase are interdependent: the plugin system requires a fully operational security and permission model, and enterprise security requires a mature plugin boundary to enforce.
 
@@ -415,4 +415,4 @@ After completing this phase, proceed to:
 
 **Phase 07 – Automation**
 
-The final phase establishes the quality assurance strategy, automates testing and release pipelines, and prepares the Enterprise AI Companion for production deployment.
+The final phase establishes the quality assurance strategy, automates testing and release pipelines, and prepares the Document-Management-RAG-Graph-Agent for production deployment.

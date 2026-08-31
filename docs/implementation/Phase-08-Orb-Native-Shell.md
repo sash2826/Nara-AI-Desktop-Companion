@@ -10,9 +10,9 @@
 
 # Purpose
 
-This phase transforms the Living Orb from an element inside the EAC Tauri window into a standalone always-on-top desktop widget that remains visible regardless of whether the main application is open.
+This phase transforms the Living Orb from an element inside the Document-Management-RAG-Graph-Agent Tauri window into a standalone always-on-top desktop widget that remains visible regardless of whether the main application is open.
 
-The orb is the primary ambient interface surface for the Enterprise AI Companion. All file organisation prompts, AI query shortcuts, and notification states are delivered through it.
+The orb is the primary ambient interface surface for the Document-Management-RAG-Graph-Agent. All file organisation prompts, AI query shortcuts, and notification states are delivered through it.
 
 ---
 
@@ -24,8 +24,8 @@ Upon completion of this phase the application should provide:
 * Liquid Glass visual design applied to the orb shell and all floating overlays.
 * Five distinct animation states reflecting system activity.
 * Single-click to open an inline query overlay growing out of the orb.
-* Double-click to open or focus the full EAC main window.
-* Inline response rendering with an "Open in EAC" escalation button.
+* Double-click to open or focus the full Document-Management-RAG-Graph-Agent main window.
+* Inline response rendering with an "Open in Document-Management-RAG-Graph-Agent" escalation button.
 * Amber notification glow state when file placement recommendations are pending.
 * Orb auto-starts with Windows on login.
 * Orb persists across main window close/open cycles.
@@ -67,13 +67,13 @@ The orb, its query overlay, and all floating notification prompts use the Liquid
 * Subtle border highlight simulating glass edge refraction
 * Translucent fill that picks up the desktop wallpaper colour
 
-The main EAC application window retains its current dark theme. Liquid Glass applies only to the orb shell layer. The Volvo/Scandinavian main app design is a separate decision deferred to a later phase.
+The main Document-Management-RAG-Graph-Agent application window retains its current dark theme. Liquid Glass applies only to the orb shell layer. The Volvo/Scandinavian main app design is a separate decision deferred to a later phase.
 
 ## Animation States
 
 | State | Trigger | Visual |
 |---|---|---|
-| Idle | EAC running, nothing pending | Slow breathing pulse, fixed circle |
+| Idle | Document-Management-RAG-Graph-Agent running, nothing pending | Slow breathing pulse, fixed circle |
 | Listening | User clicked orb, overlay open | Energetic wave/ripple, morphing blob |
 | Processing | Query submitted, awaiting response | Spinning/morphing, morphing blob |
 | Notification Pending | File placement recommendations waiting | Gentle persistent amber glow, fixed circle |
@@ -84,7 +84,7 @@ Technology: CSS animations + SVG filters + Framer Motion for state transitions. 
 ## Interaction Model
 
 * **Single click** → compact query overlay grows out of the orb. Stays floating. Dismisses on submit or Escape.
-* **Double click** → open/focus the main EAC window.
+* **Double click** → open/focus the main Document-Management-RAG-Graph-Agent window.
 * **Click when Notification Pending** → overlay shows pending file placement recommendations list instead of query input.
 * **Drag** → orb repositions; position persisted to orbStore per-monitor.
 
@@ -92,12 +92,12 @@ Technology: CSS animations + SVG filters + Framer Motion for state transitions. 
 
 * Compact text input attached visually to the orb.
 * Response rendered inline below the input (max ~5 lines before scroll).
-* "Open in EAC" button escalates the conversation to the full main window.
+* "Open in Document-Management-RAG-Graph-Agent" button escalates the conversation to the full main window.
 * Overlay does not persist — dismissed after response is acknowledged or on Escape.
 
 ## Startup Behaviour
 
-The orb process registers itself in the Windows startup registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) on first launch. It remains running as a background process when the main EAC window is closed.
+The orb process registers itself in the Windows startup registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) on first launch. It remains running as a background process when the main Document-Management-RAG-Graph-Agent window is closed.
 
 ---
 
@@ -144,11 +144,11 @@ frontend/src/components/orb/            — Retain for in-app fallback only; orb
 # Completion Criteria
 
 * Orb remains visible above all other application windows.
-* Orb survives main EAC window close and reopen.
+* Orb survives main Document-Management-RAG-Graph-Agent window close and reopen.
 * Orb starts automatically on Windows login.
 * All five animation states trigger correctly.
 * Single click opens query overlay; response renders inline.
-* Double click opens main EAC window.
+* Double click opens main Document-Management-RAG-Graph-Agent window.
 * Orb position is remembered per monitor.
 * Amber glow appears when file placement recommendations are pending.
 * Liquid Glass visual is applied to orb and overlays.

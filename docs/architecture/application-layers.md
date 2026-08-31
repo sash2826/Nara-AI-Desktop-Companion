@@ -8,11 +8,11 @@
 
 # 1. Purpose
 
-This document defines the logical layering of the Enterprise AI Companion.
+This document defines the logical layering of the Document-Management-RAG-Graph-Agent.
 
 The application is organized into a series of architectural layers, each with a clearly defined responsibility. Layering promotes maintainability, modularity, testability, and long-term scalability by ensuring that responsibilities remain separated and dependencies remain predictable.
 
-Every implementation within the Enterprise AI Companion must belong to one of these architectural layers.
+Every implementation within the Document-Management-RAG-Graph-Agent must belong to one of these architectural layers.
 
 ---
 
@@ -36,7 +36,7 @@ No layer should assume responsibilities belonging to another layer.
 
 # 3. Layer Overview
 
-The Enterprise AI Companion follows a layered architecture.
+The Document-Management-RAG-Graph-Agent follows a layered architecture.
 
 ```text
                            User
@@ -139,7 +139,7 @@ Communication between capabilities should occur through well-defined interfaces.
 
 ## Responsibility
 
-The Domain Layer represents the core business concepts of the Enterprise AI Companion.
+The Domain Layer represents the core business concepts of the Document-Management-RAG-Graph-Agent.
 
 Examples include:
 
@@ -194,7 +194,7 @@ Examples include:
 * Cloud services.
 * Third-party APIs.
 
-The Enterprise AI Companion should communicate with external systems only through the Infrastructure Layer.
+The Document-Management-RAG-Graph-Agent should communicate with external systems only through the Infrastructure Layer.
 
 ---
 
@@ -253,7 +253,7 @@ Maintaining stable architectural boundaries is more valuable than optimizing for
 
 # 13. Relationship to Other Documents
 
-This document defines the logical layering of the Enterprise AI Companion.
+This document defines the logical layering of the Document-Management-RAG-Graph-Agent.
 
 Related documentation includes:
 

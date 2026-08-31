@@ -10,9 +10,9 @@
 
 # Purpose
 
-Phase 00 establishes the visual identity and primary interaction model of the Enterprise AI Companion.
+Phase 00 establishes the visual identity and primary interaction model of the Document-Management-RAG-Graph-Agent.
 
-The Enterprise AI Companion is not a chat application that lives in a window. It is a **desktop-native AI companion** — a persistent, context-aware presence that understands the user's work and is immediately accessible from anywhere within Windows.
+The Document-Management-RAG-Graph-Agent is not a chat application that lives in a window. It is a **desktop-native AI companion** — a persistent, context-aware presence that understands the user's work and is immediately accessible from anywhere within Windows.
 
 The Living Orb and Glass Prompt form the application's primary interaction surface. The Workspace provides an expanded environment for longer conversations and advanced capabilities. Beneath these surfaces lies a Context Engine that understands what the user is working on, a Retrieval Broker that can locate knowledge across local files and cloud storage, and a Project Knowledge Layer that accumulates understanding over time.
 
@@ -48,7 +48,7 @@ No backend services or real AI providers are required during this phase.
 
 # Product Pillars
 
-The Enterprise AI Companion is built around five core pillars. Each pillar represents a distinct capability domain that the platform must support.
+The Document-Management-RAG-Graph-Agent is built around five core pillars. Each pillar represents a distinct capability domain that the platform must support.
 
 ## Desktop Companion
 
@@ -92,7 +92,7 @@ The Workspace surfaces when a conversation or task exceeds the lightweight inter
 
 # Experience Principles
 
-These principles govern how the Enterprise AI Companion behaves from the user's perspective.
+These principles govern how the Document-Management-RAG-Graph-Agent behaves from the user's perspective.
 
 ## Desktop First, Workspace Second
 
@@ -560,7 +560,7 @@ This phase is complete when:
 
 # Success Definition
 
-A user launching the Enterprise AI Companion for the first time should immediately understand that the application is a desktop-native AI companion — not a chat window they navigate to, but a persistent and accessible presence that understands their work.
+A user launching the Document-Management-RAG-Graph-Agent for the first time should immediately understand that the application is a desktop-native AI companion — not a chat window they navigate to, but a persistent and accessible presence that understands their work.
 
 Even without AI functionality, the experience should communicate the product's vision through a polished, responsive, and intuitive interface. The architecture introduced in this phase should support the Context Engine, Retrieval Broker, and Project Knowledge Layer without requiring significant redesign when those capabilities are introduced.
 
@@ -990,7 +990,7 @@ The objective of this phase is not to build intelligence, but to build the exper
 
 This Product Requirements Document defines the vision, goals, user experience, and functional requirements for the Product Identity & Desktop Companion Presence epic.
 
-Unlike traditional AI chat applications that require users to open a dedicated window before interacting, Enterprise AI Companion introduces a persistent desktop-native companion that is immediately accessible from anywhere within Windows. The companion understands what the user is working on, can retrieve knowledge from local and cloud sources, and accumulates project context over time.
+Unlike traditional AI chat applications that require users to open a dedicated window before interacting, Document-Management-RAG-Graph-Agent introduces a persistent desktop-native companion that is immediately accessible from anywhere within Windows. The companion understands what the user is working on, can retrieve knowledge from local and cloud sources, and accumulates project context over time.
 
 This epic establishes the Desktop Companion as the primary interface of the application while positioning the full Workspace as a secondary interface for extended interactions.
 
@@ -1000,7 +1000,7 @@ The objective is to create an experience where interacting with AI feels instant
 
 ## Vision
 
-Enterprise AI Companion should feel less like a chat application and more like a native desktop companion that understands the user's work.
+Document-Management-RAG-Graph-Agent should feel less like a chat application and more like a native desktop companion that understands the user's work.
 
 The companion should always be available without interrupting the user's workflow.
 
@@ -1032,7 +1032,7 @@ Users must:
 
 For frequent AI usage, these repeated actions interrupt workflow and reduce accessibility. The need to re-state context on every interaction compounds the friction further.
 
-Enterprise AI Companion aims to eliminate this friction by making AI continuously available through a persistent desktop companion that already understands the user's work.
+Document-Management-RAG-Graph-Agent aims to eliminate this friction by making AI continuously available through a persistent desktop companion that already understands the user's work.
 
 ---
 
@@ -1866,7 +1866,7 @@ These capabilities will build upon this architecture in future phases.
 
 ### Overview
 
-This document defines the visual identity, motion principles, interaction language, and aesthetic guidelines for Enterprise AI Companion.
+This document defines the visual identity, motion principles, interaction language, and aesthetic guidelines for Document-Management-RAG-Graph-Agent.
 
 The objective is to establish a distinctive, professional, and cohesive visual language that reflects the Desktop Companion's role as a persistent presence in the user's environment while remaining consistent with Windows design principles.
 
@@ -1876,7 +1876,7 @@ The Desktop Companion should feel calm, intelligent, and trustworthy rather than
 
 # Design Philosophy
 
-Enterprise AI Companion should not resemble a traditional chat application.
+Document-Management-RAG-Graph-Agent should not resemble a traditional chat application.
 
 Instead, it should feel like a native part of the user's desktop environment.
 
@@ -1950,7 +1950,7 @@ Each should appear as part of the same design system.
 
 # Living Orb
 
-The Living Orb is the primary visual identity of Enterprise AI Companion.
+The Living Orb is the primary visual identity of Document-Management-RAG-Graph-Agent.
 
 It should immediately communicate:
 
@@ -2161,7 +2161,7 @@ Accessibility should be considered a core design requirement rather than an opti
 
 # Brand Personality
 
-Enterprise AI Companion should feel:
+Document-Management-RAG-Graph-Agent should feel:
 
 - Intelligent
 - Calm
@@ -2888,7 +2888,7 @@ Future enhancements should follow these principles:
 
 # Summary
 
-The implementation delivered by Epic 0.6 establishes the architectural and visual foundation for Enterprise AI Companion.
+The implementation delivered by Epic 0.6 establishes the architectural and visual foundation for Document-Management-RAG-Graph-Agent.
 
 Future enhancements should extend this foundation incrementally while preserving the product vision of a persistent, intelligent, and professional desktop AI companion.
 
@@ -2911,7 +2911,7 @@ Status key: ✅ Complete · ☐ Not done · ⚠️ Needs rework
 - ✅ pnpm workspace configured
 - ✅ Tauri v2 desktop application building successfully
 - ✅ React 19 + Vite frontend bootstrapped
-- ✅ Tauri application identity updated (`productName`: "Enterprise AI Companion", `identifier`: "com.volvogroup.enterprise-ai-companion", window `title` corrected)
+- ✅ Tauri application identity updated (`productName`: "Document-Management-RAG-Graph-Agent", `identifier`: "com.volvogroup.enterprise-ai-companion", window `title` corrected)
 - ✅ Minimum window dimensions set in `tauri.conf.json` (minWidth: 960, minHeight: 640; default 1280×800)
 - ✅ Python backend directory scaffolded with README, `pyproject.toml`, capability subdirectories, and passing smoke tests (`backend/` at repo root, parallel to `frontend/`)
 - ⚠️ Directory layout decision recorded: repo uses `frontend/` and `backend/` at root rather than `apps/desktop/` and `apps/backend/` as specified in `repository-layout.md`. Current layout is accepted for Phase 00. Migration to the spec layout should be evaluated before Phase 01 begins and recorded in an ADR.

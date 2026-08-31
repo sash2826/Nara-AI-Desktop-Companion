@@ -10,7 +10,7 @@
 
 # Purpose
 
-Phase 01 connects the Enterprise AI Companion to real AI services.
+Phase 01 connects the Document-Management-RAG-Graph-Agent to real AI services.
 
 Phase 00 established the complete user experience — Living Orb, Glass Prompt, conversation architecture, and all service interfaces — using a `MockProvider` that returns canned responses. The user can see the interface but the AI is not real.
 

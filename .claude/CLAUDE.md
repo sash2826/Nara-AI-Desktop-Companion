@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-# Enterprise AI Companion
+# Document-Management-RAG-Graph-Agent
 
 ## Global Engineering Instructions
 
@@ -9,7 +9,7 @@ Status: Active
 Audience: Claude Code CLI
 Last Updated: 2026-07-23
 
-This document defines the permanent engineering standards for the Enterprise AI Companion repository.
+This document defines the permanent engineering standards for the Document-Management-RAG-Graph-Agent repository.
 
 Claude Code must treat this document as the highest-priority engineering specification for this project.
 
@@ -18,7 +18,7 @@ Claude Code must treat this document as the highest-priority engineering specifi
 # Part 1 – Identity, Mission, Operating Rules, Engineering Standards
 # 1. Purpose
 
-This repository contains the complete source code for the **Enterprise AI Companion**, an enterprise-grade, local-first AI platform designed to organize, understand, retrieve, and assist with digital knowledge.
+This repository contains the complete source code for the **Document-Management-RAG-Graph-Agent**, an enterprise-grade, local-first AI platform designed to organize, understand, retrieve, and assist with digital knowledge.
 
 This document defines the permanent engineering rules for this repository.
 
@@ -52,7 +52,7 @@ Always optimize for long-term maintainability.
 
 # 3. Project Vision
 
-The Enterprise AI Companion is not a chatbot.
+The Document-Management-RAG-Graph-Agent is not a chatbot.
 
 It is not a file explorer.
 
@@ -68,10 +68,10 @@ The architecture must support future expansion without major redesign.
 
 **Living Orb — Desktop Native Widget**
 
-The Living Orb is a standalone always-on-top Tauri window that floats on the desktop independently of the main application. It is the ambient interface surface for EAC:
+The Living Orb is a standalone always-on-top Tauri window that floats on the desktop independently of the main application. It is the ambient interface surface for Document-Management-RAG-Graph-Agent:
 
 - Single click opens a compact inline query overlay (Liquid Glass visual, grows from the orb).
-- Double click opens the full EAC main window.
+- Double click opens the full Document-Management-RAG-Graph-Agent main window.
 - Orb glows amber when file placement recommendations are pending.
 - Five animation states signal system activity: Idle, Listening, Processing, Notification Pending, Error.
 - Orb auto-starts with Windows and persists when the main window is closed.
@@ -79,14 +79,14 @@ The Living Orb is a standalone always-on-top Tauri window that floats on the des
 
 **File Intelligence — Placement Recommendations**
 
-EAC watches the OS Downloads folder automatically. When a new file arrives:
+Document-Management-RAG-Graph-Agent watches the OS Downloads folder automatically. When a new file arrives:
 
 1. The file is indexed (embeddings, entities, graph relationships).
 2. A placement scorer combines knowledge graph community overlap (70%) and hybrid search rerank similarity (30%) against all known folders.
 3. The top 3 candidate folders are presented via the orb overlay with confidence labels.
-4. If the user accepts, EAC physically moves the file and updates all records in place (no re-indexing).
+4. If the user accepts, Document-Management-RAG-Graph-Agent physically moves the file and updates all records in place (no re-indexing).
 5. If the user ignores, the recommendation persists in a Suggestions inbox until acted upon.
-6. EAC never moves a file without explicit user consent.
+6. Document-Management-RAG-Graph-Agent never moves a file without explicit user consent.
 
 For existing indexed files, an on-demand "Organise" audit and a passive background suggester surface reorganisation opportunities over time using the same scoring formula.
 
@@ -270,7 +270,7 @@ Completion is measured by quality, not by speed.
 
 Maintain a clean, modular, scalable architecture that allows the application to grow without requiring major refactoring.
 
-The Enterprise AI Companion must be designed as a collection of independent capabilities communicating through well-defined interfaces.
+The Document-Management-RAG-Graph-Agent must be designed as a collection of independent capabilities communicating through well-defined interfaces.
 
 The architecture must prioritize maintainability, extensibility, and testability over implementation speed.
 
@@ -1632,7 +1632,7 @@ Repository-wide improvements should be handled as dedicated refactoring tasks.
 
 # 62. Final Principle
 
-The Enterprise AI Companion is intended to become a long-lived, enterprise-quality software platform.
+The Document-Management-RAG-Graph-Agent is intended to become a long-lived, enterprise-quality software platform.
 
 Every design decision should assume that:
 
@@ -1653,7 +1653,7 @@ Prefer the solution that another experienced engineer would appreciate maintaini
 Version: 1.0.0
 Status: Active
 
-This document serves as the permanent engineering specification for the Enterprise AI Companion repository.
+This document serves as the permanent engineering specification for the Document-Management-RAG-Graph-Agent repository.
 # graphify
 - **graphify** (`.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
 When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.

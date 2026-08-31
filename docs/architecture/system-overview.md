@@ -8,7 +8,7 @@
 
 # 1. Purpose
 
-The Enterprise AI Companion is a local-first, AI-powered desktop platform designed to help users organize, understand, retrieve, and interact with their digital knowledge.
+The Document-Management-RAG-Graph-Agent is a local-first, AI-powered desktop platform designed to help users organize, understand, retrieve, and interact with their digital knowledge.
 
 Rather than replacing existing file systems or functioning as a conventional chatbot, the platform acts as an intelligent layer above the user's existing documents, notes, media, and structured information.
 
@@ -16,13 +16,13 @@ Its primary objective is to transform disconnected information into an organized
 
 The platform is designed to operate primarily on the user's machine while maintaining an architecture that supports future expansion, including optional cloud services, additional AI providers, and new capabilities without requiring major architectural changes.
 
-This document defines the high-level architecture of the Enterprise AI Companion and serves as the primary architectural reference for all Architecture Decision Records (ADRs), implementation guides, and future architectural documentation.
+This document defines the high-level architecture of the Document-Management-RAG-Graph-Agent and serves as the primary architectural reference for all Architecture Decision Records (ADRs), implementation guides, and future architectural documentation.
 
 ---
 
 # 2. Vision
 
-The Enterprise AI Companion aims to become a long-lived, enterprise-grade personal knowledge platform capable of intelligently understanding and organizing digital information.
+The Document-Management-RAG-Graph-Agent aims to become a long-lived, enterprise-grade personal knowledge platform capable of intelligently understanding and organizing digital information.
 
 The system is designed around the following long-term objectives:
 
@@ -89,7 +89,7 @@ Core functionality should continue operating without requiring continuous intern
 
 # 4. High-Level Architecture
 
-The Enterprise AI Companion is organized as a collection of independent architectural layers.
+The Document-Management-RAG-Graph-Agent is organized as a collection of independent architectural layers.
 
 ```text
                         User
@@ -231,7 +231,7 @@ Technology choices may evolve over time without affecting the overall architectu
 
 # 8. Architectural Principles
 
-The Enterprise AI Companion follows these architectural principles.
+The Document-Management-RAG-Graph-Agent follows these architectural principles.
 
 * Layered Architecture
 * Separation of Concerns
@@ -272,7 +272,7 @@ Future expansion should preserve existing architectural boundaries wherever poss
 
 # 10. Relationship to Other Documents
 
-This document provides the high-level architectural view of the Enterprise AI Companion.
+This document provides the high-level architectural view of the Document-Management-RAG-Graph-Agent.
 
 More detailed architectural decisions are documented separately.
 

@@ -10,7 +10,7 @@
 
 # Purpose
 
-This phase implements the knowledge graph capabilities of the Enterprise AI Companion.
+This phase implements the knowledge graph capabilities of the Document-Management-RAG-Graph-Agent.
 
 The objective is to transform isolated documents into an interconnected network of entities, relationships, concepts, and contextual knowledge that enhances retrieval, reasoning, and AI-assisted workflows.
 

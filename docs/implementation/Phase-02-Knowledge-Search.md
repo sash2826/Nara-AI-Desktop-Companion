@@ -10,7 +10,7 @@
 
 # Purpose
 
-Phase 02 establishes the data persistence layer and hybrid search architecture for the Enterprise AI Companion.
+Phase 02 establishes the data persistence layer and hybrid search architecture for the Document-Management-RAG-Graph-Agent.
 
 The two objectives of this phase are closely coupled: persistent storage makes indexing possible, and indexing makes intelligent search possible. They are implemented sequentially within this phase.
 

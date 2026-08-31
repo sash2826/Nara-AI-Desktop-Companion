@@ -10,7 +10,7 @@
 
 # Purpose
 
-Phase 04 elevates the Enterprise AI Companion from a retrieval-augmented chatbot into a genuinely context-aware AI assistant.
+Phase 04 elevates the Document-Management-RAG-Graph-Agent from a retrieval-augmented chatbot into a genuinely context-aware AI assistant.
 
 Phase 00 established the conversation interface. Phase 01 connected the LLM. Phase 02 built the search and indexing infrastructure. Phase 03 surfaced workspace management in the UI. What is still missing is the intelligence layer that ties them together — the AI currently receives raw retrieved chunks but has no understanding of the user's current context, recent activity, workspace structure, or the quality of retrieved evidence.
 

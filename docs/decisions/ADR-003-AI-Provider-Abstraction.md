@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion relies on artificial intelligence for natural language understanding, semantic search, summarization, document analysis, reasoning, and conversational interactions.
+The Document-Management-RAG-Graph-Agent relies on artificial intelligence for natural language understanding, semantic search, summarization, document analysis, reasoning, and conversational interactions.
 
 The AI ecosystem continues to evolve rapidly, with new providers, models, deployment options, and pricing structures emerging frequently.
 
@@ -22,7 +22,7 @@ The architecture therefore requires a provider-independent approach to AI integr
 
 # Decision
 
-The Enterprise AI Companion will access all AI functionality through a provider abstraction layer.
+The Document-Management-RAG-Graph-Agent will access all AI functionality through a provider abstraction layer.
 
 Business logic, application workflows, and capabilities will interact only with abstract AI interfaces.
 
@@ -197,7 +197,7 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the AI integration strategy for the Enterprise AI Companion.
+This decision establishes the AI integration strategy for the Document-Management-RAG-Graph-Agent.
 
 Future AI providers should integrate through the abstraction layer while preserving existing application behavior.
 

@@ -106,7 +106,7 @@ Items deferred from completed phases. Each entry records what was deferred, why,
 
 ### Volvo/Scandinavian main app design
 **Deferred from:** Phase 08 design session (2026-08-11)  
-**Why:** The user will decide the Volvo/Scandinavian visual direction separately. The main EAC window retains its current dark theme until that decision is made.  
+**Why:** The user will decide the Volvo/Scandinavian visual direction separately. The main Document-Management-RAG-Graph-Agent window retains its current dark theme until that decision is made.  
 **Recommended:** Treat as a dedicated design + implementation phase once direction is confirmed.
 
 ---

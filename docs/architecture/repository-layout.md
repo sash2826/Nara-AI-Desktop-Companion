@@ -8,7 +8,7 @@
 
 # 1. Purpose
 
-This document defines the physical organization of the Enterprise AI Companion repository.
+This document defines the physical organization of the Document-Management-RAG-Graph-Agent repository.
 
 The repository structure is designed to promote maintainability, scalability, modularity, and clear separation of responsibilities.
 
@@ -318,7 +318,7 @@ This document defines the physical organization of the repository.
 
 Additional architectural details are documented separately.
 
-* **System Overview** defines the overall architecture of the Enterprise AI Companion.
+* **System Overview** defines the overall architecture of the Document-Management-RAG-Graph-Agent.
 * **Application Layers** defines the logical layering of the system.
 * **Capability Model** defines the functional organization of the application.
 * **Technology Stack** defines the responsibilities of each technology.

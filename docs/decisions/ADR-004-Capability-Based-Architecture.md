@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion is expected to evolve into a large, modular platform consisting of numerous independent features, including document processing, AI interaction, semantic search, knowledge management, automation, and future extensibility through plugins and additional services.
+The Document-Management-RAG-Graph-Agent is expected to evolve into a large, modular platform consisting of numerous independent features, including document processing, AI interaction, semantic search, knowledge management, automation, and future extensibility through plugins and additional services.
 
 Traditional project structures organized around technical layers or framework-specific directories often become increasingly difficult to maintain as the application grows.
 
@@ -22,7 +22,7 @@ The architecture therefore requires an organizational model that promotes modula
 
 # Decision
 
-The Enterprise AI Companion will adopt a capability-based architecture.
+The Document-Management-RAG-Graph-Agent will adopt a capability-based architecture.
 
 Each major business capability will own its implementation, including its services, domain models, repositories, interfaces, validation, tests, and supporting infrastructure.
 
@@ -188,7 +188,7 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the organizational philosophy of the Enterprise AI Companion.
+This decision establishes the organizational philosophy of the Document-Management-RAG-Graph-Agent.
 
 Future capabilities should follow the same architectural principles while remaining consistent with the existing capability model.
 

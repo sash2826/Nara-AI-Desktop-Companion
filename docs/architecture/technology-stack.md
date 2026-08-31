@@ -8,7 +8,7 @@
 
 # 1. Purpose
 
-This document defines the technologies used by the Enterprise AI Companion and the architectural responsibilities assigned to each.
+This document defines the technologies used by the Document-Management-RAG-Graph-Agent and the architectural responsibilities assigned to each.
 
 The technology stack exists to support the system architecture defined in the System Overview. Technologies are implementation choices, not architectural boundaries.
 
@@ -341,7 +341,7 @@ Future technologies should integrate into the existing architecture without alte
 
 # 17. Relationship to Other Documents
 
-This document defines the implementation technologies supporting the Enterprise AI Companion.
+This document defines the implementation technologies supporting the Document-Management-RAG-Graph-Agent.
 
 Related documentation includes:
 

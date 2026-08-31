@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion integrates multiple technologies, including AI providers, databases, local file systems, OCR engines, search services, plugins, and background processing.
+The Document-Management-RAG-Graph-Agent integrates multiple technologies, including AI providers, databases, local file systems, OCR engines, search services, plugins, and background processing.
 
 Each subsystem may produce failures originating from different sources.
 
@@ -22,7 +22,7 @@ The architecture therefore requires a standardized approach to detecting, propag
 
 # Decision
 
-The Enterprise AI Companion will implement a centralized error handling strategy.
+The Document-Management-RAG-Graph-Agent will implement a centralized error handling strategy.
 
 Errors will be represented using standardized application error types.
 
@@ -231,7 +231,7 @@ This option was selected.
 * More abstraction.
 * Slight increase in implementation complexity.
 
-These trade-offs are acceptable given the architectural goals of the Enterprise AI Companion.
+These trade-offs are acceptable given the architectural goals of the Document-Management-RAG-Graph-Agent.
 
 ---
 
@@ -259,6 +259,6 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the error handling strategy for the Enterprise AI Companion.
+This decision establishes the error handling strategy for the Document-Management-RAG-Graph-Agent.
 
 Future capabilities, integrations, and infrastructure components should adopt the standardized error handling model defined in this document to ensure consistent behavior, maintainability, and user experience across the platform.

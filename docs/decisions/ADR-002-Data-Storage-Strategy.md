@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion manages several distinct categories of information, including structured metadata, semantic embeddings, knowledge relationships, application configuration, and user-generated data.
+The Document-Management-RAG-Graph-Agent manages several distinct categories of information, including structured metadata, semantic embeddings, knowledge relationships, application configuration, and user-generated data.
 
 Each category has different access patterns, storage requirements, and performance characteristics.
 
@@ -22,7 +22,7 @@ The architecture therefore requires a storage strategy that aligns each type of 
 
 # Decision
 
-The Enterprise AI Companion will adopt a polyglot persistence strategy.
+The Document-Management-RAG-Graph-Agent will adopt a polyglot persistence strategy.
 
 Multiple storage technologies will be used, with each technology responsible for a specific category of data.
 
@@ -218,7 +218,7 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the storage architecture of the Enterprise AI Companion.
+This decision establishes the storage architecture of the Document-Management-RAG-Graph-Agent.
 
 Future storage technologies may be introduced or replaced provided they preserve the architectural responsibilities defined in this document.
 

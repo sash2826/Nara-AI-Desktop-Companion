@@ -20,7 +20,7 @@ This phase introduces two complementary mechanisms: an on-demand audit that anal
 
 Upon completion of this phase the application should provide:
 
-* An "Organise" button in the main EAC application that triggers a full indexed-file audit.
+* An "Organise" button in the main Document-Management-RAG-Graph-Agent application that triggers a full indexed-file audit.
 * Batch placement recommendations produced for files whose current location scores poorly against better-matching folders.
 * Passive background suggestions that surface gradually as the knowledge graph evolves.
 * All suggestions delivered through the same orb notification channel and Suggestions inbox established in Phase 09.
@@ -44,7 +44,7 @@ All decisions below were settled during the Phase 08/09/10 grilling session (202
 
 ## On-Demand Audit
 
-The user triggers the audit from a prominent "Organise my files" button in the main EAC app (location TBD during UI design). The audit:
+The user triggers the audit from a prominent "Organise my files" button in the main Document-Management-RAG-Graph-Agent app (location TBD during UI design). The audit:
 
 1. Iterates every `IndexedDocument` in SQLite.
 2. Skips files that already have a pending or recently accepted recommendation.
@@ -58,7 +58,7 @@ The audit runs as a background task so it does not block the UI. Progress is rep
 
 Each time `FileIndexer` completes indexing a file (new or modified), the `RecommendationService` re-evaluates a small random sample of already-indexed files from the same community cluster. If a materially better folder emerges for any sampled file, a suggestion is added to pending.
 
-This is deliberately low-frequency — sampling prevents the background layer from hammering the scoring pipeline. The goal is that over weeks of normal use, EAC gradually surfaces reorganisation opportunities the user did not know to ask for.
+This is deliberately low-frequency — sampling prevents the background layer from hammering the scoring pipeline. The goal is that over weeks of normal use, Document-Management-RAG-Graph-Agent gradually surfaces reorganisation opportunities the user did not know to ask for.
 
 ## Deduplication
 
@@ -109,7 +109,7 @@ frontend/src/...                                    — "Organise" button wired 
 
 * AuditService with configurable score delta threshold.
 * PassiveSuggester integrated into the post-index callback.
-* "Organise" button in the main EAC app triggering the audit as a background task.
+* "Organise" button in the main Document-Management-RAG-Graph-Agent app triggering the audit as a background task.
 * Progress reporting during audit via existing IPC progress mechanism.
 * Deduplication logic preventing duplicate pending recommendations per file.
 * Unified Suggestions inbox showing both new-file and existing-file recommendations.

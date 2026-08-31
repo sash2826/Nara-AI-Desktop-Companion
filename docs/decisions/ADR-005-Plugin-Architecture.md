@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion is designed as a long-lived platform that will continue to evolve with new capabilities, AI providers, integrations, automation workflows, and enterprise features.
+The Document-Management-RAG-Graph-Agent is designed as a long-lived platform that will continue to evolve with new capabilities, AI providers, integrations, automation workflows, and enterprise features.
 
 Embedding every future feature directly into the core application would increase complexity, strengthen coupling between unrelated components, and make long-term maintenance increasingly difficult.
 
@@ -20,7 +20,7 @@ The architecture therefore requires a mechanism that allows functionality to be 
 
 # Decision
 
-The Enterprise AI Companion will adopt a plugin-based extension architecture.
+The Document-Management-RAG-Graph-Agent will adopt a plugin-based extension architecture.
 
 Core application functionality will remain independent of optional features.
 
@@ -187,7 +187,7 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the long-term extensibility strategy of the Enterprise AI Companion.
+This decision establishes the long-term extensibility strategy of the Document-Management-RAG-Graph-Agent.
 
 The initial release may include only internal plugins or extension points. The architecture should nevertheless be designed to support future expansion without requiring significant restructuring of the core application.
 

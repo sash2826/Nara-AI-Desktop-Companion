@@ -11,7 +11,7 @@
 
 # Context
 
-The Enterprise AI Companion separates the presentation layer from the backend application services.
+The Document-Management-RAG-Graph-Agent separates the presentation layer from the backend application services.
 
 The frontend is responsible for user interaction and presentation, while the backend manages business logic, AI orchestration, indexing, search, storage coordination, and other application services.
 
@@ -25,7 +25,7 @@ The architecture therefore requires a standardized communication strategy.
 
 # Decision
 
-The Enterprise AI Companion will use a command-based Inter-Process Communication (IPC) architecture.
+The Document-Management-RAG-Graph-Agent will use a command-based Inter-Process Communication (IPC) architecture.
 
 All communication between the frontend and backend will occur through explicitly defined IPC interfaces.
 
@@ -240,6 +240,6 @@ and is not persisted between application launches.
 
 # Notes
 
-This decision establishes the communication strategy between the frontend and backend of the Enterprise AI Companion.
+This decision establishes the communication strategy between the frontend and backend of the Document-Management-RAG-Graph-Agent.
 
 Future communication mechanisms should preserve the same architectural principles, ensuring that presentation and business logic remain cleanly separated regardless of the underlying transport technology.

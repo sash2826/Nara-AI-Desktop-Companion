@@ -12,7 +12,7 @@
 
 # Purpose
 
-This phase implements the automation capabilities of the Enterprise AI Companion.
+This phase implements the automation capabilities of the Document-Management-RAG-Graph-Agent.
 
 The objective is to enable the application to perform intelligent background work through scheduled tasks, event-driven workflows, user-defined automations, and AI-assisted orchestration.
 
@@ -292,4 +292,4 @@ After completing this phase, proceed to:
 
 **Phase 08: Polish & Release**
 
-The next phase establishes comprehensive test suites, CI quality gates, production builds, cross-platform packaging, and the release automation process that prepares the Enterprise AI Companion for production deployment.
+The next phase establishes comprehensive test suites, CI quality gates, production builds, cross-platform packaging, and the release automation process that prepares the Document-Management-RAG-Graph-Agent for production deployment.

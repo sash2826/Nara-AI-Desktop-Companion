@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion processes user documents, AI provider credentials, application configuration, and other potentially sensitive information.
+The Document-Management-RAG-Graph-Agent processes user documents, AI provider credentials, application configuration, and other potentially sensitive information.
 
 Although the application is designed as a local-first platform, future releases may include cloud synchronization, enterprise deployments, collaboration, and external integrations.
 
@@ -22,7 +22,7 @@ Security must be treated as a cross-cutting architectural concern rather than an
 
 # Decision
 
-The Enterprise AI Companion will implement a layered security architecture.
+The Document-Management-RAG-Graph-Agent will implement a layered security architecture.
 
 Security responsibilities will be distributed across the application through clearly defined security boundaries rather than centralized within a single component.
 
@@ -219,7 +219,7 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the security strategy for the Enterprise AI Companion.
+This decision establishes the security strategy for the Document-Management-RAG-Graph-Agent.
 
 Future authentication providers, authorization models, or deployment environments should integrate with the existing security architecture while preserving consistent security boundaries throughout the application.
 

@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion is intended to operate as a local-first, AI-powered knowledge platform capable of processing and managing large volumes of user data while maintaining a responsive desktop user experience.
+The Document-Management-RAG-Graph-Agent is intended to operate as a local-first, AI-powered knowledge platform capable of processing and managing large volumes of user data while maintaining a responsive desktop user experience.
 
 The architecture requires a desktop solution that:
 
@@ -28,7 +28,7 @@ The chosen desktop architecture must remain maintainable over the long term whil
 
 # Decision
 
-The Enterprise AI Companion will adopt a desktop architecture consisting of:
+The Document-Management-RAG-Graph-Agent will adopt a desktop architecture consisting of:
 
 * A native desktop shell.
 * A web-based presentation layer.
@@ -158,6 +158,6 @@ Future implementation guides should follow these principles.
 
 # Notes
 
-This decision establishes the fundamental architectural structure of the Enterprise AI Companion.
+This decision establishes the fundamental architectural structure of the Document-Management-RAG-Graph-Agent.
 
 Subsequent Architecture Decision Records build upon this decision and should remain consistent with the architectural boundaries established here.

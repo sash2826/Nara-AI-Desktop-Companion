@@ -12,7 +12,7 @@
 
 This phase implements intelligent placement recommendations for files that arrive in the OS Downloads folder.
 
-When a new file lands in Downloads, EAC indexes it automatically, scores every known folder against the file's content using a combined knowledge graph and rerank signal, and presents the top three placement suggestions via the orb notification overlay. If the user accepts a suggestion, EAC physically moves the file to the target folder and updates all internal records without re-indexing.
+When a new file lands in Downloads, Document-Management-RAG-Graph-Agent indexes it automatically, scores every known folder against the file's content using a combined knowledge graph and rerank signal, and presents the top three placement suggestions via the orb notification overlay. If the user accepts a suggestion, Document-Management-RAG-Graph-Agent physically moves the file to the target folder and updates all internal records without re-indexing.
 
 ---
 
@@ -26,7 +26,7 @@ Upon completion of this phase the application should provide:
 * Orb notification prompt delivered via the Phase 08 orb overlay.
 * Physical file move to the accepted folder, with SQLite path and Qdrant record updated in place.
 * Pending recommendations persisted — file stays in Downloads until the user decides.
-* Pending recommendations accessible from the orb notification overlay and from a dedicated inbox inside the main EAC app.
+* Pending recommendations accessible from the orb notification overlay and from a dedicated inbox inside the main Document-Management-RAG-Graph-Agent app.
 * No file is ever moved without explicit user consent.
 
 ---
@@ -46,9 +46,9 @@ All decisions below were settled during the Phase 08/09 grilling session (2026-0
 
 ## Downloads Watch
 
-EAC registers the OS Downloads folder (`%USERPROFILE%\Downloads`) as a watched folder automatically on first launch. It is treated identically to any other watched folder for indexing purposes, with one addition: new files arriving here enter the placement recommendation pipeline instead of being silently indexed.
+Document-Management-RAG-Graph-Agent registers the OS Downloads folder (`%USERPROFILE%\Downloads`) as a watched folder automatically on first launch. It is treated identically to any other watched folder for indexing purposes, with one addition: new files arriving here enter the placement recommendation pipeline instead of being silently indexed.
 
-Existing watched folders do not trigger placement recommendations. Files already in Downloads at the time EAC first watches it do not trigger recommendations (they are handled by Phase 10's on-demand audit).
+Existing watched folders do not trigger placement recommendations. Files already in Downloads at the time Document-Management-RAG-Graph-Agent first watches it do not trigger recommendations (they are handled by Phase 10's on-demand audit).
 
 ## Confidence Scoring Formula
 
@@ -62,7 +62,7 @@ score = 0.70 × graph_score + 0.30 × rerank_score
 
 **rerank_score**: Cross-encoder rerank similarity between the new file's text chunks and the existing document chunks in the candidate folder, using the existing `RerankService`.
 
-Only folders that are already watched and indexed by EAC are considered as candidates.
+Only folders that are already watched and indexed by Document-Management-RAG-Graph-Agent are considered as candidates.
 
 ## Recommendation Presentation
 
@@ -93,7 +93,7 @@ On acceptance:
 
 ## Pending Recommendations
 
-If the user dismisses or ignores a recommendation, it is persisted in a new `file_placement_recommendations` SQLite table with status `pending`. The orb continues to glow amber while any pending recommendations exist. The main EAC app exposes a "Suggestions" inbox listing all pending items.
+If the user dismisses or ignores a recommendation, it is persisted in a new `file_placement_recommendations` SQLite table with status `pending`. The orb continues to glow amber while any pending recommendations exist. The main Document-Management-RAG-Graph-Agent app exposes a "Suggestions" inbox listing all pending items.
 
 ---
 
@@ -136,7 +136,7 @@ backend/.../capabilities/indexing/file_watcher.py   — Hook Downloads new-file 
 backend/.../capabilities/indexing/file_indexer.py   — Pass progress_cb result to RecommendationService for Downloads files
 backend/.../api/app.py                              — Register organisation router; place RecommendationService on app.state
 frontend/src/windows/orb/OrbNotificationOverlay.tsx — Render recommendation list fetched from /organisation/recommendations
-frontend/src/pages/SettingsPage.tsx or new page     — "Suggestions" inbox in main EAC app
+frontend/src/pages/SettingsPage.tsx or new page     — "Suggestions" inbox in main Document-Management-RAG-Graph-Agent app
 ```
 
 ## New Tauri IPC Commands
@@ -170,7 +170,7 @@ list_pending_recommendations()
 * Accepting a recommendation physically moves the file and updates all records.
 * No re-indexing occurs after the move.
 * Dismissing a recommendation leaves the file in Downloads and persists the pending record.
-* Pending count badge in main EAC app reflects unresolved recommendations.
+* Pending count badge in main Document-Management-RAG-Graph-Agent app reflects unresolved recommendations.
 * No file is ever moved without user action.
 
 ---

@@ -18,7 +18,7 @@ interface OrbHandoffPayload {
 /**
  * Invisible component mounted in the main window.
  * Listens for the "orb-handoff" event emitted when the user clicks
- * "Open in EAC" in the orb overlay, then injects the Q&A pair into
+ * "Open in Chat" in the orb overlay, then injects the Q&A pair into
  * the conversation store and navigates to the Chat page.
  *
  * Sources from the orb are mapped to CitationMeta so the existing

@@ -1656,7 +1656,7 @@ fn create_orb_window(app: &tauri::App) {
     };
 
     match WebviewWindowBuilder::new(app, "orb", WebviewUrl::App("index.html".into()))
-        .title("EAC Orb")
+        .title("Document-Management-RAG-Graph-Agent Orb")
         .inner_size(440.0, 660.0)
         .resizable(false)
         .always_on_top(true)

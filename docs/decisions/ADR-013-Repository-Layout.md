@@ -43,7 +43,7 @@ requiring a formal decision before Phase 01 continued.
 # Decision
 
 The `frontend/` / `backend/` flat layout is accepted as the canonical layout for
-Version 1 of the Enterprise AI Companion.
+Version 1 of the Document-Management-RAG-Graph-Agent.
 
 The `docs/architecture/repository-layout.md` document will be updated to reflect
 this layout.

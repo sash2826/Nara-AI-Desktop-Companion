@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion requires configuration for AI providers, databases, application behavior, user preferences, feature flags, logging, plugin settings, and future integrations.
+The Document-Management-RAG-Graph-Agent requires configuration for AI providers, databases, application behavior, user preferences, feature flags, logging, plugin settings, and future integrations.
 
 Configuration values will differ across environments, users, and deployments.
 
@@ -22,7 +22,7 @@ The architecture therefore requires a centralized configuration strategy.
 
 # Decision
 
-The Enterprise AI Companion will implement centralized configuration management.
+The Document-Management-RAG-Graph-Agent will implement centralized configuration management.
 
 Configuration will be accessed exclusively through dedicated configuration services.
 
@@ -235,7 +235,7 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the configuration strategy for the Enterprise AI Companion.
+This decision establishes the configuration strategy for the Document-Management-RAG-Graph-Agent.
 
 Future configuration sources or deployment environments should integrate through the centralized configuration service while preserving consistent application behavior.
 

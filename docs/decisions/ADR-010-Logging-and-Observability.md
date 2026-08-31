@@ -10,7 +10,7 @@
 
 # Context
 
-The Enterprise AI Companion consists of multiple capabilities responsible for document processing, AI integration, indexing, semantic search, storage coordination, background processing, and user interaction.
+The Document-Management-RAG-Graph-Agent consists of multiple capabilities responsible for document processing, AI integration, indexing, semantic search, storage coordination, background processing, and user interaction.
 
 As the application grows, identifying failures, diagnosing unexpected behavior, monitoring system health, and understanding application performance become increasingly important.
 
@@ -22,7 +22,7 @@ The architecture therefore requires a standardized approach to logging and obser
 
 # Decision
 
-The Enterprise AI Companion will implement a centralized observability strategy.
+The Document-Management-RAG-Graph-Agent will implement a centralized observability strategy.
 
 Application components will emit structured logs through a common logging service.
 
@@ -246,6 +246,6 @@ Implementation should ensure that:
 
 # Notes
 
-This decision establishes the observability strategy for the Enterprise AI Companion.
+This decision establishes the observability strategy for the Document-Management-RAG-Graph-Agent.
 
 Future monitoring systems, diagnostic tools, or enterprise observability platforms should integrate through the centralized observability architecture while preserving consistent logging behavior across all application capabilities.
