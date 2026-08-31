@@ -87,7 +87,7 @@ export interface ConversationCallbacks {
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
 
-const NARA_TOOLS: ToolDefinition[] = [
+const AGENT_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
@@ -232,7 +232,7 @@ export class ConversationService {
           signal,
           history: combinedHistory.length > 0 ? combinedHistory : undefined,
           systemMessage,
-          tools: NARA_TOOLS,
+          tools: AGENT_TOOLS,
         });
 
         for await (const chunk of stream) {

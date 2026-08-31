@@ -84,7 +84,7 @@ export function LivingOrb({
     <OrbContainer x={x} y={y} className={className}>
       <button
         type="button"
-        aria-label="Nara"
+        aria-label="Document-Management-RAG-Graph-Agent"
         data-orb-state={orbState}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}

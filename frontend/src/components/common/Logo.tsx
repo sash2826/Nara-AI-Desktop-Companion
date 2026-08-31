@@ -14,7 +14,7 @@ export function Logo({ collapsed = false, className }: LogoProps) {
       {!collapsed && (
         <div className="flex min-w-0 flex-col leading-none">
           <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-            Nara
+            Document-Management-RAG-Graph-Agent
           </span>
           <span className="mt-0.5 truncate text-2xs text-muted-foreground">
             Your workspace, within reach.

@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Nara",
+        "title": "Document-Management-RAG-Graph-Agent",
         "width": 1280,
         "height": 800,
         "minWidth": 960,

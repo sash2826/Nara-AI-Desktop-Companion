@@ -158,7 +158,7 @@ export function PromptComposer({
         <p className="pb-2 text-center text-2xs text-muted-foreground/50">
           {model && <span className="font-medium text-muted-foreground/70">{model}</span>}
           {model && " · "}
-          Nara can make mistakes — verify important information.
+          Document-Management-RAG-Graph-Agent can make mistakes — verify important information.
         </p>
       </div>
     </div>

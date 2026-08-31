@@ -17,7 +17,9 @@ describe("LivingOrb", () => {
 
   it("has the expected accessible label", () => {
     renderOrb();
-    expect(screen.getByRole("button", { name: "Nara" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Document-Management-RAG-Graph-Agent" })
+    ).toBeInTheDocument();
   });
 
   // ── OrbState CSS classes ───────────────────────────────────────────────────

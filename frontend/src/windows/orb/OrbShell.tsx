@@ -340,7 +340,7 @@ export function OrbShell() {
         {/* The draggable orb button */}
         <button
           type="button"
-          aria-label="Nara"
+          aria-label="Document-Management-RAG-Graph-Agent"
           data-orb-state={animationState}
           onMouseDown={handleMouseDown}
           onClick={handleClick}
