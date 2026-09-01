@@ -90,7 +90,7 @@ Document-Management-RAG-Graph-Agent watches the OS Downloads folder automaticall
 
 For existing indexed files, an on-demand "Organise" audit and a passive background suggester surface reorganisation opportunities over time using the same scoring formula.
 
-## Phase Roadmap (as of 2026-08-18)
+## Phase Roadmap (as of 2026-09-01)
 
 | Phase    | Name                               | Status    |
 | -------- | ---------------------------------- | --------- |
@@ -101,6 +101,8 @@ For existing indexed files, an on-demand "Organise" audit and a passive backgrou
 | 10       | File Organisation — Existing Files | Complete  |
 | 07       | Automation Engine                  | Deferred — under review |
 | 11       | Polish & Release                   | Planned   |
+
+> **Phase 10 — Clustering UI:** The intelligent folder-discovery backend (cluster pipeline, scoring, REST API, proposal storage) is complete and tested. The UI is intentionally hidden (`CLUSTER_UI_ENABLED = false` in `OrganiseTab.tsx`) pending final folder-naming quality validation. Re-enable by flipping that flag.
 
 ---
 

@@ -2,9 +2,13 @@
 
 **Phase:** 10
 
-**Status:** Planned
+**Status:** Complete
 
-**Estimated Duration:** 3–5 Days
+**Completed:** 2026-08-18
+
+---
+
+> **Clustering UI note:** Scenario 3 (Intelligent Folder Discovery) is fully implemented in the backend — the clustering pipeline, proposal repository, REST endpoints, and scoring are all production-ready. The UI surface (Discover Folders button and Folder Proposals list in the Organise tab) is **hidden** pending final folder-naming quality validation. Set `CLUSTER_UI_ENABLED = true` in `frontend/src/components/workspace/OrganiseTab.tsx` to re-enable it.
 
 ---
 

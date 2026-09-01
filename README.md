@@ -12,6 +12,8 @@ An AI-powered desktop platform for the Volvo Group that helps users understand, 
 - **Semantic Search** — hybrid keyword + vector search across all indexed documents.
 - **AI Chat** — conversational interface grounded in your document library.
 
+> **Note — Intelligent Folder Discovery (Clustering):** The backend pipeline for automatic folder discovery is fully implemented (Phase 10 Scenario 3). It uses agglomerative clustering over document embeddings and knowledge-graph entity overlap to propose new folders for unorganised floating files. The feature is **hidden in the UI** pending final folder-naming quality validation. To re-enable it set `CLUSTER_UI_ENABLED = true` in [OrganiseTab.tsx](frontend/src/components/workspace/OrganiseTab.tsx). The REST API endpoints remain active at `POST /organisation/clusters/discover` and `GET /organisation/clusters/proposals`.
+
 ---
 
 ## Architecture

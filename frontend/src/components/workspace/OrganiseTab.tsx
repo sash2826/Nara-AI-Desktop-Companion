@@ -34,6 +34,10 @@ import {
 
 const SKIP_ALL_KEY = "__all__";
 
+// Cluster folder-discovery UI is complete in the backend but pending final
+// naming-quality validation before user-facing release. Set to true to re-enable.
+const CLUSTER_UI_ENABLED = false as const;
+
 /** A recommendation whose top match is too weak to file under a folder heading. */
 function isNeedsReview(rec: PendingRecommendation): boolean {
   const top = rec.candidates[0];
@@ -461,23 +465,25 @@ export function OrganiseTab() {
             )}
             Organise
           </button>
-          <button
-            onClick={() => void handleDiscover()}
-            disabled={discovering}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-xs font-semibold transition-colors",
-              discovering
-                ? "opacity-60 cursor-not-allowed text-muted-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            )}
-          >
-            {discovering ? (
-              <Loader2 size={13} className="animate-spin" strokeWidth={2} />
-            ) : (
-              <FolderPlus size={13} strokeWidth={1.5} />
-            )}
-            Discover folders
-          </button>
+          {CLUSTER_UI_ENABLED && (
+            <button
+              onClick={() => void handleDiscover()}
+              disabled={discovering}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-xs font-semibold transition-colors",
+                discovering
+                  ? "opacity-60 cursor-not-allowed text-muted-foreground"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              )}
+            >
+              {discovering ? (
+                <Loader2 size={13} className="animate-spin" strokeWidth={2} />
+              ) : (
+                <FolderPlus size={13} strokeWidth={1.5} />
+              )}
+              Discover folders
+            </button>
+          )}
           <button
             onClick={() => void handleRefresh()}
             disabled={refreshing}
@@ -670,7 +676,9 @@ export function OrganiseTab() {
           </div>
         ) : (
           <div className="flex flex-col gap-5">
-            {recommendations.length === 0 && clusterProposals.length === 0 && !auditRunning ? (
+            {recommendations.length === 0 &&
+            (!CLUSTER_UI_ENABLED || clusterProposals.length === 0) &&
+            !auditRunning ? (
               <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
                 <PackageSearch size={32} strokeWidth={1} className="text-muted-foreground/50" />
                 <div className="space-y-1">
@@ -681,10 +689,7 @@ export function OrganiseTab() {
                 </div>
               </div>
             ) : (
-              <OrganiseDashboard
-                recommendations={recommendations}
-                clusterProposalCount={clusterProposals.length}
-              />
+              <OrganiseDashboard recommendations={recommendations} />
             )}
 
             <div className="flex flex-col gap-2">
@@ -702,7 +707,7 @@ export function OrganiseTab() {
               </p>
             </div>
 
-            {clusterProposals.length > 0 && (
+            {CLUSTER_UI_ENABLED && clusterProposals.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <FolderPlus size={13} strokeWidth={1.5} />

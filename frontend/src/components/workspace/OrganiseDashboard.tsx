@@ -1,24 +1,20 @@
-import { FolderPlus, PackageSearch, ShieldQuestion, Sparkles } from "lucide-react";
+import { PackageSearch, ShieldQuestion, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PendingRecommendation } from "@/services/ipc/IPCClient";
 import { CONFIDENT_THRESHOLD, LOW_CONFIDENCE_THRESHOLD } from "@/windows/orb/recommendationGroups";
 
 interface OrganiseDashboardProps {
   recommendations: PendingRecommendation[];
-  clusterProposalCount: number;
 }
 
-export function OrganiseDashboard({
-  recommendations,
-  clusterProposalCount,
-}: OrganiseDashboardProps) {
+export function OrganiseDashboard({ recommendations }: OrganiseDashboardProps) {
   const total = recommendations.length;
   const topScores = recommendations.map((rec) => rec.candidates[0]?.score ?? 0);
   const confident = topScores.filter((s) => s >= CONFIDENT_THRESHOLD).length;
   const needsReview = topScores.filter((s) => s < LOW_CONFIDENCE_THRESHOLD).length;
 
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       <StatTile
         icon={<PackageSearch size={14} strokeWidth={1.5} />}
         value={total}
@@ -35,12 +31,6 @@ export function OrganiseDashboard({
         value={needsReview}
         label="Needs review"
         tone="muted"
-      />
-      <StatTile
-        icon={<FolderPlus size={14} strokeWidth={1.5} />}
-        value={clusterProposalCount}
-        label={`Folder proposal${clusterProposalCount !== 1 ? "s" : ""}`}
-        tone={clusterProposalCount > 0 ? "default" : "muted"}
       />
     </div>
   );
