@@ -57,6 +57,7 @@ class ClusterScorer:
         self,
         doc_ids: list[str],
         vectors: dict[str, list[float]],
+        file_paths: dict[str, str] | None = None,
     ) -> list[list[float]]:
         """Return an N×N symmetric distance matrix for the supplied documents.
 
@@ -74,7 +75,7 @@ class ClusterScorer:
             return []
 
         # Fetch all canonical entity sets in parallel.
-        entity_sets = await self._fetch_entity_sets(doc_ids)
+        entity_sets = await self._fetch_entity_sets(doc_ids, file_paths or {})
 
         # Build the matrix. Only compute the upper triangle; mirror to lower.
         matrix = [[0.0] * n for _ in range(n)]
@@ -94,13 +95,16 @@ class ClusterScorer:
     # ------------------------------------------------------------------
 
     async def _fetch_entity_sets(
-        self, doc_ids: list[str]
+        self,
+        doc_ids: list[str],
+        file_paths: dict[str, str],
     ) -> dict[str, frozenset[str]]:
         """Fetch canonical entity sets for all documents."""
         result: dict[str, frozenset[str]] = {}
         for doc_id in doc_ids:
             try:
-                canonicals = await self._graph.get_canonicals_for_document(doc_id)
+                fp = file_paths.get(doc_id, "")
+                canonicals = await self._graph.get_canonicals_for_document(doc_id, fp)
                 result[doc_id] = frozenset(canonicals)
             except Exception as exc:
                 logger.warning(

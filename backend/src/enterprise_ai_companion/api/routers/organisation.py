@@ -254,7 +254,7 @@ async def discover_clusters(request: Request) -> dict[str, Any]:
     try:
         new_proposals = await svc.discover_proposals()
     except Exception as exc:
-        logger.error("[CLUSTER-API] discover_proposals failed: %s", exc)
+        logger.error("[CLUSTER-API] discover_proposals failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Cluster discovery failed") from exc
 
     return {

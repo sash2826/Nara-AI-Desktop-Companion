@@ -104,7 +104,9 @@ class ClusterDiscoveryService:
         )
 
         vectors = await self._vectors.get_vectors(doc_ids)
-        distance_matrix = await self._scorer.compute_distance_matrix(doc_ids, vectors)
+        distance_matrix = await self._scorer.compute_distance_matrix(
+            doc_ids, vectors, file_paths=file_paths_by_id
+        )
         raw_clusters = self._engine.cluster(doc_ids, distance_matrix)
 
         logger.info(
@@ -126,7 +128,9 @@ class ClusterDiscoveryService:
                 continue
 
             name = await self._naming.name_cluster(
-                cluster_doc_ids, existing_folder_samples=folder_samples
+                cluster_doc_ids,
+                existing_folder_samples=folder_samples,
+                file_paths=file_paths_by_id,
             )
             file_paths = [
                 file_paths_by_id[doc_id]

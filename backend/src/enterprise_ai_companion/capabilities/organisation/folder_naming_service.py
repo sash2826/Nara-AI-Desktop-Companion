@@ -79,6 +79,7 @@ class FolderNamingService:
         self,
         doc_ids: list[str],
         existing_folder_samples: list[str] | None = None,
+        file_paths: dict[str, str] | None = None,
     ) -> str:
         """Return a short proposed folder name for the given document cluster.
 
@@ -87,12 +88,14 @@ class FolderNamingService:
             existing_folder_samples: Optional list of existing folder names from
                 the workspace, passed to the LLM for stylistic consistency
                 (ignored when ``llm_enabled=False``).
+            file_paths: Optional mapping of doc_id → absolute file path, used
+                for filename-keyword supplementation when entity sets are sparse.
 
         Returns:
             A sanitized, title-cased folder name. Falls back to
             ``"New Folder"`` when no useful entities are found.
         """
-        top_entities = await self._top_entities(doc_ids)
+        top_entities = await self._top_entities(doc_ids, file_paths or {})
 
         if self._llm_enabled and top_entities:
             try:
@@ -118,12 +121,17 @@ class FolderNamingService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _top_entities(self, doc_ids: list[str]) -> list[str]:
+    async def _top_entities(
+        self,
+        doc_ids: list[str],
+        file_paths: dict[str, str],
+    ) -> list[str]:
         """Return the top ``_TOP_ENTITY_COUNT`` entities by document frequency."""
         counts: Counter[str] = Counter()
         for doc_id in doc_ids:
             try:
-                entities = await self._graph.get_canonicals_for_document(doc_id)
+                fp = file_paths.get(doc_id, "")
+                entities = await self._graph.get_canonicals_for_document(doc_id, fp)
                 for entity in entities:
                     counts[entity] += 1
             except Exception as exc:
